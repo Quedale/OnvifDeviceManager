@@ -9,7 +9,8 @@ struct DiscoveredServer udp_discover() {
     char buffer[MAXLINE]; 
     char *envelop; 
     struct sockaddr_in     servaddr; 
-    
+    struct DiscoveredServer server;
+
     //TODO Use generated uuid
     envelop="<soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:wsa=\"http://schemas.xmlsoap.org/ws/2004/08/addressing\" xmlns:wsd=\"http://schemas.xmlsoap.org/ws/2005/04/discovery\">\n" \
           "              <soap:Header>\n" \
@@ -57,7 +58,14 @@ struct DiscoveredServer udp_discover() {
                 MSG_WAITALL, (struct sockaddr *) &servaddr, 
                 &len); 
     buffer[n] = '\0'; 
-    struct DiscoveredServer server = parse_soap_msg(buffer);
+
+    if (strlen(buffer) > 0){
+        server = parse_soap_msg(buffer);
+    } else {
+        server.msg_uuid = "";
+        server.relate_uuid = "";
+        server.match_count = 0;
+    }
 
     close(sockfd); 
     return server; 

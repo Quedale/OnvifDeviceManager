@@ -2,8 +2,6 @@
 #ifndef SOAP_PARSER_H_   /* Include guard */
 #define SOAP_PARSER_H_
 
-#include <expat.h>
-
 
 struct ProbMatch {
     char *prob_uuid;
