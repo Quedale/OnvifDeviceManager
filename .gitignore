@@ -1,0 +1,14 @@
+.deps
+autom4te.cache
+build
+*.log
+compile
+config.status
+configure
+depcomp
+aclocal.m4
+install-sh
+Makefile
+Makefile.in
+missing
+src/generated
