@@ -57,9 +57,11 @@ struct DiscoveredServer udp_discover() {
     n = recvfrom(sockfd, (char *)buffer, MAXLINE,  
                 MSG_WAITALL, (struct sockaddr *) &servaddr, 
                 &len); 
-    buffer[n] = '\0'; 
 
-    if (strlen(buffer) > 0){
+    if (strlen(buffer) > 6){
+        printf("buffer print %li\n",strlen(buffer));
+        printf("buffer : \"%s\"\n",buffer);
+        buffer[n] = '\0'; 
         server = parse_soap_msg(buffer);
     } else {
         server.msg_uuid = "";

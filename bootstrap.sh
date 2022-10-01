@@ -4,6 +4,13 @@ sudo apt install libxml2-dev libgtk-3-dev
 echo "-- installing gsoap libgsoap-dev --"
 sudo apt install gsoap libgsoap-dev
 
+echo "-- installing Gstreamer dependencies --"
+sudo apt install libgstreamer1.0-dev #client
+sudo apt install sudo apt-get install gstreamer1.0-libav #H264 decoder
+sudo apt install gstreamer1.0-pulseaudio #pulsesink for client
+sudo apt install libgstrtspserver-1.0-dev #server
+sudo apt install gstreamer1.0-plugins-ugly #x264enc for server
+
 aclocal
 autoconf
 automake --add-missing

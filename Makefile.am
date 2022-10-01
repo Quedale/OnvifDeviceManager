@@ -1,8 +1,22 @@
 AUTOMAKE_OPTIONS = foreign
-bin_PROGRAMS = guitest soaptest
+bin_PROGRAMS = guitest soaptest onvifclient onvifserver
 guitest_SOURCES = gui-test.c
 soaptest_SOURCES = soap-test.c
+onvifclient_SOURCES = onvif-client.c
+onvifserver_SOURCES = onvif-server.c
 
+onvifserver$(EXEEXT):
+	@echo "Compiling onvif-server..."
+	@mkdir -p build
+	@gcc `pkg-config --cflags gstreamer-rtsp-server-1.0` src/onvif-server.c \
+		-o build/onvif-server `pkg-config --libs gstreamer-rtsp-server-1.0`
+
+
+onvifclient$(EXEEXT):
+	@echo "Compiling onvif-client..."
+	@mkdir -p build
+	@gcc `pkg-config --cflags gstreamer-1.0` src/onvif-client.c \
+		-o build/onvif-client `pkg-config --libs gstreamer-1.0`
 
 soaptest$(EXEEXT):
 	@echo "Compiling soap-test..."
