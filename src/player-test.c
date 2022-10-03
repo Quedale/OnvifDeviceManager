@@ -49,23 +49,18 @@ static void delete_event_cb (GtkWidget *widget, GdkEvent *event, OnvifPlayer *da
 void row_selected_cb (GtkWidget *widget,   GtkListBoxRow* row,
   OnvifPlayer* player)
 {
-    // int* number;
-    // number = (int*)user_data;
-    // printf("Number: %ls\n", number);
     
     int pos;
     pos = gtk_list_box_row_get_index (GTK_LIST_BOX_ROW (row));
     
     OnvifDevice dev = player->onvifDeviceList->devices[pos];
-    printf("dev %s\n",dev.hostname);
     
     /* Set the URI to play */
-    OnvifPlayer__set_playback_url(player,"https://www.freedesktop.org/software/gstreamer-sdk/data/media/sintel_trailer-480p.webm");
+    char * uri = OnvifDevice__media_getStreamUri(&dev);
+
+    OnvifPlayer__set_playback_url(player,uri);
 
     OnvifPlayer__play(player);
-
-    // set_playback_url("https://www.freedesktop.org/software/gstreamer-sdk/data/media/sintel_trailer-480p.webm");
-    // g_idle_add(add_player, pos);
     
 }
 
@@ -75,6 +70,8 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   GtkWidget *row, *handle, *box, *label, *image;
 
   OnvifDevice dev = OnvifDevice__create(m->addr);
+  printf("prtinging endpoint3\n");
+  printf("endpoint3 %s\n",dev.media_soap->endpoint);
 
   OnvifDeviceList__insert_element(player->onvifDeviceList,dev,player->onvifDeviceList->device_count);
   int b;

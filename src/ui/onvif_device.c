@@ -11,13 +11,9 @@ OnvifCapabilities* OnvifDevice__device_getCapabilities(OnvifDevice* self) {
     memset (&response, 0, sizeof (response));
     OnvifCapabilities* capabilities = (OnvifCapabilities *) malloc(sizeof(OnvifCapabilities));
     
-    printf("soap call\n");
     if (soap_call___tds__GetCapabilities(self->device_soap->soap, self->device_soap->endpoint, "", &gethostname,  &response) == SOAP_OK){
-        printf("allocate\n");
         OnvifMedia* media =  (OnvifMedia *) malloc(sizeof(OnvifMedia));
-        printf("set xaddr\n");
         media->xaddr = response.Capabilities->Media->XAddr;
-        printf("set media\n");
         capabilities->media = media;
     } else {
         soap_print_fault(self->device_soap->soap, stderr);
@@ -45,13 +41,25 @@ char * OnvifDevice__device_getHostname(OnvifDevice* self) {
     return "error";
 }
 
+void * OnvifDevice__media_getStreamUri(OnvifDevice* self){
+    struct _trt__GetStreamUri req; //trt__GetStreamUri
+    struct _trt__GetStreamUriResponse resp; //trt__GetStreamUriResponse
+    memset (&req, 0, sizeof (req));
+    memset (&resp, 0, sizeof (resp));
+    
+    if (soap_call___trt__GetStreamUri(self->media_soap->soap, self->media_soap->endpoint, "", &req, &resp) == SOAP_OK){
+        return resp.MediaUri->Uri;
+    } else {
+        soap_print_fault(self->device_soap->soap, stderr);
+    }
+    //TODO error handling timout, invalid url, etc...
+    return "error";
+}
+
 void OnvifDevice__init(OnvifDevice* self, char * device_url) {
-    printf("creating device soap");
     self->device_soap = OnvifSoapClient__create(device_url);
-    printf("gegtting hosthame \n");
     self->hostname = OnvifDevice__device_getHostname(self);
-    // self->capabilities = OnvifSoapClient__getCapabilities(self->device_soap);
-  
+
     self->media_soap = OnvifDevice__device_getMediaSoap(self);
 }
 

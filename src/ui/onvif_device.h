@@ -25,5 +25,6 @@ OnvifDevice OnvifDevice__create(char * device_url);
 void OnvifDevice__destroy(OnvifDevice* device); 
 // char * OnvifDevice__device_getHostname(OnvifDevice* self);  // equivalent to "point->x()"
 // OnvifCapabilities* OnvifDevice__device_getCapabilities(OnvifDevice* self);
+void * OnvifDevice__media_getStreamUri(OnvifDevice* self);
 
 #endif
