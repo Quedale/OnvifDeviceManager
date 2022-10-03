@@ -1,13 +1,9 @@
 #ifndef ONVIF_LIST_H_ 
 #define ONVIF_LIST_H_
 
-#include "../soap/client.h"
+#include "onvif_device.h"
 #include <stdlib.h>
 
-// Header
-typedef struct {
-  char * hostname;
-} OnvifDevice;
 
 typedef struct {
   int device_count;

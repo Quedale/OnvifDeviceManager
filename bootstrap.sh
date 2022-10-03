@@ -6,14 +6,35 @@ sudo apt install gsoap libgsoap-dev
 
 echo "-- installing Gstreamer dependencies --"
 sudo apt install libgstreamer1.0-dev #client
-sudo apt install sudo apt-get install gstreamer1.0-libav #H264 decoder
+sudo apt install gstreamer1.0-libav #H264 decoder
 sudo apt install gstreamer1.0-pulseaudio #pulsesink for client
 sudo apt install libgstrtspserver-1.0-dev #server
 sudo apt install gstreamer1.0-plugins-ugly #x264enc for server
 
+#For some reason, the backchannel server doesn't work out of the apt package.
+#Setup from source
+#git clone https://gitlab.freedesktop.org/gstreamer/cerbero.git
+#cerbero/cerbero-uninstalled bootstrap
+#cervero/cerbero-uninstalled package gstreamer-1.0
+# PKG_CONFIG_PATH=/home/quedale/git/cerbero/build/dist/linux_x86_64/lib/pkgconfig
 aclocal
 autoconf
 automake --add-missing
+
+#WSL Video (Assuming the host is setup)
+#echo $'\n\nexport DISPLAY=$(cat /etc/resolv.conf | grep nameserver | awk \'{print $2}\'):0\n' >> ~/.bashrc
+#echo "dbus_status=$(service dbus status)"  >> ~/.bashrc
+#echo "if [[ $dbus_status = *\"is not running\"* ]]; then"  >> ~/.bashrc
+#echo "  sudo service dbus --full-restart"  >> ~/.bashrc
+#echo "fi"  >> ~/.bashrc
+#source ~/.bashrc
+
+#WSL Audio (Assuming the host is setup)
+#sudo add-apt-repository ppa:therealkenc/wsl-pulseaudio
+#sudo apt update
+#echo $'\n'"export HOST_IP=\"\$(ip route |awk '/^default/{print \$3}')\""  >> ~/.bashrc
+#echo "export PULSE_SERVER=\"tcp:\$HOST_IP\""  >> ~/.bashrc
+
 
 #TODO extract http://docs.oasis-open.org/wsn/b-2.xsd
 #               http://docs.oasis-open.org/wsrf/bf-2.xsd

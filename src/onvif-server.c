@@ -148,17 +148,17 @@ main (int argc, char *argv[])
     * that be used to map uri mount points to media factories */
     mounts = gst_rtsp_server_get_mount_points (server);
 
-    asprintf(&strbin, "( videotestsrc ! video/x-raw,width=%i,height=%i,framerate=%i/1,format=YUY2 ! videoconvert ! %s ! video/x-h264,profile=main ! rtph264pay name=pay0 pt=96 )",
-        arguments.width,
-        arguments.height,
-        arguments.fps,
-        arguments.encoder); 
-
-    //    asprintf(&strbin, "( videotestsrc ! video/x-raw,width=%i,height=%i,framerate=%i/1,format=YUY2 ! videoconvert ! %s ! video/x-h264,profile=main ! rtph264pay name=pay0 pt=96 audiotestsrc is-live=true ! mulawenc ! rtppcmupay name=pay1 )",
+    // asprintf(&strbin, "( videotestsrc ! video/x-raw,width=%i,height=%i,framerate=%i/1,format=YUY2 ! videoconvert ! %s ! video/x-h264,profile=main ! rtph264pay name=pay0 pt=96 )",
     //     arguments.width,
     //     arguments.height,
     //     arguments.fps,
     //     arguments.encoder); 
+
+    asprintf(&strbin, "( videotestsrc ! video/x-raw,width=%i,height=%i,framerate=%i/1,format=YUY2 ! videoconvert ! %s ! video/x-h264,profile=main ! rtph264pay name=pay0 pt=96 audiotestsrc is-live=true ! mulawenc ! rtppcmupay name=pay1 )",
+        arguments.width,
+        arguments.height,
+        arguments.fps,
+        arguments.encoder); 
 
     // asprintf(&strbin, "( v4l2src device=%s ! video/x-raw,width=%i,height=%i,framerate=%i/1,format=YUY2 ! videoconvert ! %s ! video/x-h264,profile=main ! rtph264pay name=pay0 pt=96 audiotestsrc is-live=true ! mulawenc ! rtppcmupay name=pay1 )",
     //     arguments.vdev,

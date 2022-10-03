@@ -91,8 +91,8 @@ main (int argc, char *argv[])
   loop = g_main_loop_new (NULL, FALSE);
 
   pipeline = gst_parse_launch ("rtspsrc backchannel=onvif debug=true name=r "
-      "r. ! queue ! decodebin ! queue ! autovideosink async=false "
-      "r. ! queue ! decodebin ! queue ! autoaudiosink async=false ", NULL);
+      "r. ! queue ! decodebin ! queue ! autovideosink "
+      "r. ! queue ! decodebin ! queue ! autoaudiosink ", NULL);
   if (!pipeline)
     g_error ("Failed to parse pipeline");
 
