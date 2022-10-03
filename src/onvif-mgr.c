@@ -70,8 +70,6 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   GtkWidget *row, *handle, *box, *label, *image;
 
   OnvifDevice dev = OnvifDevice__create(m->addr);
-  printf("prtinging endpoint3\n");
-  printf("endpoint3 %s\n",dev.media_soap->endpoint);
 
   OnvifDeviceList__insert_element(player->onvifDeviceList,dev,player->onvifDeviceList->device_count);
   int b;
@@ -151,11 +149,13 @@ void create_ui (OnvifPlayer* player) {
   GtkWidget *widget;
   // GtkWidget *listbox;
   GtkWidget *label;
+  GtkWidget *frame;
+  GtkWidget *canvas;
   
   main_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
   g_signal_connect (G_OBJECT (main_window), "delete-event", G_CALLBACK (delete_event_cb), player);
 
-  gtk_window_set_title (GTK_WINDOW (main_window), "Window");
+  gtk_window_set_title (GTK_WINDOW (main_window), "Onvif Device Manager");
   gtk_container_set_border_width (GTK_CONTAINER (main_window), 10);
 
   /* Here we construct the container that is going pack our buttons */
@@ -195,14 +195,31 @@ void create_ui (OnvifPlayer* player) {
   gtk_widget_set_size_request(widget,20,-1);
   gtk_grid_attach (GTK_GRID (grid), widget, 1, 0, 1, 3);
 
-  widget = gtk_drawing_area_new ();
-  gtk_widget_set_double_buffered (widget, FALSE);
-
+  /* Create a new notebook, place the position of the tabs */
+  widget = gtk_notebook_new ();
+  gtk_notebook_set_tab_pos (GTK_NOTEBOOK (widget), GTK_POS_TOP);
   gtk_widget_set_vexpand (widget, TRUE);
   gtk_widget_set_hexpand (widget, TRUE);
   gtk_grid_attach (GTK_GRID (grid), widget, 2, 0, 1, 3);
 
-  OnvifPlayer__set_canvas(player,widget);
+
+  canvas = gtk_drawing_area_new ();
+  gtk_widget_set_double_buffered (canvas, FALSE);
+  gtk_widget_set_vexpand (canvas, TRUE);
+  gtk_widget_set_hexpand (canvas, TRUE);
+
+  OnvifPlayer__set_canvas(player,canvas);
+
+  char * TITLE_STR = "NVT";
+  label = gtk_label_new (TITLE_STR);
+  gtk_notebook_append_page (GTK_NOTEBOOK (widget), canvas, label);
+
+  TITLE_STR = "Info";
+  frame = gtk_frame_new (TITLE_STR);
+  label = gtk_label_new (TITLE_STR);
+  gtk_container_add (GTK_CONTAINER (frame), label);
+  label = gtk_label_new (TITLE_STR);
+  gtk_notebook_append_page (GTK_NOTEBOOK (widget), frame, label);
 
   gtk_window_set_default_size(GTK_WINDOW(main_window),640,480);
   gtk_widget_show_all (main_window);

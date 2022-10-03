@@ -1,13 +1,13 @@
 AUTOMAKE_OPTIONS = foreign
-bin_PROGRAMS = soaptest onvifclient onvifserver gstplayer
+bin_PROGRAMS = soaptest onvifclient onvifserver onvifmgr
 soaptest_SOURCES = soap-test.c
 onvifclient_SOURCES = onvif-client.c
 onvifserver_SOURCES = onvif-server.c
-gstplayer_SOURCES = player-test.c
+onvifmgr_SOURCES = onvif-mgr.c
 
 
-gstplayer$(EXEEXT):
-	@echo "Compiling gstplayer..."
+onvifmgr$(EXEEXT):
+	@echo "Compiling onvif-mgr..."
 	@mkdir -p build
 	@gcc \
 		`pkg-config --cflags gstreamer-rtsp-server-1.0` \
@@ -15,7 +15,7 @@ gstplayer$(EXEEXT):
 		`pkg-config --cflags gtk+-3.0` \
 		`pkg-config --cflags libxml-2.0` \
 		`pkg-config --cflags gsoap` \
-		src/player-test.c \
+		src/onvif-mgr.c \
 		src/gst2/player.c \
 		src/udp/discovery.c \
 		src/udp/soap_parser.c \
@@ -24,7 +24,7 @@ gstplayer$(EXEEXT):
 		src/generated/soapC.c \
 		src/ui/onvif_list.c \
 		src/ui/onvif_device.c \
-		-o build/player-test \
+		-o build/onvif-mgr \
 			`pkg-config --libs gstreamer-rtsp-server-1.0` \
 			`pkg-config --libs gstreamer-video-1.0` \
 			`pkg-config --libs gtk+-3.0` \
