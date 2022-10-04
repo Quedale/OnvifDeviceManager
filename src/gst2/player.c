@@ -176,7 +176,8 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
 
       if (strcmp (name, "level") == 0) {
         return level_handler(bus,message,player,s);
-      } else if (strcmp (name, "GstNavigationMessage") == 0){
+      } else if (strcmp (name, "GstNavigationMessage") == 0 || 
+                strcmp (name, "application/x-rtp-source-sdes") == 0){
         //Ignore intentionally left unhandled for now
       } else {
         printf("TODO Unhandled element msg name : %s//%d\n",name,message->type);
@@ -303,6 +304,75 @@ static gboolean draw_cb (GtkWidget *widget, cairo_t *cr, OnvifPlayer *data) {
   return FALSE;
 }
 
+gboolean
+remove_extra_fields (GQuark field_id, GValue * value G_GNUC_UNUSED,
+    gpointer user_data G_GNUC_UNUSED)
+{
+  return !g_str_has_prefix (g_quark_to_string (field_id), "a-");
+}
+
+GstFlowReturn
+new_sample (GstElement * appsink, OnvifPlayer * player)
+{
+  GstSample *sample;
+  GstFlowReturn ret = GST_FLOW_OK;
+
+  g_assert (player->back_stream_id != (guint *)-1);
+
+  g_signal_emit_by_name (appsink, "pull-sample", &sample);
+
+  if (!sample)
+    goto out;
+
+  g_signal_emit_by_name (player->src, "push-backchannel-buffer", player->back_stream_id, sample, &ret);
+
+out:
+  return ret;
+}
+
+void
+setup_backchannel_shoveler (OnvifPlayer * player, GstCaps * caps)
+{
+  GstElement *appsink;
+  GstElement *backpipe;
+  
+  backpipe = gst_parse_launch ("audiotestsrc is-live=true wave=red-noise ! "
+      "mulawenc ! rtppcmupay ! appsink name=out", NULL);
+  if (!backpipe)
+    g_error ("Could not setup backchannel pipeline");
+
+  appsink = gst_bin_get_by_name (GST_BIN (backpipe), "out");
+  g_object_set (G_OBJECT (appsink), "caps", caps, "emit-signals", TRUE, NULL);
+
+  g_signal_connect (appsink, "new-sample", G_CALLBACK (new_sample), player);
+
+  g_print ("Playing backchannel shoveler\n");
+  gst_element_set_state (backpipe, GST_STATE_PLAYING);
+}
+
+gboolean
+find_backchannel (GstElement * rtspsrc, guint idx, GstCaps * caps,
+    OnvifPlayer *player G_GNUC_UNUSED)
+{
+  GstStructure *s;
+  gchar *caps_str = gst_caps_to_string (caps);
+  g_print ("Selecting stream idx %u, caps %s\n", idx, caps_str);
+  g_free (caps_str);
+
+  s = gst_caps_get_structure (caps, 0);
+  if (gst_structure_has_field (s, "a-sendonly")) {
+    player->back_stream_id = (guint *) &idx;
+    caps = gst_caps_new_empty ();
+    s = gst_structure_copy (s);
+    gst_structure_set_name (s, "application/x-rtp");
+    gst_structure_filter_and_map_in_place (s, remove_extra_fields, NULL);
+    gst_caps_append_structure (caps, s);
+    setup_backchannel_shoveler (player, caps);
+  }
+
+  return TRUE;
+}
+
 //TODO Create pipeline manually selecting elements for faster construct
 void * create_pipeline(OnvifPlayer *self){
   GstElement *lvler;
@@ -332,6 +402,7 @@ void * create_pipeline(OnvifPlayer *self){
 void OnvifPlayer__init(OnvifPlayer* self) {
 
     self->video_window_handle = 0;
+    self->back_stream_id = malloc(sizeof(guint));
     self->level = malloc(sizeof(double));
     self->level = 0;
     self->onvifDeviceList = OnvifDeviceList__create();
@@ -384,6 +455,6 @@ GtkWidget * OnvifDevice__createCanvas(OnvifPlayer *self){
   gtk_widget_set_double_buffered (widget, FALSE);
   g_signal_connect (widget, "realize", G_CALLBACK (realize_cb), self);
   g_signal_connect (widget, "draw", G_CALLBACK (draw_cb), self);
-  
+  g_signal_connect (self->src, "select-stream", G_CALLBACK (find_backchannel),self);
   return widget;
 }
