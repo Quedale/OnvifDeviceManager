@@ -21,12 +21,12 @@
 
 /* This function is called when the PLAY button is clicked */
 static void play_cb (GtkButton *button, OnvifPlayer *data) {
-  gst_element_set_state (data->playbin, GST_STATE_PLAYING);
+  gst_element_set_state (data->pipeline, GST_STATE_PLAYING);
 }
 
 /* This function is called when the STOP button is clicked */
 static void stop_cb (GtkButton *button, OnvifPlayer *data) {
-  gst_element_set_state (data->playbin, GST_STATE_READY);
+  gst_element_set_state (data->pipeline, GST_STATE_READY);
 }
 
 /* This function is called when the STOP button is clicked */
@@ -143,14 +143,53 @@ scan (GtkWidget *widget,
   gtk_widget_show_all (player->listbox);
 }
 
+
+// gboolean update_level (OnvifPlayer* player) {
+//   //TODO Compare to previous value and test
+//   int d = (int) player->level;
+//   gtk_level_bar_set_value (GTK_LEVEL_BAR (player->levelbar),d);
+//   return TRUE;
+// }
+
+GtkWidget * create_nvt_ui (OnvifPlayer *player){
+  GtkWidget *grid;
+  GtkWidget *widget;
+
+  grid = gtk_grid_new ();
+
+  //TODO use custom drawing surface for better responsive sound level decay
+  player->levelbar = gtk_level_bar_new ();
+  gtk_grid_attach (GTK_GRID (grid), player->levelbar, 0, 0, 1, 1);
+  gtk_level_bar_add_offset_value (GTK_LEVEL_BAR (player->levelbar),
+                                  GTK_LEVEL_BAR_OFFSET_LOW,
+                                  0.10);
+  // alternative way to update levelbar
+  // g_idle_add ((GSourceFunc) update_level, player);
+
+  // This adds a new offset to the bar; the application will
+  // be able to change its color CSS like this:
+  //
+  // levelbar block.my-offset {
+  //   background-color: magenta;
+  //   border-style: solid;
+  //   border-color: black;
+  //   border-style: 1px;
+  // }
+  gtk_level_bar_add_offset_value (GTK_LEVEL_BAR (player->levelbar), "my-offset", 0.60);
+
+  widget = OnvifDevice__createCanvas(player);
+  gtk_widget_set_vexpand (widget, TRUE);
+  gtk_widget_set_hexpand (widget, TRUE);
+
+  gtk_grid_attach (GTK_GRID (grid), widget, 0, 1, 1, 1);
+  return grid;
+}
 void create_ui (OnvifPlayer* player) {
   GtkWidget *main_window;  /* The uppermost window, containing all other windows */
   GtkWidget *grid;
   GtkWidget *widget;
-  // GtkWidget *listbox;
+  GtkWidget *notebook;
   GtkWidget *label;
-  GtkWidget *frame;
-  GtkWidget *canvas;
   
   main_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
   g_signal_connect (G_OBJECT (main_window), "delete-event", G_CALLBACK (delete_event_cb), player);
@@ -196,41 +235,35 @@ void create_ui (OnvifPlayer* player) {
   gtk_grid_attach (GTK_GRID (grid), widget, 1, 0, 1, 3);
 
   /* Create a new notebook, place the position of the tabs */
-  widget = gtk_notebook_new ();
-  gtk_notebook_set_tab_pos (GTK_NOTEBOOK (widget), GTK_POS_TOP);
-  gtk_widget_set_vexpand (widget, TRUE);
-  gtk_widget_set_hexpand (widget, TRUE);
-  gtk_grid_attach (GTK_GRID (grid), widget, 2, 0, 1, 3);
+  notebook = gtk_notebook_new ();
+  gtk_notebook_set_tab_pos (GTK_NOTEBOOK (notebook), GTK_POS_TOP);
+  gtk_widget_set_vexpand (notebook, TRUE);
+  gtk_widget_set_hexpand (notebook, TRUE);
+  gtk_grid_attach (GTK_GRID (grid), notebook, 2, 0, 1, 3);
 
 
-  canvas = gtk_drawing_area_new ();
-  gtk_widget_set_double_buffered (canvas, FALSE);
-  gtk_widget_set_vexpand (canvas, TRUE);
-  gtk_widget_set_hexpand (canvas, TRUE);
-
-  OnvifPlayer__set_canvas(player,canvas);
+  widget = create_nvt_ui(player);
 
   char * TITLE_STR = "NVT";
   label = gtk_label_new (TITLE_STR);
-  gtk_notebook_append_page (GTK_NOTEBOOK (widget), canvas, label);
+  gtk_notebook_append_page (GTK_NOTEBOOK (notebook), widget, label);
 
   TITLE_STR = "Info";
-  frame = gtk_frame_new (TITLE_STR);
+  widget = gtk_frame_new (TITLE_STR);
   label = gtk_label_new (TITLE_STR);
-  gtk_container_add (GTK_CONTAINER (frame), label);
+  gtk_container_add (GTK_CONTAINER (widget), label);
   label = gtk_label_new (TITLE_STR);
-  gtk_notebook_append_page (GTK_NOTEBOOK (widget), frame, label);
+  gtk_notebook_append_page (GTK_NOTEBOOK (notebook), widget, label);
 
   gtk_window_set_default_size(GTK_WINDOW(main_window),640,480);
   gtk_widget_show_all (main_window);
-
 }
 
 
 
 int main(int argc, char *argv[]) {
   OnvifPlayer data;
-  
+
   /* Initialize GTK */
   gtk_init (&argc, &argv);
 
@@ -247,7 +280,7 @@ int main(int argc, char *argv[]) {
   gtk_main ();
 
   /* Free resources */
-  gst_element_set_state (data.playbin, GST_STATE_NULL);
-  gst_object_unref (data.playbin);
+  gst_element_set_state (data.pipeline, GST_STATE_NULL);
+  gst_object_unref (data.pipeline);
   return 0;
 }

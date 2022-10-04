@@ -59,8 +59,6 @@ struct DiscoveredServer udp_discover() {
                 &len); 
 
     if (strlen(buffer) > 6){
-        printf("buffer print %li\n",strlen(buffer));
-        printf("buffer : \"%s\"\n",buffer);
         buffer[n] = '\0'; 
         server = parse_soap_msg(buffer);
     } else {

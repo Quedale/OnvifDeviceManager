@@ -19,10 +19,17 @@
 
 /* Structure to contain all our information, so we can pass it around */
 typedef struct _OnvifPlayer {
-  GstElement *playbin;           /* Our one and only pipeline */
+  GstElement *pipeline; /* Our one and only pipeline */
+  GstElement *src;  /* RtspSrc to support backchannel */
+  GstElement *sink;  /* Video Sink */
+  GstVideoOverlay *overlay; //Overlay rendered on the canvas widget
+  
   GstState state;                 /* Current state of the pipeline */
   OnvifDeviceList* onvifDeviceList;
   GtkWidget *listbox;
+  guintptr video_window_handle;
+  GtkWidget * levelbar; //To display sound level
+  double * level; //Used to calculate level decay
 
 } OnvifPlayer;
 
@@ -30,6 +37,6 @@ OnvifPlayer OnvifPlayer__create();  // equivalent to "new Point(x, y)"
 void OnvifPlayer__destroy(OnvifPlayer* self);  // equivalent to "delete point"
 void OnvifPlayer__set_playback_url(OnvifPlayer* self, char *url);
 void OnvifPlayer__play(OnvifPlayer* self);
-void OnvifPlayer__set_canvas(OnvifPlayer* self, GtkWidget* canvas);
+GtkWidget * OnvifDevice__createCanvas(OnvifPlayer *self);
 
 #endif
