@@ -29,7 +29,7 @@ typedef struct _OnvifPlayer {
   GtkWidget *listbox;
   guintptr video_window_handle;
   GtkWidget * levelbar; //To display sound level
-  double * level; //Used to calculate level decay
+  double level; //Used to calculate level decay
   guint * back_stream_id;
 } OnvifPlayer;
 

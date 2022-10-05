@@ -44,7 +44,7 @@ static void eos_cb (GstBus *bus, GstMessage *msg, OnvifPlayer *data) {
  }
 
 
-gboolean level_handler(GstBus * bus, GstMessage * message, OnvifPlayer *player, GstStructure *s){
+gboolean level_handler(GstBus * bus, GstMessage * message, OnvifPlayer *player, const GstStructure *s){
 
   gint channels;
   GstClockTime endtime;
@@ -69,6 +69,10 @@ gboolean level_handler(GstBus * bus, GstMessage * message, OnvifPlayer *player, 
   array_val = gst_structure_get_value (s, "decay");
   decay_arr = (GValueArray *) g_value_get_boxed (array_val);
 
+//No control over the use of GValueArray over GArray since its constructed by gstreamer libs
+//Depracation can't be fixed until Gstreamer update this library
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   /* we can get the number of channels as the length of any of the value
     * arrays */
   channels = rms_arr->n_values;
@@ -90,28 +94,40 @@ gboolean level_handler(GstBus * bus, GstMessage * message, OnvifPlayer *player, 
     //Quiet
     //-700.000000 dB, peak: -350.000000 dB, decay: -2.016216 dB
   }
-
+#pragma GCC diagnostic pop
   output = output / channels;
-
-  int intv = (int) output;
+  printf("-----------------\n");
+  printf("output %f\n",output);
+  double intv = (double)output;
+  printf("intv %f\n",intv);
+  // double current_level = player->level;
+  printf("player->level %f\n",player->level);
+  // printf("current_level : %f\n",current_level);
   if( intv == player->level){
     //Ignore
+    printf("ignore\n");
   } else if( intv > player->level){
     //Set new peak
+    printf("set value %f\n",intv);
     gtk_level_bar_set_value (GTK_LEVEL_BAR (player->levelbar),output/100);
-    player->level = (int *) intv;
+    player->level = intv;
+    // *intv = -1;
+    // memcpy(player->levelbar,intv,sizeof(double));
   } else {
-    int variance = player->level-intv;
+    double variance = player->level-intv;
+    printf("varience %f\n",variance);
     if(variance > 15){
-      int tmpv = (int) player->level;
-      tmpv=tmpv-15;
-      player->level= tmpv;
+      player->level=player->level-15;
     } else {
       player->level = intv;
     }
+
     int tmpv2 = (int) player->level;
     double toset = (double) tmpv2/(double)100;
     gtk_level_bar_set_value (GTK_LEVEL_BAR (player->levelbar),toset);
+    // player->level = (double) player->level/(double)100;
+    // gtk_level_bar_set_value (GTK_LEVEL_BAR (player->levelbar),player->level);
+    printf("lowered to %f\n",player->level);
   }
 
 
@@ -171,8 +187,8 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
       printf("msg : GST_MESSAGE_APPLICATION\n");
       break;
     case GST_MESSAGE_ELEMENT:
-      GstStructure *s = gst_message_get_structure (message);
-      gchar *name = gst_structure_get_name (s);
+      const GstStructure *s = gst_message_get_structure (message);
+      const gchar *name = gst_structure_get_name (s);
 
       if (strcmp (name, "level") == 0) {
         return level_handler(bus,message,player,s);
@@ -403,7 +419,6 @@ void OnvifPlayer__init(OnvifPlayer* self) {
 
     self->video_window_handle = 0;
     self->back_stream_id = malloc(sizeof(guint));
-    self->level = malloc(sizeof(double));
     self->level = 0;
     self->onvifDeviceList = OnvifDeviceList__create();
     self->levelbar =  (GtkWidget *) malloc(sizeof(GtkWidget));
@@ -452,7 +467,11 @@ void OnvifPlayer__play(OnvifPlayer* self){
 GtkWidget * OnvifDevice__createCanvas(OnvifPlayer *self){
   GtkWidget *widget;
   widget = gtk_drawing_area_new ();
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+  //TODO Support Gl. Currently not well supported by WSL
   gtk_widget_set_double_buffered (widget, FALSE);
+#pragma GCC diagnostic pop
   g_signal_connect (widget, "realize", G_CALLBACK (realize_cb), self);
   g_signal_connect (widget, "draw", G_CALLBACK (draw_cb), self);
   g_signal_connect (self->src, "select-stream", G_CALLBACK (find_backchannel),self);

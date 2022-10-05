@@ -143,6 +143,24 @@ scan (GtkWidget *widget,
   gtk_widget_show_all (player->listbox);
 }
 
+GtkWidget * create_info_ui (OnvifPlayer *player){
+  GtkWidget * notebook;
+  GtkWidget * widget;
+  GtkWidget *label;
+  char * TITLE_STR = "Information";
+
+  notebook = gtk_notebook_new ();
+  gtk_notebook_set_tab_pos (GTK_NOTEBOOK (notebook), GTK_POS_LEFT);
+
+  widget = gtk_frame_new (TITLE_STR);
+  label = gtk_label_new (TITLE_STR);
+  gtk_container_add (GTK_CONTAINER (widget), label);
+
+  label = gtk_label_new (TITLE_STR);
+  gtk_notebook_append_page (GTK_NOTEBOOK (notebook), widget, label);
+
+  return notebook;
+}
 
 // gboolean update_level (OnvifPlayer* player) {
 //   //TODO Compare to previous value and test
@@ -248,11 +266,8 @@ void create_ui (OnvifPlayer* player) {
   label = gtk_label_new (TITLE_STR);
   gtk_notebook_append_page (GTK_NOTEBOOK (notebook), widget, label);
 
-  TITLE_STR = "Info";
-  widget = gtk_frame_new (TITLE_STR);
-  label = gtk_label_new (TITLE_STR);
-  gtk_container_add (GTK_CONTAINER (widget), label);
-  label = gtk_label_new (TITLE_STR);
+  widget = create_info_ui(player);
+  label = gtk_label_new ("Details");
   gtk_notebook_append_page (GTK_NOTEBOOK (notebook), widget, label);
 
   gtk_window_set_default_size(GTK_WINDOW(main_window),640,480);
