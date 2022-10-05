@@ -3,16 +3,22 @@ Onvif Device Manager for Linux
 
 # Description
 The goal of this project is to implement a Onvif Device Manager similar to the windows client, compatible for linux. I'm also working on adding some Profile T capabilities, such as bidirectional audio.
-This is currently just the GUI skeleton with a prototype Onvif Soap client implementation and UDP discovery.
+
+# Working
+- Onvif UDP Discovery
+- Soap Client for Onvif Device and Media service
+- Vew RTSP Stream with backchannel
+- Prototype Soundlevel indicator
 
 # TODO
 - Display Onvif device information
 - Display Media information
-- Display Media RTSP Stream (NVT) using Gstreamer onvif backchannel
+- Better Look&Feel
+- Testing with a variety of camera
 
 # Use-case
-1. Doorbell-like security camera
-2. Babymonitor (I hope to add common baby monitor feature like soundgage and playing music)
+1. Doorbell-like security camera terminal
+2. Babymonitor terminal (I hope to add common baby monitor feature like soundgage and playing music)
 3. Cross-room communication terminal
 
 # Note
