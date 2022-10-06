@@ -2,7 +2,6 @@
 #define ONVIF_DEVICE_H_
 
 #include "../soap/client.h"
-// #include <stdlib.h>
 
 typedef struct {
     char *xaddr;
@@ -15,6 +14,14 @@ typedef struct {
 } OnvifCapabilities;
 
 typedef struct {
+    char * manufacturer;
+    char * model;
+    char * firmwareVersion;
+    char * serialNumber;
+    char * hardwareId;
+} OnvifDeviceInformation;
+
+typedef struct {
     char * hostname;
     OnvifSoapClient* device_soap;
     OnvifSoapClient* media_soap;
@@ -24,7 +31,8 @@ typedef struct {
 OnvifDevice OnvifDevice__create(char * device_url); 
 void OnvifDevice__destroy(OnvifDevice* device); 
 // char * OnvifDevice__device_getHostname(OnvifDevice* self);  // equivalent to "point->x()"
-// OnvifCapabilities* OnvifDevice__device_getCapabilities(OnvifDevice* self);
+OnvifCapabilities* OnvifDevice__device_getCapabilities(OnvifDevice* self);
+OnvifDeviceInformation * OnvifDevice__device_getDeviceInformation(OnvifDevice *self);
 void * OnvifDevice__media_getStreamUri(OnvifDevice* self);
 
 #endif

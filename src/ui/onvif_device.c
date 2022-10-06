@@ -19,13 +19,33 @@ OnvifCapabilities* OnvifDevice__device_getCapabilities(OnvifDevice* self) {
         soap_print_fault(self->device_soap->soap, stderr);
     }
 
-    printf("return capabilities\n");
     return capabilities; 
 }
 
 OnvifSoapClient * OnvifDevice__device_getMediaSoap(OnvifDevice* self){
     OnvifCapabilities* capabilities = OnvifDevice__device_getCapabilities(self);
     return OnvifSoapClient__create(capabilities->media->xaddr);
+}
+
+//GetGeoLocation
+//
+OnvifDeviceInformation * OnvifDevice__device_getDeviceInformation(OnvifDevice *self){
+    struct _tds__GetDeviceInformation request;
+    struct _tds__GetDeviceInformationResponse response;
+    OnvifDeviceInformation *ret = (OnvifDeviceInformation *) malloc(sizeof(OnvifDeviceInformation));
+
+    if (soap_call___tds__GetDeviceInformation(self->device_soap->soap, self->device_soap->endpoint, "", &request,  &response) == SOAP_OK){
+        ret->firmwareVersion = response.FirmwareVersion;
+        ret->hardwareId = response.HardwareId;
+        ret->manufacturer = response.Manufacturer;
+        ret->model = response.Model;
+        ret->serialNumber = response.SerialNumber;
+        return ret;
+    } else {
+        soap_print_fault(self->device_soap->soap, stderr);
+        //TODO error handling timout, invalid url, etc...
+        return NULL;
+    }
 }
 
 char * OnvifDevice__device_getHostname(OnvifDevice* self) {
@@ -64,7 +84,6 @@ void OnvifDevice__init(OnvifDevice* self, char * device_url) {
 }
 
 OnvifDevice OnvifDevice__create(char * device_url) {
-//    OnvifDevice* result = (OnvifDevice*) malloc(sizeof(OnvifDevice));
     OnvifDevice result;
     memset (&result, 0, sizeof (result));
     OnvifDevice__init(&result,device_url);

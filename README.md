@@ -15,6 +15,12 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Display Media information
 - Better Look&Feel
 - Testing with a variety of camera
+- Record video
+- JPEG Snapshot
+- Push-to-Talk button
+- Soundlevel GstOverlay instead of GtkWidget
+- Check for better backchannel audio support. (PCMU@8000 might be Onvif's spec limit)
+- Handle changing camera selection
 
 # Use-case
 1. Doorbell-like security camera terminal

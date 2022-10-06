@@ -177,7 +177,7 @@ main (int argc, char *argv[])
     gst_rtsp_media_factory_set_launch (factory,strbin);
     gst_rtsp_onvif_media_factory_set_backchannel_launch
         (GST_RTSP_ONVIF_MEDIA_FACTORY (factory),
-        "( capsfilter caps=\"application/x-rtp, media=audio, payload=0, clock-rate=8000, encoding-name=PCMU\" name=depay_backchannel ! rtppcmudepay ! fakesink async=false  )");
+        "( capsfilter caps=\"application/x-rtp, media=audio, payload=0, clock-rate=8000, encoding-name=PCMU\" name=depay_backchannel ! rtppcmudepay ! autoaudiosink  )");
     gst_rtsp_media_factory_set_shared (factory, TRUE);
     gst_rtsp_media_factory_set_media_gtype (factory, GST_TYPE_RTSP_ONVIF_MEDIA);
 

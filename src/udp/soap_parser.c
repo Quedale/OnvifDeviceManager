@@ -31,7 +31,7 @@ char *trimwhitespace(char *str)
 }
 
 void 
-parse_header(xmlNode *pnode, struct DiscoveredServer *server){
+parse_header(xmlNode *pnode, DiscoveredServer *server){
     xmlNode        *first_child, *cnode;
     xmlElementType *type;
     char *MSGID_TAG="MessageID";
@@ -109,7 +109,7 @@ parse_prob_match(xmlNode *pnode, struct ProbMatch *match){
 } 
 
 void 
-parse_prob_matches(xmlNode *pnode, struct DiscoveredServer *server){
+parse_prob_matches(xmlNode *pnode, DiscoveredServer *server){
     xmlNode        *first_child, *cnode;
     xmlElementType *type;
     struct ProbMatch matche;
@@ -132,7 +132,7 @@ parse_prob_matches(xmlNode *pnode, struct DiscoveredServer *server){
 }
 
 void 
-parse_body(xmlNode *pnode, struct DiscoveredServer *server){
+parse_body(xmlNode *pnode, DiscoveredServer *server){
     xmlNode        *first_child, *cnode;
     xmlElementType *type;
     char *PROBMATCHES_TAG="ProbeMatches";
@@ -148,7 +148,7 @@ parse_body(xmlNode *pnode, struct DiscoveredServer *server){
 }
 
 void 
-parse_envelope(xmlNode *pnode, struct DiscoveredServer *server){
+parse_envelope(xmlNode *pnode, DiscoveredServer *server){
     xmlNode        *first_child, *cnode;
     xmlElementType *type;
     char *HEADER_TAG="Header";
@@ -166,12 +166,12 @@ parse_envelope(xmlNode *pnode, struct DiscoveredServer *server){
     }
 }
 
-struct DiscoveredServer 
+DiscoveredServer 
 parse_soap_msg (char *msg){
 
     xmlDoc         *document;
     xmlNode        *root, *first_child, *node;
-    struct DiscoveredServer server;
+    DiscoveredServer server;
     server.match_count = 0;
     server.matches = (struct ProbMatch *) malloc (sizeof (struct ProbMatch) * server.match_count);
 

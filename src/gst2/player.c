@@ -96,26 +96,15 @@ gboolean level_handler(GstBus * bus, GstMessage * message, OnvifPlayer *player, 
   }
 #pragma GCC diagnostic pop
   output = output / channels;
-  printf("-----------------\n");
-  printf("output %f\n",output);
   double intv = (double)output;
-  printf("intv %f\n",intv);
-  // double current_level = player->level;
-  printf("player->level %f\n",player->level);
-  // printf("current_level : %f\n",current_level);
   if( intv == player->level){
     //Ignore
-    printf("ignore\n");
   } else if( intv > player->level){
     //Set new peak
-    printf("set value %f\n",intv);
     gtk_level_bar_set_value (GTK_LEVEL_BAR (player->levelbar),output/100);
     player->level = intv;
-    // *intv = -1;
-    // memcpy(player->levelbar,intv,sizeof(double));
   } else {
     double variance = player->level-intv;
-    printf("varience %f\n",variance);
     if(variance > 15){
       player->level=player->level-15;
     } else {
@@ -125,9 +114,6 @@ gboolean level_handler(GstBus * bus, GstMessage * message, OnvifPlayer *player, 
     int tmpv2 = (int) player->level;
     double toset = (double) tmpv2/(double)100;
     gtk_level_bar_set_value (GTK_LEVEL_BAR (player->levelbar),toset);
-    // player->level = (double) player->level/(double)100;
-    // gtk_level_bar_set_value (GTK_LEVEL_BAR (player->levelbar),player->level);
-    printf("lowered to %f\n",player->level);
   }
 
 
@@ -151,6 +137,17 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
       break;
     case GST_MESSAGE_WARNING:
       printf("msg : GST_MESSAGE_WARNING\n");
+      GError *gerror;
+      gchar *debug;
+
+      if (message->type == GST_MESSAGE_ERROR)
+        gst_message_parse_error (message, &gerror, &debug);
+      else
+        gst_message_parse_warning (message, &gerror, &debug);
+
+      gst_object_default_error (GST_MESSAGE_SRC (message), gerror, debug);
+      g_error_free (gerror);
+      g_free (debug);
       break;
     case GST_MESSAGE_INFO:
       printf("msg : GST_MESSAGE_INFO\n");
@@ -280,7 +277,6 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
  * and pass it to GStreamer through the VideoOverlay interface. */
 static void realize_cb (GtkWidget *widget, OnvifPlayer *data) {
   GdkWindow *window = gtk_widget_get_window (widget);
-
   if (!gdk_window_ensure_native (window))
     g_error ("Couldn't create native window needed for GstVideoOverlay!");
 

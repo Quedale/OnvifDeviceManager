@@ -16,15 +16,15 @@ struct ProbMatch {
 
 #define MAX_MATCHES 100
 
-struct DiscoveredServer {
+typedef struct {
     char *msg_uuid; // SOAP-ENV:Envelope/SOAP-ENV:Header/wsa:MessageID
     char *relate_uuid; // SOAP-ENV:Envelope/SOAP-ENV:Header/wsa:RelatesTo
     struct ProbMatch *matches; // SOAP-ENV:Envelope/SOAP-ENV:Body/d:ProbeMatches/
     int match_count;
-};
+} DiscoveredServer;
 
 
-struct DiscoveredServer
+DiscoveredServer
 parse_soap_msg (char *msg);
 
 #endif

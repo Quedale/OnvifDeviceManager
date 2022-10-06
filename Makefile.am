@@ -17,7 +17,7 @@ onvifmgr$(EXEEXT):
 		`pkg-config --cflags gsoap` \
 		src/onvif-mgr.c \
 		src/gst2/player.c \
-		src/udp/discovery.c \
+		src/udp/discoverer.c \
 		src/udp/soap_parser.c \
 		src/soap/client.c \
 		src/generated/soapClient.c \
