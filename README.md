@@ -11,6 +11,7 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Prototype Soundlevel indicator
 
 # TODO
+- WIP: Fixed change of camera (pipeline rotation is required because of a "unsupported timestamp reference clock")
 - Display Onvif device information
 - Display Media information
 - Better Look&Feel
@@ -18,9 +19,8 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Record video
 - JPEG Snapshot
 - Push-to-Talk button
-- Soundlevel GstOverlay instead of GtkWidget
+- Soundlevel GstOverlay instead of GtkWidget (GtkLevelBar makes UI unresponsive event without event)
 - Check for better backchannel audio support. (PCMU@8000 might be Onvif's spec limit)
-- Handle changing camera selection
 
 # Use-case
 1. Doorbell-like security camera terminal

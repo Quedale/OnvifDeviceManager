@@ -26,7 +26,7 @@ static void play_cb (GtkButton *button, OnvifPlayer *data) {
 
 /* This function is called when the STOP button is clicked */
 static void stop_cb (GtkButton *button, OnvifPlayer *data) {
-  gst_element_set_state (data->pipeline, GST_STATE_READY);
+  OnvifPlayer__stop(data);
 }
 
 /* This function is called when the STOP button is clicked */
@@ -63,7 +63,7 @@ void row_selected_cb (GtkWidget *widget,   GtkListBoxRow* row,
     char * uri = OnvifDevice__media_getStreamUri(&dev);
 
     OnvifPlayer__set_playback_url(player,uri);
-
+    
     OnvifPlayer__play(player);
     
 }
@@ -71,25 +71,32 @@ void row_selected_cb (GtkWidget *widget,   GtkListBoxRow* row,
 static GtkWidget *
 create_row (struct ProbMatch * m, OnvifPlayer *player)
 {
-  GtkWidget *row, *handle, *box, *label, *image;
-  int i;
-  printf("\tProbe %s\n",m->prob_uuid);
-  printf("\tAddr %s\n",m->addr);
-  printf("\tTypes %s\n",m->types);
-  printf("\tVersion : %s\n", m->version);
-  printf("\tcount : %i\n", m->scope_count);
-  for (i = 0 ; i < m->scope_count ; ++i) {
-    printf("\t\tScope : %s\n",m->scopes[i]);
-  }
+  // GtkWidget *row, *handle, *box, *label, *image;
+  GtkWidget *row;
+  GtkWidget *grid;
+  GtkWidget *label;
+  GtkWidget *handle;
+  GtkWidget *image;
+
+  // int i;
+  // printf("--- Prob -------\n");
+  // printf("\tProbe %s\n",m->prob_uuid);
+  // printf("\tAddr %s\n",m->addr);
+  // printf("\tTypes %s\n",m->types);
+  // printf("\tVersion : %s\n", m->version);
+  // printf("\tcount : %i\n", m->scope_count);
+  // for (i = 0 ; i < m->scope_count ; ++i) {
+  //   printf("\t\tScope : %s\n",m->scopes[i]);
+  // }
   
   OnvifDevice dev = OnvifDevice__create(m->addr);
   OnvifDeviceInformation * devinfo = OnvifDevice__device_getDeviceInformation(&dev);
-  printf("--- Device -------\n");
-  printf("\tfirmware : %s\n",devinfo->firmwareVersion);
-  printf("\thardware : %s\n",devinfo->hardwareId);
-  printf("\tmanufacturer : %s\n",devinfo->manufacturer);
-  printf("\tmodel : %s\n",devinfo->model);
-  printf("\tserial# : %s\n",devinfo->serialNumber);
+  // printf("--- Device -------\n");
+  // printf("\tfirmware : %s\n",devinfo->firmwareVersion);
+  // printf("\thardware : %s\n",devinfo->hardwareId);
+  // printf("\tmanufacturer : %s\n",devinfo->manufacturer);
+  // printf("\tmodel : %s\n",devinfo->model);
+  // printf("\tserial# : %s\n",devinfo->serialNumber);
 
   OnvifDeviceList__insert_element(player->onvifDeviceList,dev,player->onvifDeviceList->device_count);
   int b;
@@ -99,23 +106,29 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
 
   row = gtk_list_box_row_new ();
 
-  box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 10);
-  g_object_set (box, "margin-start", 10, "margin-end", 10, NULL);
-  gtk_container_add (GTK_CONTAINER (row), box);
+  grid = gtk_grid_new ();
+  g_object_set (grid, "margin", 5, NULL);
+  gtk_container_add (GTK_CONTAINER (row), grid);
 
   handle = gtk_event_box_new ();
   image = gtk_image_new_from_icon_name ("open-menu-symbolic", 1);
   gtk_container_add (GTK_CONTAINER (handle), image);
-  gtk_container_add (GTK_CONTAINER (box), handle);
+  g_object_set (handle, "margin-end", 10, NULL);
+  // gtk_container_add (GTK_CONTAINER (grid), handle);
+  gtk_grid_attach (GTK_GRID (grid), handle, 0, 0, 1, 3);
 
   label = gtk_label_new (dev.hostname);
-  gtk_container_add_with_properties (GTK_CONTAINER (box), label, "expand", TRUE, NULL);
+  g_object_set (label, "margin-end", 5, NULL);
+  gtk_grid_attach (GTK_GRID (grid), label, 1, 0, 1, 1);
 
-  GValue a = G_VALUE_INIT;
-  g_value_init (&a, G_TYPE_STRING);
-  g_value_set_string (&a, "IVALUE");
+  label = gtk_label_new (devinfo->manufacturer);
+  g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
+  gtk_grid_attach (GTK_GRID (grid), label, 1, 1, 1, 1);
 
-  g_value_unset (&a);
+  label = gtk_label_new (devinfo->model);
+  g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
+  gtk_grid_attach (GTK_GRID (grid), label, 1, 2, 1, 1);
+
 
   return row;
 }
@@ -144,7 +157,6 @@ found_server (void * e)
   printf("Found server ----------------\n");
   for (i = 0 ; i < server->match_count ; ++i) {
     m = server->matches[i];
-    m = server->matches[i];
 
     // Create GtkListBoxRow and add it
     printf("Prob Match #%i ----------------\n",i);
@@ -172,7 +184,7 @@ onvif_scan (GtkWidget *widget,
   OnvifDeviceList__clear(player->onvifDeviceList);
 
   //Start UDP Scan
-  struct UdpDiscoverer discoverer = UdpDiscoverer__create(&found_server,&finished_discovery);
+  struct UdpDiscoverer discoverer = UdpDiscoverer__create(found_server,finished_discovery);
   UdpDiscoverer__start(&discoverer, widget, player);
 
 }
@@ -237,6 +249,7 @@ GtkWidget * create_details_ui (OnvifPlayer *player){
   return notebook;
 }
 
+
 GtkWidget * create_nvt_ui (OnvifPlayer *player){
   GtkWidget *grid;
   GtkWidget *widget;
@@ -244,6 +257,7 @@ GtkWidget * create_nvt_ui (OnvifPlayer *player){
   grid = gtk_grid_new ();
 
   //TODO use custom drawing surface for better responsive sound level decay
+  // GtkLevelBar makes the entire gui less responsive. (event without any events)
   player->levelbar = gtk_level_bar_new ();
   gtk_grid_attach (GTK_GRID (grid), player->levelbar, 0, 0, 1, 1);
   gtk_level_bar_add_offset_value (GTK_LEVEL_BAR (player->levelbar),
@@ -268,6 +282,7 @@ GtkWidget * create_nvt_ui (OnvifPlayer *player){
   gtk_grid_attach (GTK_GRID (grid), widget, 0, 1, 1, 1);
   return grid;
 }
+
 void create_ui (OnvifPlayer* player) {
   GtkWidget *main_window;  /* The uppermost window, containing all other windows */
   GtkWidget *grid;

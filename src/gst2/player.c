@@ -1,4 +1,5 @@
 #include "player.h"
+#include<unistd.h>
 
 /* This function is called when an error message is posted on the bus */
 static void error_cb (GstBus *bus, GstMessage *msg, OnvifPlayer *data) {
@@ -121,6 +122,20 @@ gboolean level_handler(GstBus * bus, GstMessage * message, OnvifPlayer *player, 
 
 }
 
+
+/* This function is called when the pipeline changes states. We use it to
+ * keep track of the current state. */
+static void
+state_changed_cb (GstBus * bus, GstMessage * msg, OnvifPlayer * data)
+{
+  GstState old_state, new_state, pending_state;
+  gst_message_parse_state_changed (msg, &old_state, &new_state, &pending_state);
+  if (GST_MESSAGE_SRC (msg) == GST_OBJECT (data->pipeline)) {
+    data->state = new_state;
+    g_print ("State set to %s\n", gst_element_state_get_name (new_state));
+  }
+}
+
 int
 message_handler (GstBus * bus, GstMessage * message, gpointer p)
 { 
@@ -159,7 +174,7 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
       printf("msg : GST_MESSAGE_BUFFERING\n");
       break;
     case GST_MESSAGE_STATE_CHANGED:
-      // state_changed_cb(bus,message,player);
+      state_changed_cb(bus,message,player);
       break;
     case GST_MESSAGE_STATE_DIRTY:
       printf("msg : GST_MESSAGE_STATE_DIRTY\n");
@@ -329,7 +344,7 @@ new_sample (GstElement * appsink, OnvifPlayer * player)
   GstSample *sample;
   GstFlowReturn ret = GST_FLOW_OK;
 
-  g_assert (player->back_stream_id != (guint *)-1);
+  g_assert (player->back_stream_id != -1);
 
   g_signal_emit_by_name (appsink, "pull-sample", &sample);
 
@@ -368,12 +383,11 @@ find_backchannel (GstElement * rtspsrc, guint idx, GstCaps * caps,
 {
   GstStructure *s;
   gchar *caps_str = gst_caps_to_string (caps);
-  g_print ("Selecting stream idx %u, caps %s\n", idx, caps_str);
   g_free (caps_str);
 
   s = gst_caps_get_structure (caps, 0);
   if (gst_structure_has_field (s, "a-sendonly")) {
-    player->back_stream_id = (guint *) &idx;
+    player->back_stream_id = idx;
     caps = gst_caps_new_empty ();
     s = gst_structure_copy (s);
     gst_structure_set_name (s, "application/x-rtp");
@@ -388,9 +402,11 @@ find_backchannel (GstElement * rtspsrc, guint idx, GstCaps * caps,
 //TODO Create pipeline manually selecting elements for faster construct
 void * create_pipeline(OnvifPlayer *self){
   GstElement *lvler;
+
+  self->pipeline = malloc(sizeof(GstElement *));
   self->pipeline = gst_parse_launch ("rtspsrc backchannel=onvif debug=true name=r "
       "r. ! queue ! decodebin ! queue ! autovideosink name=vsink " //glimagesink gives warning
-      "r. ! queue ! decodebin ! queue ! audioconvert ! level name=lvler post-messages=true messages=true ! autoaudiosink ", NULL);
+      "r. ! queue ! decodebin ! queue ! audioconvert ! level name=lvler post-messages=true ! autoaudiosink ", NULL);
 
     self->src = gst_bin_get_by_name (GST_BIN (self->pipeline), "r");
     if (!self->src) {
@@ -403,7 +419,7 @@ void * create_pipeline(OnvifPlayer *self){
         g_printerr ("Not all elements could be created.\n");
         return NULL;
     }
-    
+
     lvler = gst_bin_get_by_name (GST_BIN (self->pipeline), "lvler");
     if (!lvler) {
         g_printerr ("Not all elements could be created.\n");
@@ -414,7 +430,6 @@ void * create_pipeline(OnvifPlayer *self){
 void OnvifPlayer__init(OnvifPlayer* self) {
 
     self->video_window_handle = 0;
-    self->back_stream_id = malloc(sizeof(guint));
     self->level = 0;
     self->onvifDeviceList = OnvifDeviceList__create();
     self->levelbar =  (GtkWidget *) malloc(sizeof(GtkWidget));
@@ -449,7 +464,19 @@ void OnvifPlayer__set_playback_url(OnvifPlayer* self, char *url) {
     g_object_set (G_OBJECT (self->src), "location", url, NULL);
 }
 
+void OnvifPlayer__stop(OnvifPlayer* self){
+    GstStateChangeReturn ret;
+    GstState state;
+    ret = gst_element_set_state (self->pipeline, GST_STATE_READY);
+    if (ret == GST_STATE_CHANGE_FAILURE) {
+        g_printerr ("Unable to set the pipeline to the ready state.\n");
+        gst_object_unref (self->pipeline);
+        return;
+    }
+}
+
 void OnvifPlayer__play(OnvifPlayer* self){
+    printf("OnvifPlayer__play \n");
     GstStateChangeReturn ret;
     ret = gst_element_set_state (self->pipeline, GST_STATE_PLAYING);
     if (ret == GST_STATE_CHANGE_FAILURE) {
@@ -457,19 +484,18 @@ void OnvifPlayer__play(OnvifPlayer* self){
         gst_object_unref (self->pipeline);
         return;
     }
-    printf("set state to playing..\n");
 }
 
 GtkWidget * OnvifDevice__createCanvas(OnvifPlayer *self){
-  GtkWidget *widget;
-  widget = gtk_drawing_area_new ();
+
+  self->canvas = gtk_drawing_area_new ();
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   //TODO Support Gl. Currently not well supported by WSL
-  gtk_widget_set_double_buffered (widget, FALSE);
+  gtk_widget_set_double_buffered (self->canvas, FALSE);
 #pragma GCC diagnostic pop
-  g_signal_connect (widget, "realize", G_CALLBACK (realize_cb), self);
-  g_signal_connect (widget, "draw", G_CALLBACK (draw_cb), self);
-  g_signal_connect (self->src, "select-stream", G_CALLBACK (find_backchannel),self);
-  return widget;
+  g_signal_connect (self->canvas, "realize", G_CALLBACK (realize_cb), self);
+  g_signal_connect (self->canvas, "draw", G_CALLBACK (draw_cb), self);
+  // g_signal_connect (self->src, "select-stream", G_CALLBACK (find_backchannel),self);
+  return self->canvas;
 }

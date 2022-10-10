@@ -33,13 +33,8 @@ struct DiscoverThreadInput {
 
 
 void UdpDiscoverer__init(struct UdpDiscoverer* self, void * func, void * done_func) {
-
-    self->done_callback = (void *) malloc(sizeof(void));
     self->done_callback = done_func;
-
-    self->found_callback =  (void *) malloc(sizeof(void));
     self->found_callback = func;
-
 }
 
 struct UdpDiscoverer UdpDiscoverer__create(void * func, void * done_func) {
@@ -60,18 +55,25 @@ void UdpDiscoverer__destroy(struct UdpDiscoverer* self) {
   }
 }
 
+static gboolean * 
+event_callback (void * e)
+{
+    struct EventDispatch * in = (struct EventDispatch *) e;
+    ((GSourceFunc) in->callback) (in->data);
+    void * data = in->data;
+    free(in->data);
+    free(in);
+    return FALSE;
+}
+
 void *scan(void * vargp) {
     struct sockaddr_in     servaddr; 
     int sockfd; 
     char buffer[MAXLINE]; 
-    DiscoveredServer server;
-    DiscoveryEvent * ret_event; 
     int n, len; //Used by the socket
 
     //Initialize memory
-    ret_event = malloc(0);
     memset(&servaddr, 0, sizeof(servaddr)); 
-    memset(&server, 0, sizeof(server)); 
     
     //Cast to expected struct
     struct DiscoverThreadInput * in = (struct DiscoverThreadInput *) vargp;
@@ -109,8 +111,8 @@ void *scan(void * vargp) {
     //Looping until timeout
     do {
 
-        //Reallocate event memory
-        ret_event =  (DiscoveryEvent *) realloc(ret_event,sizeof(DiscoveryEvent)); 
+        //Define dedicated pointer to dispatch to the main thread
+        DiscoveryEvent * ret_event =  (DiscoveryEvent *) malloc(sizeof(DiscoveryEvent)); 
         ret_event->player = in->data;
 
         //Reset buffer
@@ -125,12 +127,14 @@ void *scan(void * vargp) {
             //Wrap buffer
             buffer[n] = '\0'; 
             //Extract struct and set pointer on event struct
-            server = parse_soap_msg(buffer);
-            ret_event->server = &server;
+            ret_event->server = parse_soap_msg(buffer);
             ret_event->widget = in->widget;
 
+            struct EventDispatch * evt_dispatch =  (struct EventDispatch *) malloc(sizeof(struct EventDispatch)); 
+            evt_dispatch->callback = in->callback;
+            evt_dispatch->data = ret_event;
             //Dispatch notification about found server
-            gdk_threads_add_idle(in->callback,ret_event);
+            gdk_threads_add_idle((void *)event_callback,evt_dispatch);
         }
 
     //Loop until timeout
@@ -138,8 +142,20 @@ void *scan(void * vargp) {
 
     close(sockfd); 
 
+    DiscoveryEvent * ret_event =  (DiscoveryEvent *) malloc(sizeof(DiscoveryEvent)); 
+    ret_event->player = in->data;
+    ret_event->widget = in->widget;
+
+    //Define new event point to dispatch on main thread
+    struct EventDispatch * evt_dispatch =  (struct EventDispatch *) malloc(sizeof(struct EventDispatch)); 
+    evt_dispatch->data = ret_event;
+    evt_dispatch->callback = in->done_callback;
+
     //Dispatch notification of completion
-    gdk_threads_add_idle(in->done_callback,ret_event);
+    gdk_threads_add_idle((void *)event_callback,evt_dispatch);
+
+    //Clean up
+    free(in);
 }
 
 void * UdpDiscoverer__start(struct UdpDiscoverer* self, void * widget, void *player) {

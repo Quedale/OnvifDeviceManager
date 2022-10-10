@@ -166,19 +166,21 @@ parse_envelope(xmlNode *pnode, DiscoveredServer *server){
     }
 }
 
-DiscoveredServer 
+DiscoveredServer *
 parse_soap_msg (char *msg){
 
     xmlDoc         *document;
     xmlNode        *root, *first_child, *node;
-    DiscoveredServer server;
-    server.match_count = 0;
-    server.matches = (struct ProbMatch *) malloc (sizeof (struct ProbMatch) * server.match_count);
+    // DiscoveredServer * server;
+    // TODO handle cleaning when rescan occur
+    DiscoveredServer * server =  (DiscoveredServer *) malloc(sizeof(DiscoveredServer));
+    server->match_count = 0;
+    server->matches = (struct ProbMatch *) malloc (sizeof (struct ProbMatch) * server->match_count);
 
     document = xmlParseDoc(msg);
 
     root = xmlDocGetRootElement(document);
-    parse_envelope(root,&server);
+    parse_envelope(root,server);
 
     return server;
 }

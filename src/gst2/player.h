@@ -27,15 +27,17 @@ typedef struct _OnvifPlayer {
   GstState state;                 /* Current state of the pipeline */
   OnvifDeviceList* onvifDeviceList;
   GtkWidget *listbox;
+  GtkWidget *canvas;
   guintptr video_window_handle;
   GtkWidget * levelbar; //To display sound level
   double level; //Used to calculate level decay
-  guint * back_stream_id;
+  guint back_stream_id;
 } OnvifPlayer;
 
 OnvifPlayer OnvifPlayer__create();  // equivalent to "new Point(x, y)"
 void OnvifPlayer__destroy(OnvifPlayer* self);  // equivalent to "delete point"
 void OnvifPlayer__set_playback_url(OnvifPlayer* self, char *url);
+void OnvifPlayer__stop(OnvifPlayer* self);
 void OnvifPlayer__play(OnvifPlayer* self);
 GtkWidget * OnvifDevice__createCanvas(OnvifPlayer *self);
 

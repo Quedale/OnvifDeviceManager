@@ -30,6 +30,10 @@ struct UdpDiscoverer {
     void * done_callback;
 };
 
+struct EventDispatch {
+    void * callback;
+    void * data;
+};
 
 typedef struct {
     DiscoveredServer * server;

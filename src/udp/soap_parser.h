@@ -24,7 +24,7 @@ typedef struct {
 } DiscoveredServer;
 
 
-DiscoveredServer
+DiscoveredServer *
 parse_soap_msg (char *msg);
 
 #endif
