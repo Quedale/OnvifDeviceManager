@@ -399,32 +399,119 @@ find_backchannel (GstElement * rtspsrc, guint idx, GstCaps * caps,
   return TRUE;
 }
 
-//TODO Create pipeline manually selecting elements for faster construct
+/* Dynamically link */
+static void on_pad_added (GstElement *element, GstPad *pad, gpointer data){
+    GstPad *sinkpad;
+    GstPadLinkReturn ret;
+    GstElement *decoder = (GstElement *) data;
+    GstCaps *new_pad_caps = NULL;
+    GstStructure *new_pad_struct = NULL;
+    const gchar *new_pad_type = NULL;
+    gchar *capstr = NULL;
+
+    /* We can now link this pad with the rtsp-decoder sink pad */
+    sinkpad = gst_element_get_static_pad (decoder, "sink");
+    ret = gst_pad_link (pad, sinkpad);
+
+    if (GST_PAD_LINK_FAILED (ret)) {
+        //failed
+        g_print("failed to link dynamically\n");
+    } else {
+        //pass
+        g_print("dynamically link successful\n");
+    }
+
+    gst_object_unref (sinkpad);
+}
+
 void * create_pipeline(OnvifPlayer *self){
-  GstElement *lvler;
+  GstElement *rtph264depay;
+  GstElement *h264parse;
+  GstElement *vdecoder;
+  GstElement *videoqueue0;
+  GstElement *videoconvert;
+  GstElement *adecoder;
+  GstElement *audioqueue0;
+  GstElement *audioconvert;
+  GstElement *level;
+  GstElement *audio_sink;
 
+  /* Create the elements */
+  self->src = gst_element_factory_make ("rtspsrc", "src");
+  //Video pipe
+  rtph264depay = gst_element_factory_make ("rtph264depay", "rtph264depay0");
+  h264parse = gst_element_factory_make ("h264parse", "h264parse0");
+  vdecoder = gst_element_factory_make ("decodebin", "decodebin0");
+  videoqueue0 = gst_element_factory_make ("queue", "videoqueue0");
+  videoconvert = gst_element_factory_make ("videoconvert", "videoconvert0");
+  self->sink = gst_element_factory_make ("autovideosink", "vsink");
+  g_object_set (G_OBJECT (self->sink), "sync", FALSE, NULL);
+  g_object_set (G_OBJECT (self->src), "latency", 0, NULL);
+
+  //Audio pipe
+  adecoder = gst_element_factory_make ("decodebin", "decodebin1");
+  audioqueue0 = gst_element_factory_make ("queue", "audioqueue0");
+  audioconvert = gst_element_factory_make ("audioconvert", "audioconvert0");
+  level = gst_element_factory_make("level","level0");
+  audio_sink = gst_element_factory_make ("autoaudiosink", "autoaudiosink0");
+  g_object_set (G_OBJECT (audio_sink), "sync", FALSE, NULL);
+  g_object_set (G_OBJECT (level), "post-messages", TRUE, NULL);
+
+
+  /* Create the empty pipeline */
   self->pipeline = malloc(sizeof(GstElement *));
-  self->pipeline = gst_parse_launch ("rtspsrc backchannel=onvif debug=true name=r "
-      "r. ! queue ! decodebin ! queue ! autovideosink name=vsink " //glimagesink gives warning
-      "r. ! queue ! decodebin ! queue ! audioconvert ! level name=lvler post-messages=true ! autoaudiosink ", NULL);
+  self->pipeline = gst_pipeline_new ("test-pipeline");
 
-    self->src = gst_bin_get_by_name (GST_BIN (self->pipeline), "r");
-    if (!self->src) {
-      g_printerr ("Not all elements could be created.\n");
+  //Make sure: Every elements was created ok
+  if (!self->pipeline || !self->src || !rtph264depay || !h264parse || !vdecoder || !videoqueue0 || !videoconvert || !self->sink || !adecoder || !audioqueue0 || !audioconvert || !level || !audio_sink) {
+      g_printerr ("One of the elements wasn't created... Exiting\n");
       return NULL;
-    }
+  }
 
-    self->sink = gst_bin_get_by_name (GST_BIN (self->pipeline), "vsink");
-    if (!self->sink) {
-        g_printerr ("Not all elements could be created.\n");
-        return NULL;
-    }
+  // Add Elements to the Bin
+  gst_bin_add_many (GST_BIN (self->pipeline), self->src, rtph264depay, h264parse, vdecoder, videoqueue0, videoconvert, self->sink, adecoder, audioqueue0, audioconvert, level, audio_sink, NULL);
 
-    lvler = gst_bin_get_by_name (GST_BIN (self->pipeline), "lvler");
-    if (!lvler) {
-        g_printerr ("Not all elements could be created.\n");
-        return NULL;
-    }
+  // Link confirmation
+  if (!gst_element_link_many (rtph264depay, h264parse, vdecoder, NULL)){
+      g_warning ("Linking part (A)-1 Fail...\n");
+      return NULL;
+  }
+
+  // Link confirmation
+  if (!gst_element_link_many (videoqueue0, videoconvert, self->sink, NULL)){
+      g_warning ("Linking part (A)-2 Fail...");
+      return NULL;
+  }
+
+  // Link confirmation
+  if (!gst_element_link_many (audioqueue0, audioconvert, level, audio_sink, NULL)){
+      g_warning ("Linking part (B)-2 Fail...");
+      return NULL;
+  }
+
+  // Dynamic Pad Creation
+  if(! g_signal_connect (self->src, "pad-added", G_CALLBACK (on_pad_added),rtph264depay))
+  {
+      g_warning ("Linking part (1) with part (A)-1 Fail...");
+  }
+
+  // Dynamic Pad Creation
+  if(! g_signal_connect (vdecoder, "pad-added", G_CALLBACK (on_pad_added),videoqueue0))
+  {
+      g_warning ("Linking part (2) with part (A)-2 Fail...");
+  }
+
+  // Dynamic Pad Creation
+  if(! g_signal_connect (self->src, "pad-added", G_CALLBACK (on_pad_added),adecoder))
+  {
+      g_warning ("Linking part (1) with part (B)-1 Fail...");
+  }
+
+  // Dynamic Pad Creation
+  if(! g_signal_connect (adecoder, "pad-added", G_CALLBACK (on_pad_added),audioqueue0))
+  {
+      g_warning ("Linking part (2) with part (B)-2 Fail...");
+  }
 }
 
 void OnvifPlayer__init(OnvifPlayer* self) {

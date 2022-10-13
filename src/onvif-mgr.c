@@ -49,9 +49,9 @@ static void delete_event_cb (GtkWidget *widget, GdkEvent *event, OnvifPlayer *da
 void row_selected_cb (GtkWidget *widget,   GtkListBoxRow* row,
   OnvifPlayer* player)
 {
+    stop_cb (NULL, player);
     //Unselected. Stopping stream TODO this isn't enough
     if(row == NULL){
-      stop_cb (NULL, player);
       return;
     }
     int pos;
