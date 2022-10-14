@@ -125,6 +125,11 @@ state_changed_cb (GstBus * bus, GstMessage * msg, OnvifPlayer * data)
   gst_message_parse_state_changed (msg, &old_state, &new_state, &pending_state);
   if (GST_MESSAGE_SRC (msg) == GST_OBJECT (data->pipeline)) {
     data->state = new_state;
+    if(data->state == GST_STATE_PLAYING){
+      gtk_widget_set_visible(data->canvas, TRUE);
+    } else {
+      gtk_widget_set_visible(data->canvas, FALSE);
+    }
     g_print ("State set to %s\n", gst_element_state_get_name (new_state));
   }
 }
@@ -306,23 +311,6 @@ static void realize_cb (GtkWidget *widget, OnvifPlayer *data) {
 
 }
 
-/* This function is called everytime the video window needs to be redrawn (due to damage/exposure,
- * rescaling, etc). GStreamer takes care of this in the PAUSED and PLAYING states, otherwise,
- * we simply draw a black rectangle to avoid garbage showing up. */
-static gboolean draw_cb (GtkWidget *widget, cairo_t *cr, OnvifPlayer *data) {
-  if (data->state < GST_STATE_PAUSED) {
-    GtkAllocation allocation;
-
-    /* Cairo is a 2D graphics library which we use here to clean the video window.
-     * It is used by GStreamer for other reasons, so it will always be available to us. */
-    gtk_widget_get_allocation (widget, &allocation);
-    cairo_set_source_rgb (cr, 0, 0, 0);
-    cairo_rectangle (cr, 0, 0, allocation.width, allocation.height);
-    cairo_fill (cr);
-  }
-
-  return FALSE;
-}
 
 gboolean
 remove_extra_fields (GQuark field_id, GValue * value G_GNUC_UNUSED,
@@ -589,12 +577,12 @@ void OnvifPlayer__destroy(OnvifPlayer* self) {
 }
 
 void OnvifPlayer__set_playback_url(OnvifPlayer* self, char *url) {
-    // g_object_set (self->sink, "uri", url, NULL);
     printf("set location : %s\n",url);
     g_object_set (G_OBJECT (self->src), "location", url, NULL);
 }
 
 void OnvifPlayer__stop(OnvifPlayer* self){
+    printf("OnvifPlayer__stop \n");
     GstStateChangeReturn ret;
     GstState state;
     ret = gst_element_set_state (self->pipeline, GST_STATE_READY);
@@ -619,13 +607,13 @@ void OnvifPlayer__play(OnvifPlayer* self){
 GtkWidget * OnvifDevice__createCanvas(OnvifPlayer *self){
 
   self->canvas = gtk_drawing_area_new ();
+  gtk_widget_set_visible(self->canvas, FALSE);
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   //TODO Support Gl. Currently not well supported by WSL
   gtk_widget_set_double_buffered (self->canvas, FALSE);
 #pragma GCC diagnostic pop
   g_signal_connect (self->canvas, "realize", G_CALLBACK (realize_cb), self);
-  g_signal_connect (self->canvas, "draw", G_CALLBACK (draw_cb), self);
   g_signal_connect (self->src, "select-stream", G_CALLBACK (find_backchannel),self);
   return self->canvas;
 }
