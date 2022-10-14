@@ -18,9 +18,7 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Record video
 - JPEG Snapshot
 - Push-to-Talk button
-- Soundlevel GstOverlay instead of GtkWidget (GtkLevelBar makes UI less responsive even without event)
 - Check for better backchannel audio support. (PCMU@8000 might be Onvif's spec limit)
-- Enhancement: Improve swap sound start responsiveness if possible
 
 # Use-case
 1. Doorbell-like security camera terminal

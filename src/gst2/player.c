@@ -344,18 +344,18 @@ setup_backchannel_shoveler (OnvifPlayer * player, GstCaps * caps)
   GstElement *appsink;
   GstElement *backpipe;
   
-  backpipe = gst_parse_launch ("audiotestsrc is-live=true wave=red-noise ! "
+  player->backpipe = gst_parse_launch ("audiotestsrc is-live=true wave=red-noise ! "
       "mulawenc ! rtppcmupay ! appsink name=out", NULL);
-  if (!backpipe)
+  if (!player->backpipe)
     g_error ("Could not setup backchannel pipeline");
 
-  appsink = gst_bin_get_by_name (GST_BIN (backpipe), "out");
+  appsink = gst_bin_get_by_name (GST_BIN (player->backpipe), "out");
   g_object_set (G_OBJECT (appsink), "caps", caps, "emit-signals", TRUE, NULL);
 
   g_signal_connect (appsink, "new-sample", G_CALLBACK (new_sample), player);
 
   g_print ("Playing backchannel shoveler\n");
-  gst_element_set_state (backpipe, GST_STATE_PLAYING);
+  gst_element_set_state (player->backpipe, GST_STATE_PLAYING);
 }
 
 gboolean
@@ -398,6 +398,36 @@ static void on_pad_added (GstElement *element, GstPad *pad, gpointer data){
       g_print("failed to link dynamically\n");
     }
 
+    gst_object_unref (sinkpad);
+}
+
+/* Dynamically link */
+static void on_pad_removed (GstElement *element, GstPad *pad, gpointer data){
+    GstPad *sinkpad;
+    GstPadLinkReturn ret;
+    GstElement *decoder = (GstElement *) data;
+    /* We can now link this pad with the rtsp-decoder sink pad */
+    g_print ("Dynamic pad created, unlinking source/demuxer\n");
+    if(!GST_IS_ELEMENT(decoder)){
+      g_print("Invalid sink element\n");
+      return;
+    }
+    sinkpad = gst_element_get_static_pad (decoder, "sink");
+
+    /* If our converter is already linked, we have nothing to do here */
+    if (gst_pad_is_linked (sinkpad)) {
+        g_print("proceeding to unlinking ...\n");
+    } else {
+        g_print("*** We are already unlinked ***\n");
+        gst_object_unref (sinkpad);
+        return;
+    }
+    ret = gst_pad_unlink (pad, sinkpad);
+
+    if (GST_PAD_LINK_FAILED (ret)) {
+        //failed
+        g_print("failed to unlink dynamically\n");
+    }
     gst_object_unref (sinkpad);
 }
 
@@ -465,6 +495,11 @@ void * create_pipeline(OnvifPlayer *self){
   self->sink = gst_element_factory_make ("autovideosink", "vsink");
   g_object_set (G_OBJECT (self->sink), "sync", FALSE, NULL);
   g_object_set (G_OBJECT (self->src), "latency", 0, NULL);
+  g_object_set (G_OBJECT (self->src), "teardown-timeout", 0, NULL); 
+  g_object_set (G_OBJECT (self->src), "backchannel", 1, NULL);
+  g_object_set (G_OBJECT (self->src), "user-agent", "OnvifDeviceManager-Linux-0.0", NULL);
+  g_object_set (G_OBJECT (self->src), "do-retransmission", FALSE, NULL);
+  g_object_set (G_OBJECT (self->src), "onvif-mode", TRUE, NULL);
 
   //Audio pipe
   adecoder = gst_element_factory_make ("decodebin", "decodebin1");
@@ -513,11 +548,19 @@ void * create_pipeline(OnvifPlayer *self){
   {
       g_warning ("Linking part (1) with part (A)-1 Fail...");
   }
+  if(! g_signal_connect (self->src, "pad-removed", G_CALLBACK (on_pad_removed),rtph264depay))
+  {
+      g_warning ("Linking part (2) with part (B)-2 Fail...");
+  }
 
   // Dynamic Pad Creation
   if(! g_signal_connect (vdecoder, "pad-added", G_CALLBACK (on_pad_added),videoqueue0))
   {
       g_warning ("Linking part (2) with part (A)-2 Fail...");
+  }
+  if(! g_signal_connect (vdecoder, "pad-removed", G_CALLBACK (on_pad_removed),videoqueue0))
+  {
+      g_warning ("Linking part (2) with part (B)-2 Fail...");
   }
 
   // Dynamic Pad Creation
@@ -525,12 +568,21 @@ void * create_pipeline(OnvifPlayer *self){
   {
       g_warning ("Linking part (1) with part (B)-1 Fail...");
   }
+  if(! g_signal_connect (self->src, "pad-removed", G_CALLBACK (on_pad_removed),adecoder))
+  {
+      g_warning ("Linking part (2) with part (B)-2 Fail...");
+  }
 
    // Dynamic Pad Creation
   if(! g_signal_connect (adecoder, "pad-added", G_CALLBACK (on_pad_added),audioqueue0))
   {
       g_warning ("Linking part (2) with part (B)-2 Fail...");
   }
+  if(! g_signal_connect (adecoder, "pad-removed", G_CALLBACK (on_pad_removed),audioqueue0))
+  {
+      g_warning ("Linking part (2) with part (B)-2 Fail...");
+  }
+   
 
  // Dynamic Pad Creation
   if(! g_signal_connect (cairo_overlay, "draw", G_CALLBACK (draw_overlay), self))
@@ -586,6 +638,28 @@ void OnvifPlayer__stop(OnvifPlayer* self){
     GstStateChangeReturn ret;
     GstState state;
     ret = gst_element_set_state (self->pipeline, GST_STATE_READY);
+    if (ret == GST_STATE_CHANGE_FAILURE) {
+        g_printerr ("Unable to set the pipeline to the ready state.\n");
+        gst_object_unref (self->pipeline);
+        return;
+    }
+    if(GST_IS_ELEMENT(self->backpipe)){
+      ret = gst_element_set_state (self->backpipe, GST_STATE_READY);
+      if (ret == GST_STATE_CHANGE_FAILURE) {
+          g_printerr ("Unable to set the backpipe to the ready state.\n");
+          gst_object_unref (self->pipeline);
+          return;
+      }
+      ret = gst_element_set_state (self->backpipe, GST_STATE_NULL);
+      gst_object_unref (self->backpipe);
+      if (ret == GST_STATE_CHANGE_FAILURE) {
+          g_printerr ("Unable to set the backpipe to the ready state.\n");
+          gst_object_unref (self->pipeline);
+          return;
+      }
+    }
+
+    ret = gst_element_set_state (self->pipeline, GST_STATE_NULL);
     if (ret == GST_STATE_CHANGE_FAILURE) {
         g_printerr ("Unable to set the pipeline to the ready state.\n");
         gst_object_unref (self->pipeline);

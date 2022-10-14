@@ -20,6 +20,7 @@
 /* Structure to contain all our information, so we can pass it around */
 typedef struct _OnvifPlayer {
   GstElement *pipeline; /* Our one and only pipeline */
+  GstElement *backpipe;
   GstElement *src;  /* RtspSrc to support backchannel */
   GstElement *sink;  /* Video Sink */
   GstVideoOverlay *overlay; //Overlay rendered on the canvas widget
