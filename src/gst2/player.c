@@ -401,36 +401,6 @@ static void on_pad_added (GstElement *element, GstPad *pad, gpointer data){
     gst_object_unref (sinkpad);
 }
 
-/* Dynamically link */
-static void on_pad_removed (GstElement *element, GstPad *pad, gpointer data){
-    GstPad *sinkpad;
-    GstPadLinkReturn ret;
-    GstElement *decoder = (GstElement *) data;
-    /* We can now link this pad with the rtsp-decoder sink pad */
-    g_print ("Dynamic pad created, unlinking source/demuxer\n");
-    if(!GST_IS_ELEMENT(decoder)){
-      g_print("Invalid sink element\n");
-      return;
-    }
-    sinkpad = gst_element_get_static_pad (decoder, "sink");
-
-    /* If our converter is already linked, we have nothing to do here */
-    if (gst_pad_is_linked (sinkpad)) {
-        g_print("proceeding to unlinking ...\n");
-    } else {
-        g_print("*** We are already unlinked ***\n");
-        gst_object_unref (sinkpad);
-        return;
-    }
-    ret = gst_pad_unlink (pad, sinkpad);
-
-    if (GST_PAD_LINK_FAILED (ret)) {
-        //failed
-        g_print("failed to unlink dynamically\n");
-    }
-    gst_object_unref (sinkpad);
-}
-
 static void
 prepare_overlay (GstElement * overlay, GstCaps * caps, gpointer user_data)
 {
@@ -548,19 +518,11 @@ void * create_pipeline(OnvifPlayer *self){
   {
       g_warning ("Linking part (1) with part (A)-1 Fail...");
   }
-  if(! g_signal_connect (self->src, "pad-removed", G_CALLBACK (on_pad_removed),rtph264depay))
-  {
-      g_warning ("Linking part (2) with part (B)-2 Fail...");
-  }
 
   // Dynamic Pad Creation
   if(! g_signal_connect (vdecoder, "pad-added", G_CALLBACK (on_pad_added),videoqueue0))
   {
       g_warning ("Linking part (2) with part (A)-2 Fail...");
-  }
-  if(! g_signal_connect (vdecoder, "pad-removed", G_CALLBACK (on_pad_removed),videoqueue0))
-  {
-      g_warning ("Linking part (2) with part (B)-2 Fail...");
   }
 
   // Dynamic Pad Creation
@@ -568,17 +530,9 @@ void * create_pipeline(OnvifPlayer *self){
   {
       g_warning ("Linking part (1) with part (B)-1 Fail...");
   }
-  if(! g_signal_connect (self->src, "pad-removed", G_CALLBACK (on_pad_removed),adecoder))
-  {
-      g_warning ("Linking part (2) with part (B)-2 Fail...");
-  }
 
    // Dynamic Pad Creation
   if(! g_signal_connect (adecoder, "pad-added", G_CALLBACK (on_pad_added),audioqueue0))
-  {
-      g_warning ("Linking part (2) with part (B)-2 Fail...");
-  }
-  if(! g_signal_connect (adecoder, "pad-removed", G_CALLBACK (on_pad_removed),audioqueue0))
   {
       g_warning ("Linking part (2) with part (B)-2 Fail...");
   }
