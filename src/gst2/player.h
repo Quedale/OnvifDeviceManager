@@ -3,7 +3,7 @@
 #include <gtk/gtk.h>
 #include <gst/gst.h>
 #include <gst/video/videooverlay.h>
-
+#include <gst/video/video.h>
 #include <gdk/gdk.h>
 #if defined (GDK_WINDOWING_X11)
 #include <gdk/gdkx.h>
@@ -29,12 +29,16 @@ typedef struct _OnvifPlayer {
   GtkWidget *listbox;
   GtkWidget *canvas;
   guintptr video_window_handle;
-  GtkWidget * levelbar; //To display sound level
-  double level; //Used to calculate level decay
+  gdouble level; //Used to calculate level decay
   guint back_stream_id;
+
+  //Cairo overlay
+  int valid;//For some reason taking this out causes a segment fault, although there's no reference to it???
+  int width;
+  int height;
 } OnvifPlayer;
 
-OnvifPlayer OnvifPlayer__create();  // equivalent to "new Point(x, y)"
+OnvifPlayer * OnvifPlayer__create();  // equivalent to "new Point(x, y)"
 void OnvifPlayer__destroy(OnvifPlayer* self);  // equivalent to "delete point"
 void OnvifPlayer__set_playback_url(OnvifPlayer* self, char *url);
 void OnvifPlayer__stop(OnvifPlayer* self);

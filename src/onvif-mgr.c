@@ -256,25 +256,6 @@ GtkWidget * create_nvt_ui (OnvifPlayer *player){
 
   grid = gtk_grid_new ();
 
-  //TODO use custom drawing surface for better responsive sound level decay
-  // GtkLevelBar makes the entire gui less responsive. (event without any events)
-  player->levelbar = gtk_level_bar_new ();
-  gtk_grid_attach (GTK_GRID (grid), player->levelbar, 0, 0, 1, 1);
-  gtk_level_bar_add_offset_value (GTK_LEVEL_BAR (player->levelbar),
-                                  GTK_LEVEL_BAR_OFFSET_LOW,
-                                  0.10);
-
-  // This adds a new offset to the bar; the application will
-  // be able to change its color CSS like this:
-  //
-  // levelbar block.my-offset {
-  //   background-color: magenta;
-  //   border-style: solid;
-  //   border-color: black;
-  //   border-style: 1px;
-  // }
-  gtk_level_bar_add_offset_value (GTK_LEVEL_BAR (player->levelbar), "my-offset", 0.60);
-
   widget = OnvifDevice__createCanvas(player);
   gtk_widget_set_vexpand (widget, TRUE);
   gtk_widget_set_hexpand (widget, TRUE);
@@ -358,7 +339,7 @@ void create_ui (OnvifPlayer* player) {
 
 
 int main(int argc, char *argv[]) {
-  OnvifPlayer data;
+  OnvifPlayer * data;
 
   /* Initialize GTK */
   gtk_init (&argc, &argv);
@@ -370,13 +351,13 @@ int main(int argc, char *argv[]) {
   data = OnvifPlayer__create();
   
   /* Create the GUI */
-  create_ui (&data);
+  create_ui (data);
 
   /* Start the GTK main loop. We will not regain control until gtk_main_quit is called. */
   gtk_main ();
 
   /* Free resources */
-  gst_element_set_state (data.pipeline, GST_STATE_NULL);
-  gst_object_unref (data.pipeline);
+  gst_element_set_state (data->pipeline, GST_STATE_NULL);
+  gst_object_unref (data->pipeline);
   return 0;
 }
