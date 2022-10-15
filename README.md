@@ -11,6 +11,7 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Prototype Soundlevel indicator
 
 # TODO
+- WIP : WS-Security Authentication support.
 - Display Onvif device information
 - Display Media information
 - Better Look&Feel
