@@ -12,6 +12,9 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 
 # TODO
 - WIP : WS-Security Authentication support.
+    - Credential Input
+    - Credential Storage 
+    - GtkListRow to display ProbMatch data instead of soap call
 - Display Onvif device information
 - Display Media information
 - Better Look&Feel

@@ -58,7 +58,9 @@ void row_selected_cb (GtkWidget *widget,   GtkListBoxRow* row,
     pos = gtk_list_box_row_get_index (GTK_LIST_BOX_ROW (row));
     
     OnvifDevice dev = player->onvifDeviceList->devices[pos];
-    
+    if(!dev.authorized){
+      return;
+    }
     /* Set the URI to play */
     char * uri = OnvifDevice__media_getStreamUri(&dev);
 
@@ -90,13 +92,6 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   }
   
   OnvifDevice dev = OnvifDevice__create(m->addr);
-  OnvifDeviceInformation * devinfo = OnvifDevice__device_getDeviceInformation(&dev);
-  // printf("--- Device -------\n");
-  // printf("\tfirmware : %s\n",devinfo->firmwareVersion);
-  // printf("\thardware : %s\n",devinfo->hardwareId);
-  // printf("\tmanufacturer : %s\n",devinfo->manufacturer);
-  // printf("\tmodel : %s\n",devinfo->model);
-  // printf("\tserial# : %s\n",devinfo->serialNumber);
 
   OnvifDeviceList__insert_element(player->onvifDeviceList,dev,player->onvifDeviceList->device_count);
   int b;
@@ -108,28 +103,60 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
 
   grid = gtk_grid_new ();
   g_object_set (grid, "margin", 5, NULL);
+
+  if(dev.authorized){
+
+    OnvifDeviceInformation * devinfo = OnvifDevice__device_getDeviceInformation(&dev);
+    // printf("--- Device -------\n");
+    // printf("\tfirmware : %s\n",devinfo->firmwareVersion);
+    // printf("\thardware : %s\n",devinfo->hardwareId);
+    // printf("\tmanufacturer : %s\n",devinfo->manufacturer);
+    // printf("\tmodel : %s\n",devinfo->model);
+    // printf("\tserial# : %s\n",devinfo->serialNumber);
+
+    //TODO Get image preview
+    handle = gtk_event_box_new ();
+    image = gtk_image_new_from_icon_name ("open-menu-symbolic", 1);
+    gtk_container_add (GTK_CONTAINER (handle), image);
+    g_object_set (handle, "margin-end", 10, NULL);
+    gtk_grid_attach (GTK_GRID (grid), handle, 0, 0, 1, 3);
+
+    label = gtk_label_new (dev.hostname);
+    g_object_set (label, "margin-end", 5, NULL);
+    gtk_grid_attach (GTK_GRID (grid), label, 1, 0, 1, 1);
+
+    label = gtk_label_new (devinfo->manufacturer);
+    g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
+    gtk_grid_attach (GTK_GRID (grid), label, 1, 1, 1, 1);
+
+    label = gtk_label_new (devinfo->model);
+    g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
+    gtk_grid_attach (GTK_GRID (grid), label, 1, 2, 1, 1);
+
+  } else {
+    //TODO set error image
+    handle = gtk_event_box_new ();
+    image = gtk_image_new_from_icon_name ("open-menu-symbolic", 1);
+    gtk_container_add (GTK_CONTAINER (handle), image);
+    g_object_set (handle, "margin-end", 10, NULL);
+    gtk_grid_attach (GTK_GRID (grid), handle, 0, 0, 1, 3);
+
+    //TODO handle possible unrelated failure message
+    label = gtk_label_new ("Unauthorized");
+    g_object_set (label, "margin-end", 5, NULL);
+    gtk_grid_attach (GTK_GRID (grid), label, 1, 0, 1, 1);
+
+    label = gtk_label_new ("Hardware from scope");
+    g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
+    gtk_grid_attach (GTK_GRID (grid), label, 1, 1, 1, 1);
+
+    label = gtk_label_new ("name from scope");
+    g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
+    gtk_grid_attach (GTK_GRID (grid), label, 1, 2, 1, 1);
+
+  }
+
   gtk_container_add (GTK_CONTAINER (row), grid);
-
-  handle = gtk_event_box_new ();
-  image = gtk_image_new_from_icon_name ("open-menu-symbolic", 1);
-  gtk_container_add (GTK_CONTAINER (handle), image);
-  g_object_set (handle, "margin-end", 10, NULL);
-  // gtk_container_add (GTK_CONTAINER (grid), handle);
-  gtk_grid_attach (GTK_GRID (grid), handle, 0, 0, 1, 3);
-
-  label = gtk_label_new (dev.hostname);
-  g_object_set (label, "margin-end", 5, NULL);
-  gtk_grid_attach (GTK_GRID (grid), label, 1, 0, 1, 1);
-
-  label = gtk_label_new (devinfo->manufacturer);
-  g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
-  gtk_grid_attach (GTK_GRID (grid), label, 1, 1, 1, 1);
-
-  label = gtk_label_new (devinfo->model);
-  g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
-  gtk_grid_attach (GTK_GRID (grid), label, 1, 2, 1, 1);
-
-
   return row;
 }
 

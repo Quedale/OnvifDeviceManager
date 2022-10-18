@@ -23,6 +23,7 @@ typedef struct {
 
 typedef struct {
     char * hostname;
+    int authorized;
     OnvifSoapClient* device_soap;
     OnvifSoapClient* media_soap;
     // OnvifCapabilities * capabilities;

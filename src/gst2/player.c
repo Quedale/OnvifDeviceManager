@@ -589,14 +589,18 @@ void OnvifPlayer__set_playback_url(OnvifPlayer* self, char *url) {
 
 void OnvifPlayer__stop(OnvifPlayer* self){
     printf("OnvifPlayer__stop \n");
+    if(self->state <= GST_STATE_READY){
+      return; //Ignore stop call if not playing
+    }
     GstStateChangeReturn ret;
-    GstState state;
     ret = gst_element_set_state (self->pipeline, GST_STATE_READY);
     if (ret == GST_STATE_CHANGE_FAILURE) {
-        g_printerr ("Unable to set the pipeline to the ready state.\n");
-        gst_object_unref (self->pipeline);
-        return;
+      g_printerr ("Unable to set the pipeline to the ready state.\n");
+      gst_object_unref (self->pipeline);
+      return;
     }
+
+    //Backchannel clean up
     if(GST_IS_ELEMENT(self->backpipe)){
       ret = gst_element_set_state (self->backpipe, GST_STATE_READY);
       if (ret == GST_STATE_CHANGE_FAILURE) {
@@ -613,12 +617,24 @@ void OnvifPlayer__stop(OnvifPlayer* self){
       }
     }
 
+    //Set NULL state to clear buffers
     ret = gst_element_set_state (self->pipeline, GST_STATE_NULL);
     if (ret == GST_STATE_CHANGE_FAILURE) {
         g_printerr ("Unable to set the pipeline to the ready state.\n");
         gst_object_unref (self->pipeline);
         return;
     }
+
+    //Restore READY state to dispatch state_changed event
+    ret = gst_element_set_state (self->pipeline, GST_STATE_READY);
+    if (ret == GST_STATE_CHANGE_FAILURE) {
+        g_printerr ("Unable to set the pipeline to the ready state.\n");
+        gst_object_unref (self->pipeline);
+        return;
+    } else {
+      printf("pipeline state set to GST_STATE_READY.\n");
+    }
+    // gtk_widget_set_visible(self->canvas, FALSE);
 }
 
 void OnvifPlayer__play(OnvifPlayer* self){

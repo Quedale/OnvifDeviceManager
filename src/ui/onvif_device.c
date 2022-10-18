@@ -10,7 +10,7 @@ OnvifCapabilities* OnvifDevice__device_getCapabilities(OnvifDevice* self) {
 
     memset (&gethostname, 0, sizeof (gethostname));
     memset (&response, 0, sizeof (response));
-    OnvifCapabilities* capabilities = (OnvifCapabilities *) malloc(sizeof(OnvifCapabilities));
+    OnvifCapabilities* capabilities;
     
 
     if (soap_wsse_add_Timestamp(self->device_soap->soap, "Time", 10)
@@ -24,20 +24,30 @@ OnvifCapabilities* OnvifDevice__device_getCapabilities(OnvifDevice* self) {
         OnvifMedia* media =  (OnvifMedia *) malloc(sizeof(OnvifMedia));
         media->xaddr = response.Capabilities->Media->XAddr;
         capabilities->media = media;
+        self->authorized = 1;
+
+        return capabilities; 
     } else {
-        soap_print_fault(self->device_soap->soap, stderr);
+        if(soap_fault_string(self->device_soap->soap) == "Sender not Authorized"){
+            self->authorized = 0;
+        } else if(soap_fault_detail(self->device_soap->soap) == "\"http://www.onvif.org/ver10/error\":NotAuthorized"){
+            self->authorized = 0;
+        } else {
+            //TODO Set error...
+            soap_print_fault(self->device_soap->soap, stderr);
+        }
     }
 
-    return capabilities; 
+    return NULL;
 }
 
 OnvifSoapClient * OnvifDevice__device_getMediaSoap(OnvifDevice* self){
     OnvifCapabilities* capabilities = OnvifDevice__device_getCapabilities(self);
-    return OnvifSoapClient__create(capabilities->media->xaddr);
+    if(capabilities){
+        return OnvifSoapClient__create(capabilities->media->xaddr);
+    }
 }
 
-//GetGeoLocation
-//
 OnvifDeviceInformation * OnvifDevice__device_getDeviceInformation(OnvifDevice *self){
     struct _tds__GetDeviceInformation request;
     struct _tds__GetDeviceInformationResponse response;
@@ -107,10 +117,12 @@ void * OnvifDevice__media_getStreamUri(OnvifDevice* self){
 }
 
 void OnvifDevice__init(OnvifDevice* self, char * device_url) {
+    self->authorized = 0;
     self->device_soap = OnvifSoapClient__create(device_url);
-    self->hostname = OnvifDevice__device_getHostname(self);
-
     self->media_soap = OnvifDevice__device_getMediaSoap(self);
+    if(self->authorized){
+        self->hostname = OnvifDevice__device_getHostname(self);
+    }
 }
 
 OnvifDevice OnvifDevice__create(char * device_url) {
