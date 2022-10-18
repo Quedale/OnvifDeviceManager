@@ -2,6 +2,7 @@
 #include "../soap/client.h"
 #include "../generated/soapH.h"
 #include "../generated/DeviceBinding.nsmap"
+#include "wsseapi.h"
 
 OnvifCapabilities* OnvifDevice__device_getCapabilities(OnvifDevice* self) {
     struct _tds__GetCapabilities gethostname;
@@ -11,6 +12,14 @@ OnvifCapabilities* OnvifDevice__device_getCapabilities(OnvifDevice* self) {
     memset (&response, 0, sizeof (response));
     OnvifCapabilities* capabilities = (OnvifCapabilities *) malloc(sizeof(OnvifCapabilities));
     
+
+    if (soap_wsse_add_Timestamp(self->device_soap->soap, "Time", 10)
+        || soap_wsse_add_UsernameTokenDigest(self->device_soap->soap, "Auth", "admin", "admin")){
+        printf("Unable to set wsse creds...\n");
+        //TODO Error handling
+        return "Error";
+    }
+
     if (soap_call___tds__GetCapabilities(self->device_soap->soap, self->device_soap->endpoint, "", &gethostname,  &response) == SOAP_OK){
         OnvifMedia* media =  (OnvifMedia *) malloc(sizeof(OnvifMedia));
         media->xaddr = response.Capabilities->Media->XAddr;
@@ -34,6 +43,13 @@ OnvifDeviceInformation * OnvifDevice__device_getDeviceInformation(OnvifDevice *s
     struct _tds__GetDeviceInformationResponse response;
     OnvifDeviceInformation *ret = (OnvifDeviceInformation *) malloc(sizeof(OnvifDeviceInformation));
 
+    if (soap_wsse_add_Timestamp(self->device_soap->soap, "Time", 10)
+        || soap_wsse_add_UsernameTokenDigest(self->device_soap->soap, "Auth", "admin", "admin")){
+        printf("Unable to set wsse creds...\n");
+        //TODO Error handling
+        return "Error";
+    }
+
     if (soap_call___tds__GetDeviceInformation(self->device_soap->soap, self->device_soap->endpoint, "", &request,  &response) == SOAP_OK){
         ret->firmwareVersion = response.FirmwareVersion;
         ret->hardwareId = response.HardwareId;
@@ -51,7 +67,14 @@ OnvifDeviceInformation * OnvifDevice__device_getDeviceInformation(OnvifDevice *s
 char * OnvifDevice__device_getHostname(OnvifDevice* self) {
     struct _tds__GetHostname gethostname;
     struct _tds__GetHostnameResponse response;
-    
+
+    if (soap_wsse_add_Timestamp(self->device_soap->soap, "Time", 10)
+        || soap_wsse_add_UsernameTokenDigest(self->device_soap->soap, "Auth", "admin", "admin")){
+        printf("Unable to set wsse creds...\n");
+        //TODO Error handling
+        return "Error";
+    }
+
     if (soap_call___tds__GetHostname(self->device_soap->soap, self->device_soap->endpoint, "", &gethostname,  &response) == SOAP_OK){
         return response.HostnameInformation->Name;
     } else {
@@ -62,15 +85,22 @@ char * OnvifDevice__device_getHostname(OnvifDevice* self) {
 }
 
 void * OnvifDevice__media_getStreamUri(OnvifDevice* self){
-    struct _trt__GetStreamUri req; //trt__GetStreamUri
-    struct _trt__GetStreamUriResponse resp; //trt__GetStreamUriResponse
+    struct _trt__GetStreamUri req;
+    struct _trt__GetStreamUriResponse resp;
     memset (&req, 0, sizeof (req));
     memset (&resp, 0, sizeof (resp));
-    
+
+    if (soap_wsse_add_Timestamp(self->media_soap->soap, "Time", 10)
+        || soap_wsse_add_UsernameTokenDigest(self->media_soap->soap, "Auth", "admin", "admin")){
+        printf("Unable to set wsse creds...\n");
+        //TODO Error handling
+        return "Error";
+    }
+
     if (soap_call___trt__GetStreamUri(self->media_soap->soap, self->media_soap->endpoint, "", &req, &resp) == SOAP_OK){
         return resp.MediaUri->Uri;
     } else {
-        soap_print_fault(self->device_soap->soap, stderr);
+        soap_print_fault(self->media_soap->soap, stderr);
     }
     //TODO error handling timout, invalid url, etc...
     return "error";

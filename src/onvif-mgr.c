@@ -78,16 +78,16 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   GtkWidget *handle;
   GtkWidget *image;
 
-  // int i;
-  // printf("--- Prob -------\n");
-  // printf("\tProbe %s\n",m->prob_uuid);
-  // printf("\tAddr %s\n",m->addr);
-  // printf("\tTypes %s\n",m->types);
-  // printf("\tVersion : %s\n", m->version);
-  // printf("\tcount : %i\n", m->scope_count);
-  // for (i = 0 ; i < m->scope_count ; ++i) {
-  //   printf("\t\tScope : %s\n",m->scopes[i]);
-  // }
+  int i;
+  printf("--- Prob -------\n");
+  printf("\tProbe %s\n",m->prob_uuid);
+  printf("\tAddr %s\n",m->addr);
+  printf("\tTypes %s\n",m->types);
+  printf("\tVersion : %s\n", m->version);
+  printf("\tcount : %i\n", m->scope_count);
+  for (i = 0 ; i < m->scope_count ; ++i) {
+    printf("\t\tScope : %s\n",m->scopes[i]);
+  }
   
   OnvifDevice dev = OnvifDevice__create(m->addr);
   OnvifDeviceInformation * devinfo = OnvifDevice__device_getDeviceInformation(&dev);

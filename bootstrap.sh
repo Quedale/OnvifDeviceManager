@@ -1,8 +1,20 @@
 sudo apt install automake autoconf gcc make pkg-config
 sudo apt install libxml2-dev libgtk-3-dev
-#wget https://sourceforge.net/projects/gsoap2/files/gsoap_2.8.123.zip/download -P $(dirname "$0")/
-echo "-- installing gsoap libgsoap-dev --"
-sudo apt install gsoap libgsoap-dev
+sudo apt-get install unzip
+
+echo "-- Building gsoap libgsoap-dev --"
+#WS-Security depends on OpenSSL library 3.0 or 1.1
+wget https://sourceforge.net/projects/gsoap2/files/gsoap_2.8.123.zip/download
+unzip download
+rm download
+cd gsoap-2.8
+mkdir build
+./configure --with-openssl=/usr/lib/ssl --prefix=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/build
+LIBRARY_PATH="$(pkg-config --variable=libdir openssl):$LIBRARY_PATH" \
+LD_LIBRARY_PATH="$(pkg-config --variable=libdir openssl):$LD_LIBRARY_PATH" \
+    make -j$(nproc)
+make install
+cd ..
 
 echo "-- installing Gstreamer dependencies --"
 sudo apt install libgstreamer1.0-dev #client
@@ -35,28 +47,23 @@ automake --add-missing
 #echo $'\n'"export HOST_IP=\"\$(ip route |awk '/^default/{print \$3}')\""  >> ~/.bashrc
 #echo "export PULSE_SERVER=\"tcp:\$HOST_IP\""  >> ~/.bashrc
 
-
-#TODO extract http://docs.oasis-open.org/wsn/b-2.xsd
-#               http://docs.oasis-open.org/wsrf/bf-2.xsd
-#               http://docs.oasis-open.org/wsn/t-1.xsd
-rm -rf src/generated
-# mkdir src/generated
-# wsdl2h -c -o src/generated/device_service.h wsdl/device_service.wsdl
-# soapcpp2 -CL -I/usr/share/gsoap/import src/device_service.h -dsrc/generated -x
-
 # #TODO offline files
-# mkdir src/generated
-# wsdl2h -c -o src/generated/media_service.h wsdl/media.wsdl
-# soapcpp2 -CL -I/usr/share/gsoap/import src/generated/media_service.h -dsrc/generated -x
-
+echo "Generating WSDL gsoap files..."
+rm -rf src/generated
 mkdir src/generated
-wsdl2h -c -o src/generated/common_service.h wsdl/*.wsdl
-soapcpp2 -CL -I/usr/share/gsoap/import src/generated/common_service.h -dsrc/generated -x
-
-# wget http://www.onvif.org/ver10/device/wsdl/devicemgmt.wsdl --d $(dirname "$0")/wsdl2/www.onvif.org.ver10.device.wsdl
-
-# unzip gsoap_2.8.123.zip -d $(dirname "$0")/
-# mkdir gsoap-build
-# $(dirname "$0")/gsoap-2.8/configure --enable-samples --prefix=$(dirname "$0")/gsoap-build
-# make
-# make install
+gsoap-2.8/build/bin/wsdl2h -x -t wsdl/onvif-typemap.dat -o src/generated/common_service.h -c \
+http://www.onvif.org/onvif/ver10/device/wsdl/devicemgmt.wsdl \
+http://www.onvif.org/onvif/ver10/event/wsdl/event.wsdl \
+http://www.onvif.org/onvif/ver10/display.wsdl \
+http://www.onvif.org/onvif/ver10/deviceio.wsdl \
+http://www.onvif.org/onvif/ver20/imaging/wsdl/imaging.wsdl \
+http://www.onvif.org/onvif/ver10/media/wsdl/media.wsdl \
+http://www.onvif.org/onvif/ver20/ptz/wsdl/ptz.wsdl \
+http://www.onvif.org/onvif/ver10/receiver.wsdl \
+http://www.onvif.org/onvif/ver10/recording.wsdl \
+http://www.onvif.org/onvif/ver10/search.wsdl \
+http://www.onvif.org/onvif/ver10/replay.wsdl \
+http://www.onvif.org/onvif/ver20/analytics/wsdl/analytics.wsdl \
+http://www.onvif.org/onvif/ver10/analyticsdevice.wsdl \
+http://www.onvif.org/onvif/ver10/schema/onvif.xsd 
+gsoap-2.8/build/bin/soapcpp2 -CL -x -Igsoap-2.8/gsoap/import:gsoap-2.8/gsoap src/generated/common_service.h -dsrc/generated
