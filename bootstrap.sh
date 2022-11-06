@@ -1,19 +1,47 @@
+SKIP_GSOAP=0
+i=1;
+for arg in "$@" 
+do
+    if [ $arg == "--skip-gsoap" ]; then
+        SKIP_GSOAP=1
+    fi
+    i=$((i + 1));
+done
+
 sudo apt install automake autoconf gcc make pkg-config
 sudo apt install libxml2-dev libgtk-3-dev
 sudo apt-get install unzip
 
-echo "-- Building gsoap libgsoap-dev --"
-#WS-Security depends on OpenSSL library 3.0 or 1.1
-wget https://sourceforge.net/projects/gsoap2/files/gsoap_2.8.123.zip/download
-unzip download
-rm download
-cd gsoap-2.8
-mkdir build
-./configure --with-openssl=/usr/lib/ssl --prefix=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/build
-LIBRARY_PATH="$(pkg-config --variable=libdir openssl):$LIBRARY_PATH" \
-LD_LIBRARY_PATH="$(pkg-config --variable=libdir openssl):$LD_LIBRARY_PATH" \
-    make -j$(nproc)
-make install
+if [ $SKIP_GSOAP -eq 0 ]; then
+    echo "-- Building gsoap libgsoap-dev --"
+    #WS-Security depends on OpenSSL library 3.0 or 1.1
+    wget https://sourceforge.net/projects/gsoap2/files/gsoap_2.8.123.zip/download
+    unzip download
+    rm download
+    cd gsoap-2.8
+    mkdir build
+    ./configure --with-openssl=/usr/lib/ssl --prefix=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/build
+    LIBRARY_PATH="$(pkg-config --variable=libdir openssl):$LIBRARY_PATH" \
+    LD_LIBRARY_PATH="$(pkg-config --variable=libdir openssl):$LD_LIBRARY_PATH" \
+        make -j$(nproc)
+    make install
+    cd ..
+fi
+
+echo "-- Building OnvifDiscoveryLib  --"
+git -C OnvifDiscoveryLib pull 2> /dev/null || git clone https://github.com/Quedale/OnvifDiscoveryLib.git
+cd OnvifDiscoveryLib
+GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../gsoap-2.8 ./bootstrap.sh --skip-gsoap
+./configure
+GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../gsoap-2.8 make -j$(nproc) discoverylib
+cd ..
+
+echo "-- Building OnvifSoapLib  --"
+git -C OnvifSoapLib pull 2> /dev/null || git clone https://github.com/Quedale/OnvifSoapLib.git
+cd OnvifSoapLib
+GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../gsoap-2.8 ./bootstrap.sh --skip-gsoap
+./configure
+GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../gsoap-2.8 make -j$(nproc) onviflib
 cd ..
 
 echo "-- installing Gstreamer dependencies --"

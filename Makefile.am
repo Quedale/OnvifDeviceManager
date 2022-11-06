@@ -12,8 +12,8 @@ onvifmgr$(EXEEXT):
 		`pkg-config --cflags gstreamer-video-1.0` \
 		`pkg-config --cflags gtk+-3.0` \
 		`pkg-config --cflags openssl` \
-		-L/home/quedale/git/OnvifDiscoveryLib/build/lib \
-		-L/home/quedale/git/OnvifSoapLib/build/lib \
+		-LOnvifDiscoveryLib/build/lib \
+		-LOnvifSoapLib/build/lib \
 		src/onvif-mgr.c \
 		src/gst2/player.c \
 		-o build/onvif-mgr \
