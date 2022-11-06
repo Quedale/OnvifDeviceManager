@@ -7,7 +7,7 @@ Onvif Device Manager for Linux
 The goal of this project is to implement a Onvif Device Manager similar to the windows client, compatible for linux. I'm also working on adding some Profile T capabilities, such as bidirectional audio.
 
 # Working
-- Onvif UDP Discovery
+- Onvif WS-Discovery (gsoap)
 - Soap Client for Onvif Device and Media service
 - Vew RTSP Stream with backchannel
 - Prototype Soundlevel indicator
@@ -16,7 +16,6 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - WIP : WS-Security Authentication support.
     - Credential Input
     - Credential Storage 
-    - GtkListRow to display ProbMatch data instead of soap call
 - Display Onvif device information
 - Display Media information
 - Better Look&Feel
