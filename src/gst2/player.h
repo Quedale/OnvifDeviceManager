@@ -1,5 +1,5 @@
 #include "gst/gst.h"
-#include "../ui/onvif_list.h"
+#include "onvif_list.h"
 #include <gtk/gtk.h>
 #include <gst/gst.h>
 #include <gst/video/videooverlay.h>

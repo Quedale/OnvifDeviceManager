@@ -1,5 +1,5 @@
 #include "player.h"
-#include<unistd.h>
+#include <unistd.h>
 
 /* This function is called when an error message is posted on the bus */
 static void error_cb (GstBus *bus, GstMessage *msg, OnvifPlayer *data) {

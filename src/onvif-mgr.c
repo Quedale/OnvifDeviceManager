@@ -1,10 +1,9 @@
 #include <string.h>
 #include "gst2/player.h"
-#include "udp/soap_parser.h"
-#include "udp/discoverer.h"
-#include "soap/client.h"
-#include "ui/onvif_list.h"
-#include "ui/onvif_device.h"
+#include "discoverer.h"
+#include "onvif_discovery.h"
+#include "onvif_list.h"
+#include "onvif_device.h"
 
 #include <gtk/gtk.h>
 #include <gst/gst.h>
@@ -73,23 +72,22 @@ void row_selected_cb (GtkWidget *widget,   GtkListBoxRow* row,
 static GtkWidget *
 create_row (struct ProbMatch * m, OnvifPlayer *player)
 {
-  // GtkWidget *row, *handle, *box, *label, *image;
   GtkWidget *row;
   GtkWidget *grid;
   GtkWidget *label;
   GtkWidget *handle;
   GtkWidget *image;
 
-  int i;
-  printf("--- Prob -------\n");
-  printf("\tProbe %s\n",m->prob_uuid);
-  printf("\tAddr %s\n",m->addr);
-  printf("\tTypes %s\n",m->types);
-  printf("\tVersion : %s\n", m->version);
-  printf("\tcount : %i\n", m->scope_count);
-  for (i = 0 ; i < m->scope_count ; ++i) {
-    printf("\t\tScope : %s\n",m->scopes[i]);
-  }
+  // int i;
+  // printf("--- Prob -------\n");
+  // printf("\tProbe %s\n",m->prob_uuid);
+  // printf("\tAddr %s\n",m->addr);
+  // printf("\tTypes %s\n",m->types);
+  // printf("\tVersion : %s\n", m->version);
+  // printf("\tcount : %i\n", m->scope_count);
+  // for (i = 0 ; i < m->scope_count ; ++i) {
+  //   printf("\t\tScope : %s\n",m->scopes[i]);
+  // }
   
   OnvifDevice dev = OnvifDevice__create(m->addr);
 
@@ -104,69 +102,48 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   grid = gtk_grid_new ();
   g_object_set (grid, "margin", 5, NULL);
 
-  if(dev.authorized){
+  //TODO set preview image
+  handle = gtk_event_box_new ();
+  image = gtk_image_new_from_icon_name ("open-menu-symbolic", 1);
+  gtk_container_add (GTK_CONTAINER (handle), image);
+  g_object_set (handle, "margin-end", 10, NULL);
+  gtk_grid_attach (GTK_GRID (grid), handle, 0, 1, 1, 2);
 
-    OnvifDeviceInformation * devinfo = OnvifDevice__device_getDeviceInformation(&dev);
-    // printf("--- Device -------\n");
-    // printf("\tfirmware : %s\n",devinfo->firmwareVersion);
-    // printf("\thardware : %s\n",devinfo->hardwareId);
-    // printf("\tmanufacturer : %s\n",devinfo->manufacturer);
-    // printf("\tmodel : %s\n",devinfo->model);
-    // printf("\tserial# : %s\n",devinfo->serialNumber);
+  char* m_name = onvif_extract_scope("name",m);
+  char* markup_name = malloc(strlen(m_name)+1+7);
+  strcpy(markup_name, "<b>");
+  strcat(markup_name, m_name);
+  strcat(markup_name, "</b>");
+  label = gtk_label_new (NULL);
+  gtk_label_set_markup(GTK_LABEL(label), markup_name);
+  g_object_set (label, "margin-end", 5, NULL);
+  gtk_grid_attach (GTK_GRID (grid), label, 0, 0, 2, 1);
 
-    //TODO Get image preview
-    handle = gtk_event_box_new ();
-    image = gtk_image_new_from_icon_name ("open-menu-symbolic", 1);
-    gtk_container_add (GTK_CONTAINER (handle), image);
-    g_object_set (handle, "margin-end", 10, NULL);
-    gtk_grid_attach (GTK_GRID (grid), handle, 0, 0, 1, 3);
-
-    label = gtk_label_new (dev.hostname);
-    g_object_set (label, "margin-end", 5, NULL);
-    gtk_grid_attach (GTK_GRID (grid), label, 1, 0, 1, 1);
-
-    label = gtk_label_new (devinfo->manufacturer);
-    g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
-    gtk_grid_attach (GTK_GRID (grid), label, 1, 1, 1, 1);
-
-    label = gtk_label_new (devinfo->model);
-    g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
-    gtk_grid_attach (GTK_GRID (grid), label, 1, 2, 1, 1);
-
-  } else {
-    //TODO set error image
-    handle = gtk_event_box_new ();
-    image = gtk_image_new_from_icon_name ("open-menu-symbolic", 1);
-    gtk_container_add (GTK_CONTAINER (handle), image);
-    g_object_set (handle, "margin-end", 10, NULL);
-    gtk_grid_attach (GTK_GRID (grid), handle, 0, 0, 1, 3);
-
-    //TODO handle possible unrelated failure message
-    label = gtk_label_new ("Unauthorized");
-    g_object_set (label, "margin-end", 5, NULL);
-    gtk_grid_attach (GTK_GRID (grid), label, 1, 0, 1, 1);
-
-    label = gtk_label_new ("Hardware from scope");
-    g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
-    gtk_grid_attach (GTK_GRID (grid), label, 1, 1, 1, 1);
-
-    label = gtk_label_new ("name from scope");
-    g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
-    gtk_grid_attach (GTK_GRID (grid), label, 1, 2, 1, 1);
-
-  }
+  label = gtk_label_new (onvif_extract_scope("hardware",m));
+  g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
+  gtk_grid_attach (GTK_GRID (grid), label, 1, 1, 1, 1);
+  
+  label = gtk_label_new (onvif_extract_scope("location",m));
+  gtk_label_set_ellipsize (GTK_LABEL(label),PANGO_ELLIPSIZE_END);
+  g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
+  gtk_grid_attach (GTK_GRID (grid), label, 1, 2, 1, 1);
 
   gtk_container_add (GTK_CONTAINER (row), grid);
   return row;
 }
 
+struct DiscoveryInput {
+  OnvifPlayer * player;
+  GtkWidget * widget;
+};
+
 static gboolean * 
 finished_discovery (void * e)
 {
   DiscoveryEvent * event = (DiscoveryEvent *) e;
-  GtkWidget * widget = event->widget;
+  struct DiscoveryInput * disco_in = (struct DiscoveryInput * ) event->data;
   
-  gtk_widget_set_sensitive(widget,TRUE);
+  gtk_widget_set_sensitive(disco_in->widget,TRUE);
 
   return FALSE;
 }
@@ -175,26 +152,28 @@ found_server (void * e)
 {
   GtkWidget *row;
   DiscoveryEvent * event = (DiscoveryEvent *) e;
+
   DiscoveredServer * server = event->server;
-  OnvifPlayer * player = (OnvifPlayer *) event->player;
-  
+  struct DiscoveryInput * disco_in = (struct DiscoveryInput * ) event->data;
+
   struct ProbMatch m;
   int i;
   
-  printf("Found server ----------------\n");
+  printf("Found server ---------------- %i\n",server->match_count);
   for (i = 0 ; i < server->match_count ; ++i) {
     m = server->matches[i];
 
     // Create GtkListBoxRow and add it
     printf("Prob Match #%i ----------------\n",i);
-    row = create_row (&m,player);
-    gtk_list_box_insert (GTK_LIST_BOX (player->listbox), row, -1);  
+    row = create_row (&m,disco_in->player);
+    gtk_list_box_insert (GTK_LIST_BOX (disco_in->player->listbox), row, -1);  
   }
   //Display new content
-  gtk_widget_show_all (player->listbox);
+  gtk_widget_show_all (disco_in->player->listbox);
 
   return FALSE;
 }
+
 void
 onvif_scan (GtkWidget *widget,
              OnvifPlayer *player)
@@ -210,9 +189,12 @@ onvif_scan (GtkWidget *widget,
   //Clearing old list data
   OnvifDeviceList__clear(player->onvifDeviceList);
 
+  struct DiscoveryInput * disco_in = malloc(sizeof(struct DiscoveryInput));
+  disco_in->player = player;
+  disco_in->widget = widget;
   //Start UDP Scan
   struct UdpDiscoverer discoverer = UdpDiscoverer__create(found_server,finished_discovery);
-  UdpDiscoverer__start(&discoverer, widget, player);
+  UdpDiscoverer__start(&discoverer, disco_in);
 
 }
 
@@ -368,8 +350,6 @@ void create_ui (OnvifPlayer* player) {
   gtk_window_set_default_size(GTK_WINDOW(main_window),640,480);
   gtk_widget_show_all (main_window);
 }
-
-
 
 int main(int argc, char *argv[]) {
   OnvifPlayer * data;
