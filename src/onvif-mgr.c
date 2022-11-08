@@ -77,6 +77,8 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   GtkWidget *label;
   GtkWidget *handle;
   GtkWidget *image;
+  GdkPixbufLoader *loader;
+  GdkPixbuf *pixbuf;
 
   // int i;
   // printf("--- Prob -------\n");
@@ -94,7 +96,7 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   OnvifDeviceList__insert_element(player->onvifDeviceList,dev,player->onvifDeviceList->device_count);
   int b;
   for (b=0;b<player->onvifDeviceList->device_count;b++){
-    printf("DEBUG List Record :[%i] %s\n",b,player->onvifDeviceList->devices[b].hostname);
+    printf("DEBUG List Record :[%i] %s:%s\n",b,player->onvifDeviceList->devices[b].ip,player->onvifDeviceList->devices[b].port);
   }
 
   row = gtk_list_box_row_new ();
@@ -102,9 +104,23 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   grid = gtk_grid_new ();
   g_object_set (grid, "margin", 5, NULL);
 
+  if(dev.authorized){
+    //todo load image using threaded dispatch queue on a timer
+    struct chunk * imgchunk = OnvifDevice__media_getSnapshot(&dev);
+    loader = gdk_pixbuf_loader_new ();
+    gdk_pixbuf_loader_write (loader, imgchunk->buffer, imgchunk->size, NULL);
+    pixbuf = gdk_pixbuf_loader_get_pixbuf (loader);
+    double ph = gdk_pixbuf_get_height (pixbuf);
+    double pw = gdk_pixbuf_get_width (pixbuf);
+    double newpw = 40 / ph * pw;
+    pixbuf = gdk_pixbuf_scale_simple (pixbuf,newpw,40,GDK_INTERP_NEAREST);
+    image = gtk_image_new_from_pixbuf (pixbuf);    
+  } else {
+    image = gtk_image_new_from_icon_name ("open-menu-symbolic", 1);
+  }
+  
   //TODO set preview image
   handle = gtk_event_box_new ();
-  image = gtk_image_new_from_icon_name ("open-menu-symbolic", 1);
   gtk_container_add (GTK_CONTAINER (handle), image);
   g_object_set (handle, "margin-end", 10, NULL);
   gtk_grid_attach (GTK_GRID (grid), handle, 0, 1, 1, 2);

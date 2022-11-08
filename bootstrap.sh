@@ -1,9 +1,15 @@
 SKIP_GSOAP=0
+SKIP_DISCOVERY=0
+SKIP_ONVIFLIB=0
 i=1;
 for arg in "$@" 
 do
     if [ $arg == "--skip-gsoap" ]; then
         SKIP_GSOAP=1
+    elif [ $arg == "--skip-discovery" ]; then
+        SKIP_DISCOVERY=1
+    elif [ $arg == "--skip-onviflib" ]; then
+        SKIP_ONVIFLIB=1
     fi
     i=$((i + 1));
 done
@@ -28,21 +34,25 @@ if [ $SKIP_GSOAP -eq 0 ]; then
     cd ..
 fi
 
-echo "-- Building OnvifDiscoveryLib  --"
-git -C OnvifDiscoveryLib pull 2> /dev/null || git clone https://github.com/Quedale/OnvifDiscoveryLib.git
-cd OnvifDiscoveryLib
-GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../gsoap-2.8 ./bootstrap.sh --skip-gsoap
-./configure
-GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../gsoap-2.8 make -j$(nproc) discoverylib
-cd ..
+if [ $SKIP_DISCOVERY -eq 0 ]; then
+    echo "-- Building OnvifDiscoveryLib  --"
+    git -C OnvifDiscoveryLib pull 2> /dev/null || git clone https://github.com/Quedale/OnvifDiscoveryLib.git
+    cd OnvifDiscoveryLib
+    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../gsoap-2.8 ./bootstrap.sh --skip-gsoap
+    ./configure
+    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../gsoap-2.8 make -j$(nproc) discoverylib
+    cd ..
+fi
 
-echo "-- Building OnvifSoapLib  --"
-git -C OnvifSoapLib pull 2> /dev/null || git clone https://github.com/Quedale/OnvifSoapLib.git
-cd OnvifSoapLib
-GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../gsoap-2.8 ./bootstrap.sh --skip-gsoap
-./configure
-GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../gsoap-2.8 make -j$(nproc) onviflib
-cd ..
+if [ $SKIP_ONVIFLIB -eq 0 ]; then
+    echo "-- Building OnvifSoapLib  --"
+    git -C OnvifSoapLib pull 2> /dev/null || git clone https://github.com/Quedale/OnvifSoapLib.git
+    cd OnvifSoapLib
+    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../gsoap-2.8 ./bootstrap.sh --skip-gsoap
+    ./configure
+    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../gsoap-2.8 make -j$(nproc) onviflib
+    cd ..
+fi
 
 echo "-- installing Gstreamer dependencies --"
 sudo apt install libgstreamer1.0-dev #client
