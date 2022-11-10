@@ -13,3 +13,11 @@ Makefile.in
 missing
 src/generated
 gsoap-2.8
+ltmain.sh
+config.sub
+config.guess
+m4
+*.o
+.dirstamp
+configure~
+libtool

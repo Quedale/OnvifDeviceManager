@@ -16,6 +16,9 @@
  * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
  * Boston, MA 02110-1301, USA.
  */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE 1
+#endif
 
 #include <gst/gst.h>
 #include <gst/rtsp-server/rtsp-onvif-server.h>
@@ -24,6 +27,7 @@
 
 #include <argp.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 const char *argp_program_version = "0.0";
 const char *argp_program_bug_address = "<your@email.address>";
@@ -154,7 +158,7 @@ main (int argc, char *argv[])
     //     arguments.fps,
     //     arguments.encoder); 
 
-    asprintf(&strbin, "( videotestsrc pattern=pinwheel ! video/x-raw,width=%i,height=%i,framerate=%i/1,format=YUY2 ! videoconvert ! %s ! video/x-h264,profile=main ! rtph264pay name=pay0 pt=96 audiotestsrc wave=ticks apply-tick-ramp=true tick-interval=400000000 is-live=true ! mulawenc ! rtppcmupay name=pay1 )",
+    int ret = asprintf(&strbin, "( videotestsrc pattern=pinwheel ! video/x-raw,width=%i,height=%i,framerate=%i/1,format=YUY2 ! videoconvert ! %s ! video/x-h264,profile=main ! rtph264pay name=pay0 pt=96 audiotestsrc wave=ticks apply-tick-ramp=true tick-interval=400000000 is-live=true ! mulawenc ! rtppcmupay name=pay1 )",
         arguments.width,
         arguments.height,
         arguments.fps,

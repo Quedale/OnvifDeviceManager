@@ -37,20 +37,32 @@ fi
 if [ $SKIP_DISCOVERY -eq 0 ]; then
     echo "-- Building OnvifDiscoveryLib  --"
     git -C OnvifDiscoveryLib pull 2> /dev/null || git clone https://github.com/Quedale/OnvifDiscoveryLib.git
+    #Out-of-tree build to keep src clean
     cd OnvifDiscoveryLib
-    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../gsoap-2.8 ./bootstrap.sh --skip-gsoap
-    ./configure
-    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../gsoap-2.8 make -j$(nproc) discoverylib
+    mkdir build
+    cd build
+    mkdir dist
+    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../../gsoap-2.8 ./bootstrap.sh --skip-gsoap
+    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../../gsoap-2.8 ../configure --prefix=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/dist
+    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../../gsoap-2.8 make -j$(nproc)
+    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../../gsoap-2.8 make install
+    cd ..
     cd ..
 fi
 
 if [ $SKIP_ONVIFLIB -eq 0 ]; then
     echo "-- Building OnvifSoapLib  --"
     git -C OnvifSoapLib pull 2> /dev/null || git clone https://github.com/Quedale/OnvifSoapLib.git
+    #Out-of-tree build to keep src clean
     cd OnvifSoapLib
-    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../gsoap-2.8 ./bootstrap.sh --skip-gsoap
-    ./configure
-    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../gsoap-2.8 make -j$(nproc) onviflib
+    mkdir build
+    cd build
+    mkdir dist
+    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../../ggsoap-2.8 ./bootstrap.sh --skip-gsoap
+    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../../ggsoap-2.8 ../configure --prefix=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/dist
+    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../../ggsoap-2.8 make -j$(nproc) onviflib
+    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../../gsoap-2.8 make install
+    cd ..
     cd ..
 fi
 
@@ -70,6 +82,7 @@ sudo apt install gstreamer1.0-plugins-ugly #x264enc for server
 aclocal
 autoconf
 automake --add-missing
+wget "https://git.savannah.gnu.org/gitweb/?p=autoconf-archive.git;a=blob_plain;f=m4/ax_subdirs_configure.m4" -O m4/ax_subdirs_configure.m4
 
 #WSL Video (Assuming the host is setup)
 #echo $'\n\nexport DISPLAY=$(cat /etc/resolv.conf | grep nameserver | awk \'{print $2}\'):0\n' >> ~/.bashrc
