@@ -1,4 +1,7 @@
 ACLOCAL_AMFLAGS = -I m4
+MAKE_PID := $(shell echo $$PPID)
+JOB_FLAG := $(filter -j%, $(subst -j ,-j,$(shell ps T | grep "^\s*$(MAKE_PID).*$(MAKE)")))
+JOBS     := $(subst -j,,$(JOB_FLAG))
 
 AUTOMAKE_OPTIONS = foreign subdir-objects
 
@@ -20,8 +23,11 @@ onvifmgr_LDADD =
 
 onvifsoaplib$(EXEEXT):
 	echo "soap dir : " $(GSOAP_SRC_DIR)
-	cd OnvifSoapLib && $(MAKE) GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd ..
+	cd OnvifSoapLib && $(MAKE) $(JOB_FLAG) GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd ..
 
 discolib$(EXEEXT):
 	echo "soap dir : " $(GSOAP_SRC_DIR)
-	cd OnvifDiscoveryLib && $(MAKE) GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd .. 
+	cd OnvifDiscoveryLib && $(MAKE) $(JOB_FLAG) GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd .. 
+
+gsoaplib$(EXEEXT):
+	cd $(GSOAP_SRC_DIR) && $(MAKE) $(JOB_FLAG) all-recursive && cd .. 
