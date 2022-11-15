@@ -137,8 +137,8 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
 
   gtk_container_add (GTK_CONTAINER (row), grid);
 
-  display_onvif_thumbnail(&dev,EVENT_QUEUE,handle);
-  // display_nslookup_hostname(&dev,EVENT_QUEUE);
+  display_onvif_device_row(&dev,EVENT_QUEUE,handle);
+
   return row;
 }
 

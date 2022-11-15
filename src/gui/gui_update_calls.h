@@ -5,7 +5,6 @@
 #include "onvif_device.h"
 #include <gtk/gtk.h>
 
-void display_onvif_thumbnail(OnvifDevice * device, EventQueue * queue, GtkWidget * handle);
-void display_nslookup_hostname(OnvifDevice * device, EventQueue * queue);
+void display_onvif_device_row(OnvifDevice * device, EventQueue * queue, GtkWidget * thumbnail_handle);
 
 #endif
