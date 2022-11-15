@@ -82,6 +82,7 @@ sudo apt install gstreamer1.0-plugins-ugly #x264enc for server
 aclocal
 autoconf
 automake --add-missing
+autoreconf -i
 wget "https://git.savannah.gnu.org/gitweb/?p=autoconf-archive.git;a=blob_plain;f=m4/ax_subdirs_configure.m4" -O m4/ax_subdirs_configure.m4
 
 #WSL Video (Assuming the host is setup)

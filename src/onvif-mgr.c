@@ -4,6 +4,8 @@
 #include "onvif_discovery.h"
 #include "onvif_list.h"
 #include "onvif_device.h"
+#include "queue/event_queue.h"
+#include "gui/gui_update_calls.h"
 
 #include <gtk/gtk.h>
 #include <gst/gst.h>
@@ -17,6 +19,8 @@
 #elif defined (GDK_WINDOWING_QUARTZ)
 #include <gdk/gdkquartz.h>
 #endif
+
+EventQueue* EVENT_QUEUE;
 
 /* This function is called when the PLAY button is clicked */
 static void play_cb (GtkButton *button, OnvifPlayer *data) {
@@ -104,22 +108,9 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   grid = gtk_grid_new ();
   g_object_set (grid, "margin", 5, NULL);
 
-  if(dev.authorized){
-    //todo load image using threaded dispatch queue on a timer
-    struct chunk * imgchunk = OnvifDevice__media_getSnapshot(&dev);
-    loader = gdk_pixbuf_loader_new ();
-    gdk_pixbuf_loader_write (loader, imgchunk->buffer, imgchunk->size, NULL);
-    pixbuf = gdk_pixbuf_loader_get_pixbuf (loader);
-    double ph = gdk_pixbuf_get_height (pixbuf);
-    double pw = gdk_pixbuf_get_width (pixbuf);
-    double newpw = 40 / ph * pw;
-    pixbuf = gdk_pixbuf_scale_simple (pixbuf,newpw,40,GDK_INTERP_NEAREST);
-    image = gtk_image_new_from_pixbuf (pixbuf);    
-  } else {
-    image = gtk_image_new_from_icon_name ("open-menu-symbolic", 1);
-  }
-  
-  //TODO set preview image
+  image = gtk_spinner_new ();
+  gtk_spinner_start (GTK_SPINNER (image));
+
   handle = gtk_event_box_new ();
   gtk_container_add (GTK_CONTAINER (handle), image);
   g_object_set (handle, "margin-end", 10, NULL);
@@ -145,6 +136,9 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   gtk_grid_attach (GTK_GRID (grid), label, 1, 2, 1, 1);
 
   gtk_container_add (GTK_CONTAINER (row), grid);
+
+  display_onvif_thumbnail(&dev,EVENT_QUEUE,handle);
+  // display_nslookup_hostname(&dev,EVENT_QUEUE);
   return row;
 }
 
@@ -367,8 +361,16 @@ void create_ui (OnvifPlayer* player) {
   gtk_widget_show_all (main_window);
 }
 
+
 int main(int argc, char *argv[]) {
   OnvifPlayer * data;
+  EVENT_QUEUE = EventQueue__create();
+  //Defaults 4 paralell event threads.
+  //TODO support configuration to modify this
+  EventQueue__start(EVENT_QUEUE);
+  EventQueue__start(EVENT_QUEUE);
+  EventQueue__start(EVENT_QUEUE);
+  EventQueue__start(EVENT_QUEUE);
 
   /* Initialize GTK */
   gtk_init (&argc, &argv);
