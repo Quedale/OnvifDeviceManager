@@ -52,25 +52,7 @@ static void delete_event_cb (GtkWidget *widget, GdkEvent *event, OnvifPlayer *da
 void row_selected_cb (GtkWidget *widget,   GtkListBoxRow* row,
   OnvifPlayer* player)
 {
-    stop_cb (NULL, player);
-    //Unselected. Stopping stream TODO this isn't enough
-    if(row == NULL){
-      return;
-    }
-    int pos;
-    pos = gtk_list_box_row_get_index (GTK_LIST_BOX_ROW (row));
-    
-    OnvifDevice dev = player->onvifDeviceList->devices[pos];
-    if(!dev.authorized){
-      return;
-    }
-    /* Set the URI to play */
-    char * uri = OnvifDevice__media_getStreamUri(&dev);
-
-    OnvifPlayer__set_playback_url(player,uri);
-    
-    OnvifPlayer__play(player);
-    
+  select_onvif_device_row(player,row,EVENT_QUEUE);    
 }
 
 static GtkWidget *
@@ -96,11 +78,11 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   // }
   
   OnvifDevice dev = OnvifDevice__create(m->addr);
-
-  OnvifDeviceList__insert_element(player->onvifDeviceList,dev,player->onvifDeviceList->device_count);
+  OnvifDevice * devp = OnvifDevice__copy(&dev);//malloc copy
+  OnvifDeviceList__insert_element(player->onvifDeviceList,devp,player->onvifDeviceList->device_count);
   int b;
   for (b=0;b<player->onvifDeviceList->device_count;b++){
-    printf("DEBUG List Record :[%i] %s:%s\n",b,player->onvifDeviceList->devices[b].ip,player->onvifDeviceList->devices[b].port);
+    printf("DEBUG List Record :[%i] %s:%s\n",b,player->onvifDeviceList->devices[b]->ip,player->onvifDeviceList->devices[b]->port);
   }
 
   row = gtk_list_box_row_new ();
@@ -137,7 +119,8 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
 
   gtk_container_add (GTK_CONTAINER (row), grid);
 
-  display_onvif_device_row(&dev,EVENT_QUEUE,handle);
+  //Dispatch Thread event to update GtkListRow
+  display_onvif_device_row(devp,EVENT_QUEUE,handle);
 
   return row;
 }
@@ -251,21 +234,54 @@ GtkWidget * create_info_ui(OnvifPlayer *player){
     return grid;
 }
 
+
+void update_details_page(gint index, OnvifPlayer * player){
+  printf("update_details_page %i\n",index);
+  if(index == 0){ //Information Page
+    if(!player->device){
+      printf("No device selected...\n");
+      //TODO Clear
+    } else {
+      printf("dev : %s\n",player->device->ip);
+    }
+    // OnvifDeviceInformation * dev_info = OnvifDevice__device_getDeviceInformation(dev);
+    // printf("manufacturer : %s\n",dev_info->manufacturer);
+    // printf("model %s\n",dev_info->model);
+    // printf("firmwareVersion %s\n",dev_info->firmwareVersion);
+    // printf("serialNumber %s\n",dev_info->serialNumber);
+    // printf("hardwareId %s\n",dev_info->hardwareId);
+    // char * manufacturer;
+    // char * model;
+    // char * firmwareVersion;
+    // char * serialNumber;
+    // char * hardwareId;
+  }
+}
+
+static void switch_detail_page (GtkNotebook* self, GtkWidget* page, guint page_num, OnvifPlayer * player) {
+  gboolean ret = gtk_widget_is_visible(page);
+  if(!ret){//Only trigger gui update if page is visisble
+    return;
+  }
+  update_details_page(page_num,player);
+}
+
+
 GtkWidget * create_details_ui (OnvifPlayer *player){
   GtkWidget * notebook;
   GtkWidget * widget;
   GtkWidget *label;
   char * TITLE_STR = "Information";
 
-  notebook = gtk_notebook_new ();
-  gtk_notebook_set_tab_pos (GTK_NOTEBOOK (notebook), GTK_POS_LEFT);
+  player->details_notebook = gtk_notebook_new ();
+  gtk_notebook_set_tab_pos (GTK_NOTEBOOK (player->details_notebook), GTK_POS_LEFT);
 
   widget = create_info_ui(player);
 
   label = gtk_label_new (TITLE_STR);
-  gtk_notebook_append_page (GTK_NOTEBOOK (notebook), widget, label);
+  gtk_notebook_append_page (GTK_NOTEBOOK (player->details_notebook), widget, label);
 
-  return notebook;
+  return player->details_notebook;
 }
 
 
@@ -287,6 +303,20 @@ GtkWidget * create_nvt_ui (OnvifPlayer *player){
   g_object_unref (cssProvider);  
 
   return grid;
+}
+
+void switch_ui_page (GtkNotebook* self, GtkWidget* page, guint page_num, OnvifPlayer * player) {
+    printf("switch_ui_page %i\n",page_num);
+    gboolean ret = gtk_widget_is_visible(page);
+    if(!ret){//Only trigger gui update if page is visisble
+      return;
+    }
+    if(page_num == 0){ //NVT
+
+    } else if(page_num == 1){
+      gint selected_index = gtk_notebook_get_current_page(GTK_NOTEBOOK(player->details_notebook));
+      update_details_page(selected_index,player);
+    } //Else ??
 }
 
 void create_ui (OnvifPlayer* player) {
@@ -359,6 +389,9 @@ void create_ui (OnvifPlayer* player) {
 
   gtk_window_set_default_size(GTK_WINDOW(main_window),640,480);
   gtk_widget_show_all (main_window);
+  g_signal_connect (G_OBJECT (notebook), "switch-page", G_CALLBACK (switch_ui_page), player);
+  g_signal_connect (G_OBJECT (player->details_notebook), "switch-page", G_CALLBACK (switch_detail_page), player);
+
 }
 
 

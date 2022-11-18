@@ -1,5 +1,7 @@
 #include "../queue/event_queue.h"
 #include <stdio.h>
+#include <unistd.h>
+
 void evt_callback(void * user_data){
     printf("evt_callback\n");
     char * data = (char *) user_data;

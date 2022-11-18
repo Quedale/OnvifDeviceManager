@@ -26,8 +26,10 @@ typedef struct _OnvifPlayer {
   GstVideoOverlay *overlay; //Overlay rendered on the canvas widget
 
   GstState state;                 /* Current state of the pipeline */
+  OnvifDevice* device; /* Currently selected device */
   OnvifDeviceList* onvifDeviceList;
   GtkWidget *listbox;
+  GtkWidget *details_notebook;
   GtkWidget *canvas;
   guintptr video_window_handle;
   gdouble level; //Used to calculate level decay
@@ -37,6 +39,7 @@ typedef struct _OnvifPlayer {
   int valid;//For some reason taking this out causes a segment fault, although there's no reference to it???
   int width;
   int height;
+  pthread_mutex_t * player_lock;
 } OnvifPlayer;
 
 OnvifPlayer * OnvifPlayer__create();  // equivalent to "new Point(x, y)"

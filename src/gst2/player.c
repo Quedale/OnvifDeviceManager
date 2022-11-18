@@ -558,6 +558,9 @@ void OnvifPlayer__init(OnvifPlayer* self) {
     self->onvifDeviceList = OnvifDeviceList__create();
     self->width = 0;
     self->height = 0;
+    self->device = NULL;
+    self->player_lock =malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init(self->player_lock, NULL);
     create_pipeline(self);
     if (!self->pipeline){
       g_error ("Failed to parse pipeline");
@@ -592,11 +595,14 @@ void OnvifPlayer__stop(OnvifPlayer* self){
     if(self->state <= GST_STATE_READY){
       return; //Ignore stop call if not playing
     }
+    
+    pthread_mutex_lock(self->player_lock);
     GstStateChangeReturn ret;
     ret = gst_element_set_state (self->pipeline, GST_STATE_READY);
     if (ret == GST_STATE_CHANGE_FAILURE) {
       g_printerr ("Unable to set the pipeline to the ready state.\n");
       gst_object_unref (self->pipeline);
+      pthread_mutex_unlock(self->player_lock);
       return;
     }
 
@@ -606,6 +612,7 @@ void OnvifPlayer__stop(OnvifPlayer* self){
       if (ret == GST_STATE_CHANGE_FAILURE) {
           g_printerr ("Unable to set the backpipe to the ready state.\n");
           gst_object_unref (self->pipeline);
+          pthread_mutex_unlock(self->player_lock);
           return;
       }
       ret = gst_element_set_state (self->backpipe, GST_STATE_NULL);
@@ -613,6 +620,7 @@ void OnvifPlayer__stop(OnvifPlayer* self){
       if (ret == GST_STATE_CHANGE_FAILURE) {
           g_printerr ("Unable to set the backpipe to the ready state.\n");
           gst_object_unref (self->pipeline);
+          pthread_mutex_unlock(self->player_lock);
           return;
       }
     }
@@ -622,6 +630,7 @@ void OnvifPlayer__stop(OnvifPlayer* self){
     if (ret == GST_STATE_CHANGE_FAILURE) {
         g_printerr ("Unable to set the pipeline to the ready state.\n");
         gst_object_unref (self->pipeline);
+        pthread_mutex_unlock(self->player_lock);
         return;
     }
 
@@ -630,22 +639,27 @@ void OnvifPlayer__stop(OnvifPlayer* self){
     if (ret == GST_STATE_CHANGE_FAILURE) {
         g_printerr ("Unable to set the pipeline to the ready state.\n");
         gst_object_unref (self->pipeline);
+        pthread_mutex_unlock(self->player_lock);
         return;
     } else {
       printf("pipeline state set to GST_STATE_READY.\n");
     }
+    pthread_mutex_unlock(self->player_lock);
     // gtk_widget_set_visible(self->canvas, FALSE);
 }
 
 void OnvifPlayer__play(OnvifPlayer* self){
-    printf("OnvifPlayer__play \n");
-    GstStateChangeReturn ret;
-    ret = gst_element_set_state (self->pipeline, GST_STATE_PLAYING);
-    if (ret == GST_STATE_CHANGE_FAILURE) {
-        g_printerr ("Unable to set the pipeline to the playing state.\n");
-        gst_object_unref (self->pipeline);
-        return;
-    }
+  pthread_mutex_lock(self->player_lock);
+  printf("OnvifPlayer__play \n");
+  GstStateChangeReturn ret;
+  ret = gst_element_set_state (self->pipeline, GST_STATE_PLAYING);
+  if (ret == GST_STATE_CHANGE_FAILURE) {
+      g_printerr ("Unable to set the pipeline to the playing state.\n");
+      gst_object_unref (self->pipeline);
+      pthread_mutex_unlock(self->player_lock);
+      return;
+  }
+  pthread_mutex_unlock(self->player_lock);
 }
 
 GtkWidget * OnvifDevice__createCanvas(OnvifPlayer *self){
