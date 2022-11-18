@@ -1,6 +1,7 @@
 SKIP_GSOAP=0
 SKIP_DISCOVERY=0
 SKIP_ONVIFLIB=0
+WITH_GSTREAMER=0
 i=1;
 for arg in "$@" 
 do
@@ -10,6 +11,8 @@ do
         SKIP_DISCOVERY=1
     elif [ $arg == "--skip-onviflib" ]; then
         SKIP_ONVIFLIB=1
+    elif [ $arg == "--with-gstreamer" ]; then
+        WITH_GSTREAMER=1
     fi
     i=$((i + 1));
 done
@@ -17,6 +20,13 @@ done
 sudo apt install automake autoconf gcc make pkg-config
 sudo apt install libxml2-dev libgtk-3-dev
 sudo apt-get install unzip
+
+if [ $WITH_GSTREAMER -eq 0 ]; then
+    git -C cerbero pull 2> /dev/null || git clone https://gitlab.freedesktop.org/gstreamer/cerbero.git
+    cerbero/cerbero-uninstalled bootstrap
+    #TODO Build only required component for faster/lighter bootstrap
+    cerbero/cerbero-uninstalled package gstreamer-1.0
+fi
 
 if [ $SKIP_GSOAP -eq 0 ]; then
     echo "-- Building gsoap libgsoap-dev --"
@@ -35,35 +45,15 @@ if [ $SKIP_GSOAP -eq 0 ]; then
 fi
 
 if [ $SKIP_DISCOVERY -eq 0 ]; then
-    echo "-- Building OnvifDiscoveryLib  --"
+    echo "-- Bootrap OnvifDiscoveryLib  --"
     git -C OnvifDiscoveryLib pull 2> /dev/null || git clone https://github.com/Quedale/OnvifDiscoveryLib.git
-    #Out-of-tree build to keep src clean
-    cd OnvifDiscoveryLib
-    mkdir build
-    cd build
-    mkdir dist
-    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../../gsoap-2.8 ./bootstrap.sh --skip-gsoap
-    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../../gsoap-2.8 ../configure --prefix=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/dist
-    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../../gsoap-2.8 make -j$(nproc)
-    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../../gsoap-2.8 make install
-    cd ..
-    cd ..
+    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/gsoap-2.8 OnvifDiscoveryLib/bootstrap.sh --skip-gsoap
 fi
 
 if [ $SKIP_ONVIFLIB -eq 0 ]; then
-    echo "-- Building OnvifSoapLib  --"
+    echo "-- Bootstrap OnvifSoapLib  --"
     git -C OnvifSoapLib pull 2> /dev/null || git clone https://github.com/Quedale/OnvifSoapLib.git
-    #Out-of-tree build to keep src clean
-    cd OnvifSoapLib
-    mkdir build
-    cd build
-    mkdir dist
-    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../../ggsoap-2.8 ./bootstrap.sh --skip-gsoap
-    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../../ggsoap-2.8 ../configure --prefix=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/dist
-    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../../ggsoap-2.8 make -j$(nproc) onviflib
-    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/../../gsoap-2.8 make install
-    cd ..
-    cd ..
+    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/gsoap-2.8 OnvifSoapLib/bootstrap.sh --skip-gsoap
 fi
 
 echo "-- installing Gstreamer dependencies --"
@@ -73,12 +63,6 @@ sudo apt install gstreamer1.0-pulseaudio #pulsesink for client
 sudo apt install libgstrtspserver-1.0-dev #server
 sudo apt install gstreamer1.0-plugins-ugly #x264enc for server
 
-#For some reason, the backchannel server doesn't work out of the apt package.
-#Setup from source
-#git clone https://gitlab.freedesktop.org/gstreamer/cerbero.git
-#cerbero/cerbero-uninstalled bootstrap
-#cervero/cerbero-uninstalled package gstreamer-1.0
-# PKG_CONFIG_PATH=/home/quedale/git/cerbero/build/dist/linux_x86_64/lib/pkgconfig
 aclocal
 autoconf
 automake --add-missing
@@ -98,24 +82,3 @@ wget "https://git.savannah.gnu.org/gitweb/?p=autoconf-archive.git;a=blob_plain;f
 #sudo apt update
 #echo $'\n'"export HOST_IP=\"\$(ip route |awk '/^default/{print \$3}')\""  >> ~/.bashrc
 #echo "export PULSE_SERVER=\"tcp:\$HOST_IP\""  >> ~/.bashrc
-
-# #TODO offline files
-echo "Generating WSDL gsoap files..."
-rm -rf src/generated
-mkdir src/generated
-gsoap-2.8/build/bin/wsdl2h -x -t wsdl/onvif-typemap.dat -o src/generated/common_service.h -c \
-http://www.onvif.org/onvif/ver10/device/wsdl/devicemgmt.wsdl \
-http://www.onvif.org/onvif/ver10/event/wsdl/event.wsdl \
-http://www.onvif.org/onvif/ver10/display.wsdl \
-http://www.onvif.org/onvif/ver10/deviceio.wsdl \
-http://www.onvif.org/onvif/ver20/imaging/wsdl/imaging.wsdl \
-http://www.onvif.org/onvif/ver10/media/wsdl/media.wsdl \
-http://www.onvif.org/onvif/ver20/ptz/wsdl/ptz.wsdl \
-http://www.onvif.org/onvif/ver10/receiver.wsdl \
-http://www.onvif.org/onvif/ver10/recording.wsdl \
-http://www.onvif.org/onvif/ver10/search.wsdl \
-http://www.onvif.org/onvif/ver10/replay.wsdl \
-http://www.onvif.org/onvif/ver20/analytics/wsdl/analytics.wsdl \
-http://www.onvif.org/onvif/ver10/analyticsdevice.wsdl \
-http://www.onvif.org/onvif/ver10/schema/onvif.xsd 
-gsoap-2.8/build/bin/soapcpp2 -CL -x -Igsoap-2.8/gsoap/import:gsoap-2.8/gsoap src/generated/common_service.h -dsrc/generated

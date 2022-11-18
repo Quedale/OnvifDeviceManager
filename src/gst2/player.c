@@ -196,7 +196,7 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
     case GST_MESSAGE_APPLICATION:
       printf("msg : GST_MESSAGE_APPLICATION\n");
       break;
-    case GST_MESSAGE_ELEMENT:
+    case GST_MESSAGE_ELEMENT: ;
       const GstStructure *s = gst_message_get_structure (message);
       const gchar *name = gst_structure_get_name (s);
 

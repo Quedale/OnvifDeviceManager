@@ -9,16 +9,16 @@ AUTOMAKE_OPTIONS = foreign subdir-objects
 bin_PROGRAMS = onvifclient onvifserver onvifmgr queuetest giftest
 
 onvifclient_SOURCES = $(top_srcdir)/src/onvif-client.c
-onvifclient_CFLAGS = `PKG_CONFIG_PATH=$HOME/git/cerbero-main/build/dist/linux_x86_64/lib/pkgconfig pkg-config --cflags libffi gstreamer-1.0`
-onvifclient_LDFLAGS = `PKG_CONFIG_PATH=$HOME/git/cerbero-main/build/dist/linux_x86_64/lib/pkgconfig pkg-config --libs libffi gstreamer-1.0`
+onvifclient_CFLAGS = `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --cflags libffi gstreamer-1.0`
+onvifclient_LDFLAGS = `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --libs libffi gstreamer-1.0`
 
 onvifserver_SOURCES = $(top_srcdir)/src/onvif-server.c
-onvifserver_CFLAGS = `PKG_CONFIG_PATH=$HOME/git/cerbero-main/build/dist/linux_x86_64/lib/pkgconfig pkg-config --cflags glib-2.0 gio-2.0 libffi gstreamer-video-1.0 gstreamer-rtsp-server-1.0 gstreamer-rtsp-1.0 gstreamer-rtp-1.0`
-onvifserver_LDFLAGS = `PKG_CONFIG_PATH=$HOME/git/cerbero-main/build/dist/linux_x86_64/lib/pkgconfig pkg-config --libs glib-2.0 gio-2.0 libffi gstreamer-video-1.0 gstreamer-rtsp-server-1.0 gstreamer-rtsp-1.0 gstreamer-rtp-1.0`
+onvifserver_CFLAGS = `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --cflags glib-2.0 gio-2.0 libffi gstreamer-video-1.0 gstreamer-rtsp-server-1.0 gstreamer-rtsp-1.0 gstreamer-rtp-1.0`
+onvifserver_LDFLAGS = `pkg-config --libs glib-2.0 gio-2.0 libffi` `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --libs gstreamer-video-1.0 gstreamer-rtsp-server-1.0 gstreamer-rtsp-1.0 gstreamer-rtp-1.0`
 
 onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c $(top_srcdir)/src/gst2/player.c $(top_srcdir)/src/queue/event_queue.c $(top_srcdir)/src/gui/gui_update_calls.c
-onvifmgr_CFLAGS= `pkg-config --cflags gstreamer-rtsp-server-1.0 gstreamer-video-1.0 gtk+-3.0` -I$(top_srcdir)/build/dist/include -I$(top_srcdir)/build/dist/include 
-onvifmgr_LDFLAGS= -L$(top_srcdir)/build/dist/lib -lpthread -lonvifsoap -lonvifdisco `pkg-config --libs gstreamer-rtsp-server-1.0 gstreamer-video-1.0 gtk+-3.0`
+onvifmgr_CFLAGS= `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --cflags gstreamer-rtsp-server-1.0 gstreamer-video-1.0 gtk+-3.0` -I$(top_srcdir)/build/dist/include -I$(top_srcdir)/build/dist/include 
+onvifmgr_LDFLAGS= -L$(top_srcdir)/build/dist/lib -lpthread -lonvifsoap -lonvifdisco `pkg-config --libs gtk+-3.0 gstreamer-rtsp-server-1.0 gstreamer-video-1.0` 
 onvifmgr_LDADD = locked-icon.o
 
 queuetest_SOURCES = $(top_srcdir)/src/demo/queue_test.c $(top_srcdir)/src/queue/event_queue.c
