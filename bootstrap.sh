@@ -23,7 +23,7 @@ sudo apt-get install unzip
 
 mkdir subprojects
 cd subprojects
-if [ $WITH_GSTREAMER -eq 0 ]; then
+if [ $WITH_GSTREAMER -eq 1 ]; then
     git -C cerbero pull 2> /dev/null || git clone -b 1.21.2 https://gitlab.freedesktop.org/gstreamer/cerbero.git
     cerbero/cerbero-uninstalled bootstrap
     #TODO Build only required component for faster/lighter bootstrap
