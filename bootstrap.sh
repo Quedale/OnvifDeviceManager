@@ -51,13 +51,13 @@ cd ..
 if [ $SKIP_DISCOVERY -eq 0 ]; then
     echo "-- Bootrap OnvifDiscoveryLib  --"
     git -C OnvifDiscoveryLib pull 2> /dev/null || git clone https://github.com/Quedale/OnvifDiscoveryLib.git
-    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/gsoap-2.8 OnvifDiscoveryLib/bootstrap.sh --skip-gsoap
+    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/subprojects/gsoap-2.8 OnvifDiscoveryLib/bootstrap.sh --skip-gsoap
 fi
 
 if [ $SKIP_ONVIFLIB -eq 0 ]; then
     echo "-- Bootstrap OnvifSoapLib  --"
     git -C OnvifSoapLib pull 2> /dev/null || git clone https://github.com/Quedale/OnvifSoapLib.git
-    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/gsoap-2.8 OnvifSoapLib/bootstrap.sh --skip-gsoap
+    GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/subprojects/gsoap-2.8 OnvifSoapLib/bootstrap.sh --skip-gsoap
 fi
 
 echo "-- installing Gstreamer dependencies --"
