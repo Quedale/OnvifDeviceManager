@@ -14,8 +14,8 @@ PKG_CHECK_MODULES([GSOAPSSL], [gsoapssl], [gsoapssl_pkg_local=;],
 # fi
 
 # AC_ARG_VAR(GSOAP_SRC_DIR, [gsoap src directory])
-AC_SUBST(GSOAP_SRC_DIR, '$(abs_srcdir)/gsoap-2.8')
-AC_SUBST(CERBERO_PKG, '$(abs_srcdir)/cerbero/build/dist/linux_x86_64/lib/pkgconfig')
+AC_SUBST(GSOAP_SRC_DIR, '$(abs_srcdir)/subprojects/gsoap-2.8')
+AC_SUBST(CERBERO_PKG, '$(abs_srcdir)/subprojects/cerbero/build/dist/linux_x86_64/lib/pkgconfig')
 AC_CONFIG_SUBDIRS([
     OnvifDiscoveryLib
     OnvifSoapLib

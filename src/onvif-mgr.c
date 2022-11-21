@@ -96,7 +96,7 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   handle = gtk_event_box_new ();
   gtk_container_add (GTK_CONTAINER (handle), image);
   g_object_set (handle, "margin-end", 10, NULL);
-  gtk_grid_attach (GTK_GRID (grid), handle, 0, 1, 1, 2);
+  gtk_grid_attach (GTK_GRID (grid), handle, 0, 1, 1, 3);
 
   char* m_name = onvif_extract_scope("name",m);
   char* markup_name = malloc(strlen(m_name)+1+7);
@@ -106,16 +106,25 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   label = gtk_label_new (NULL);
   gtk_label_set_markup(GTK_LABEL(label), markup_name);
   g_object_set (label, "margin-end", 5, NULL);
+  gtk_widget_set_hexpand (label, TRUE);
   gtk_grid_attach (GTK_GRID (grid), label, 0, 0, 2, 1);
+
+  label = gtk_label_new (dev.ip);
+  g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
+  gtk_widget_set_hexpand (label, TRUE);
+  gtk_grid_attach (GTK_GRID (grid), label, 1, 1, 1, 1);
 
   label = gtk_label_new (onvif_extract_scope("hardware",m));
   g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
-  gtk_grid_attach (GTK_GRID (grid), label, 1, 1, 1, 1);
-  
+  gtk_widget_set_hexpand (label, TRUE);
+  gtk_grid_attach (GTK_GRID (grid), label, 1, 2, 1, 1);
+
   label = gtk_label_new (onvif_extract_scope("location",m));
   gtk_label_set_ellipsize (GTK_LABEL(label),PANGO_ELLIPSIZE_END);
   g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
-  gtk_grid_attach (GTK_GRID (grid), label, 1, 2, 1, 1);
+  gtk_widget_set_hexpand (label, TRUE);
+  gtk_grid_attach (GTK_GRID (grid), label, 1, 3, 1, 1);
+
 
   gtk_container_add (GTK_CONTAINER (row), grid);
 

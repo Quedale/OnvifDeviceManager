@@ -271,8 +271,9 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
     case GST_MESSAGE_DEVICE_CHANGED:
       printf("msg : GST_MESSAGE_DEVICE_CHANGED\n");
       break;
-    case GST_MESSAGE_INSTANT_RATE_REQUEST:
-      printf("msg : GST_MESSAGE_INSTANT_RATE_REQUEST\n");
+    //Doesnt exists in gstreamer 1.16
+    // case GST_MESSAGE_INSTANT_RATE_REQUEST:
+      // printf("msg : GST_MESSAGE_INSTANT_RATE_REQUEST\n");
       break;
     case GST_MESSAGE_ANY:
       printf("msg : GST_MESSAGE_ANY\n");
@@ -441,12 +442,10 @@ draw_overlay (GstElement * overlay, cairo_t * cr, guint64 timestamp,
 }
 
 void * create_pipeline(OnvifPlayer *self){
-  GstElement *rtph264depay;
-  GstElement *h264parse;
   GstElement *vdecoder;
   GstElement *videoqueue0;
   GstElement *videoconvert;
-  GstElement *cairo_overlay;
+  // GstElement *cairo_overlay;
   GstElement *adecoder;
   GstElement *audioqueue0;
   GstElement *audioconvert;
@@ -456,12 +455,10 @@ void * create_pipeline(OnvifPlayer *self){
   /* Create the elements */
   self->src = gst_element_factory_make ("rtspsrc", "src");
   //Video pipe
-  rtph264depay = gst_element_factory_make ("rtph264depay", "rtph264depay0");
-  h264parse = gst_element_factory_make ("h264parse", "h264parse0");
   vdecoder = gst_element_factory_make ("decodebin", "decodebin0");
   videoqueue0 = gst_element_factory_make ("queue", "videoqueue0");
   videoconvert = gst_element_factory_make ("videoconvert", "videoconvert0");
-  cairo_overlay = gst_element_factory_make ("cairooverlay", "overlay");
+  // cairo_overlay = gst_element_factory_make ("cairooverlay", "overlay");
   self->sink = gst_element_factory_make ("autovideosink", "vsink");
   g_object_set (G_OBJECT (self->sink), "sync", FALSE, NULL);
   g_object_set (G_OBJECT (self->src), "latency", 0, NULL);
@@ -487,22 +484,41 @@ void * create_pipeline(OnvifPlayer *self){
   self->pipeline = gst_pipeline_new ("test-pipeline");
 
   //Make sure: Every elements was created ok
-  if (!self->pipeline || !self->src || !rtph264depay || !h264parse || !vdecoder || !videoqueue0 || !videoconvert || !cairo_overlay || !self->sink || !adecoder || !audioqueue0 || !audioconvert || !level || !audio_sink) {
+  if (!self->pipeline || \
+      !self->src || \
+      !vdecoder || \
+      !videoqueue0 || \
+      !videoconvert || \
+      /* !cairo_overlay || */ \
+      !self->sink || \
+      !adecoder || \
+      !audioqueue0 || \
+      !audioconvert || \
+      !level || \
+      !audio_sink) {
       g_printerr ("One of the elements wasn't created... Exiting\n");
       return NULL;
   }
 
   // Add Elements to the Bin
-  gst_bin_add_many (GST_BIN (self->pipeline), self->src, rtph264depay, h264parse, vdecoder, videoqueue0, videoconvert, cairo_overlay, self->sink, adecoder, audioqueue0, audioconvert, level, audio_sink, NULL);
+  gst_bin_add_many (GST_BIN (self->pipeline), \
+    self->src, \
+    vdecoder, \
+    videoqueue0, \
+    videoconvert, \
+    /* cairo_overlay, */ \
+    self->sink, \
+    adecoder, \
+    audioqueue0, \
+    audioconvert, \
+    level, \
+    audio_sink, NULL);
 
   // Link confirmation
-  if (!gst_element_link_many (rtph264depay, h264parse, vdecoder, NULL)){
-      g_warning ("Linking part (A)-1 Fail...\n");
-      return NULL;
-  }
-
-  // Link confirmation
-  if (!gst_element_link_many (videoqueue0, videoconvert, cairo_overlay, self->sink, NULL)){
+  if (!gst_element_link_many (videoqueue0, \
+    videoconvert, \
+    /*cairo_overlay,*/ \
+    self->sink, NULL)){
       g_warning ("Linking part (A)-2 Fail...");
       return NULL;
   }
@@ -514,7 +530,7 @@ void * create_pipeline(OnvifPlayer *self){
   }
 
   // Dynamic Pad Creation
-  if(! g_signal_connect (self->src, "pad-added", G_CALLBACK (on_pad_added),rtph264depay))
+  if(! g_signal_connect (self->src, "pad-added", G_CALLBACK (on_pad_added),vdecoder))
   {
       g_warning ("Linking part (1) with part (A)-1 Fail...");
   }
@@ -538,16 +554,16 @@ void * create_pipeline(OnvifPlayer *self){
   }
    
 
- // Dynamic Pad Creation
-  if(! g_signal_connect (cairo_overlay, "draw", G_CALLBACK (draw_overlay), self))
-  {
-      g_warning ("cairo_overlay draw callback Fail...");
-  }
- // Dynamic Pad Creation
-  if(! g_signal_connect (cairo_overlay, "caps-changed", G_CALLBACK (prepare_overlay), self))
-  {
-      g_warning ("cairo_overlay caps-changed   callback Fail...");
-  }
+//  // Dynamic Pad Creation
+//   if(! g_signal_connect (cairo_overlay, "draw", G_CALLBACK (draw_overlay), self))
+//   {
+//       g_warning ("cairo_overlay draw callback Fail...");
+//   }
+//  // Dynamic Pad Creation
+//   if(! g_signal_connect (cairo_overlay, "caps-changed", G_CALLBACK (prepare_overlay), self))
+//   {
+//       g_warning ("cairo_overlay caps-changed   callback Fail...");
+//   }
 
 }
 
@@ -559,6 +575,7 @@ void OnvifPlayer__init(OnvifPlayer* self) {
     self->width = 0;
     self->height = 0;
     self->device = NULL;
+    self->state = GST_STATE_NULL;
     self->player_lock =malloc(sizeof(pthread_mutex_t));
     pthread_mutex_init(self->player_lock, NULL);
     create_pipeline(self);
@@ -662,6 +679,20 @@ void OnvifPlayer__play(OnvifPlayer* self){
   pthread_mutex_unlock(self->player_lock);
 }
 
+static gboolean draw_cb (GtkWidget *widget, cairo_t *cr, OnvifPlayer *data) {
+  if (data->state < GST_STATE_PAUSED) {
+    GtkAllocation allocation;
+    /* Cairo is a 2D graphics library which we use here to clean the video window.
+     * It is used by GStreamer for other reasons, so it will always be available to us. */
+    gtk_widget_get_allocation (widget, &allocation);
+    cairo_set_source_rgb (cr, 0, 0, 0);
+    cairo_rectangle (cr, 0, 0, allocation.width, allocation.height);
+    cairo_fill (cr);
+  }
+
+  return FALSE;
+}
+
 GtkWidget * OnvifDevice__createCanvas(OnvifPlayer *self){
 
   self->canvas = gtk_drawing_area_new ();
@@ -671,6 +702,7 @@ GtkWidget * OnvifDevice__createCanvas(OnvifPlayer *self){
   //TODO Support Gl. Currently not well supported by WSL
   gtk_widget_set_double_buffered (self->canvas, FALSE);
 #pragma GCC diagnostic pop
+  g_signal_connect (self->canvas, "draw", G_CALLBACK (draw_cb), self);
   g_signal_connect (self->canvas, "realize", G_CALLBACK (realize_cb), self);
   g_signal_connect (self->src, "select-stream", G_CALLBACK (find_backchannel),self);
   return self->canvas;

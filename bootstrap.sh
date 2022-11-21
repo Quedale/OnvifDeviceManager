@@ -21,11 +21,14 @@ sudo apt install automake autoconf gcc make pkg-config
 sudo apt install libxml2-dev libgtk-3-dev
 sudo apt-get install unzip
 
+mkdir subprojects
+cd subprojects
 if [ $WITH_GSTREAMER -eq 0 ]; then
-    git -C cerbero pull 2> /dev/null || git clone https://gitlab.freedesktop.org/gstreamer/cerbero.git
+    git -C cerbero pull 2> /dev/null || git clone -b 1.21.2 https://gitlab.freedesktop.org/gstreamer/cerbero.git
     cerbero/cerbero-uninstalled bootstrap
     #TODO Build only required component for faster/lighter bootstrap
     cerbero/cerbero-uninstalled package gstreamer-1.0
+    #./cerbero-uninstalled build gst-rtsp-server-1.0 gst-plugins-base-1.0
 fi
 
 if [ $SKIP_GSOAP -eq 0 ]; then
@@ -43,6 +46,7 @@ if [ $SKIP_GSOAP -eq 0 ]; then
     make install
     cd ..
 fi
+cd ..
 
 if [ $SKIP_DISCOVERY -eq 0 ]; then
     echo "-- Bootrap OnvifDiscoveryLib  --"

@@ -35,6 +35,7 @@ static char doc[] = "Your program description.";
 static struct argp_option options[] = { 
     { "video", 'v', "VIDEO", 0, "Input video device. (Default: /dev/video0)"},
     { "audio", 'a', "AUDIO", 0, "Input audio device. (Default: none)"},
+    { "encoder", 'e', "ENCODER", 0, "Gstreamer encoder. (Default: x264enc)"},
     { "width", 'w', "WIDTH", 0, "Video input width. (Default: 640)"},
     { "height", 'h', "HEIGHT", 0, "Video input height. (Default: 480)"},
     { "fps", 'f', "FPS", 0, "Video input height. (Default: 30)"},
@@ -158,7 +159,7 @@ main (int argc, char *argv[])
     //     arguments.fps,
     //     arguments.encoder); 
 
-    int ret = asprintf(&strbin, "( videotestsrc pattern=pinwheel ! video/x-raw,width=%i,height=%i,framerate=%i/1,format=YUY2 ! videoconvert ! %s ! video/x-h264,profile=main ! rtph264pay name=pay0 pt=96 audiotestsrc wave=ticks apply-tick-ramp=true tick-interval=400000000 is-live=true ! mulawenc ! rtppcmupay name=pay1 )",
+    int ret = asprintf(&strbin, "( videotestsrc ! video/x-raw,width=%i,height=%i,framerate=%i/1,format=YUY2 ! videoconvert ! %s ! video/x-h264,profile=main ! rtph264pay name=pay0 pt=96 audiotestsrc wave=ticks apply-tick-ramp=true tick-interval=400000000 is-live=true ! mulawenc ! rtppcmupay name=pay1 )",
         arguments.width,
         arguments.height,
         arguments.fps,
@@ -186,7 +187,9 @@ main (int argc, char *argv[])
     gst_rtsp_media_factory_set_media_gtype (factory, GST_TYPE_RTSP_ONVIF_MEDIA);
 
     //TODO Set port
-    char mount[] = "/";
+    // char mount[] = "/";
+    char * mount = malloc(strlen(arguments.mount)+2);
+    strcpy(mount,"/");
     strcat(mount,arguments.mount);
     /* attach the test factory to the /test url */
     gst_rtsp_mount_points_add_factory (mounts, mount, factory);
@@ -201,7 +204,7 @@ main (int argc, char *argv[])
     gst_rtsp_server_set_service(server,serviceport);
     /* attach the server to the default maincontext */
     gst_rtsp_server_attach (server, NULL);
-
+    
     /* start serving */
     g_print ("stream ready at rtsp://%s:%s/%s\n",serviceaddr,serviceport,arguments.mount);
     g_main_loop_run (loop);
