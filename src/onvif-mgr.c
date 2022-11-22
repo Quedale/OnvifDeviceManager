@@ -127,6 +127,10 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
 
 
   gtk_container_add (GTK_CONTAINER (row), grid);
+  
+  //For some reason, spinner has a floating ref
+  //This is required to keep ability to remove the spinner later
+  g_object_ref(image);
 
   //Dispatch Thread event to update GtkListRow
   display_onvif_device_row(devp,EVENT_QUEUE,handle);

@@ -61,13 +61,13 @@ void _display_onvif_thumbnail(void * user_data){
   gtk_container_foreach (GTK_CONTAINER (input->thumbnail_handle), (void*) gtk_widget_destroy, NULL);
   gtk_container_add (GTK_CONTAINER (input->thumbnail_handle), image);
   gtk_widget_show (image);
-  
+  // g_object_ref(image); //We aren't going to change this picture for now
   free(input);
 }
 
 void _display_nslookup_hostname(void * user_data){
   struct DeviceInput * input = (struct DeviceInput *) user_data;
-  char * hostname; // = OnvifDevice__device_getHostname(input->device);
+  char * hostname;
 
   printf("NSLookup ... %s\n",input->device->ip);
   //Lookup hostname
