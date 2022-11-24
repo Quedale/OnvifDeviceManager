@@ -19,7 +19,8 @@ done
 
 sudo apt install automake autoconf gcc make pkg-config
 sudo apt install libxml2-dev libgtk-3-dev
-sudo apt-get install unzip
+sudo apt install unzip
+sudo apt install meson
 
 mkdir subprojects
 cd subprojects
