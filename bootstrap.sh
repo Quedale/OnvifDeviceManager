@@ -21,6 +21,9 @@ sudo apt install automake autoconf gcc make pkg-config
 sudo apt install libxml2-dev libgtk-3-dev
 sudo apt install unzip
 sudo apt install meson
+sudo apt install libssl-dev
+sudo apt install bison
+sudo apt install flex
 
 mkdir subprojects
 cd subprojects
