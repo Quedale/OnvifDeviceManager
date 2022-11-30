@@ -20,7 +20,7 @@ done
 sudo apt install automake autoconf gcc make pkg-config
 sudo apt install libxml2-dev libgtk-3-dev
 sudo apt install unzip
-sudo apt install meson
+# sudo apt install meson
 sudo apt install libssl-dev
 sudo apt install bison
 sudo apt install flex
@@ -33,6 +33,13 @@ if [ $WITH_GSTREAMER -eq 1 ]; then
     #TODO Build only required component for faster/lighter bootstrap
     cerbero/cerbero-uninstalled package gstreamer-1.0
     #./cerbero-uninstalled build gst-rtsp-server-1.0 gst-plugins-base-1.0
+else
+    echo "-- installing Gstreamer dependencies --"
+    sudo apt install libgstreamer1.0-dev #client
+    sudo apt install gstreamer1.0-libav #H264 decoder
+    sudo apt install gstreamer1.0-pulseaudio #pulsesink for client
+    sudo apt install libgstrtspserver-1.0-dev #server
+    sudo apt install gstreamer1.0-plugins-ugly #x264enc for server
 fi
 
 if [ $SKIP_GSOAP -eq 0 ]; then
@@ -64,12 +71,6 @@ if [ $SKIP_ONVIFLIB -eq 0 ]; then
     GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/subprojects/gsoap-2.8 OnvifSoapLib/bootstrap.sh --skip-gsoap
 fi
 
-echo "-- installing Gstreamer dependencies --"
-sudo apt install libgstreamer1.0-dev #client
-sudo apt install gstreamer1.0-libav #H264 decoder
-sudo apt install gstreamer1.0-pulseaudio #pulsesink for client
-sudo apt install libgstrtspserver-1.0-dev #server
-sudo apt install gstreamer1.0-plugins-ugly #x264enc for server
 
 aclocal
 autoconf
