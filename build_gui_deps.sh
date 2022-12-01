@@ -33,7 +33,8 @@ PREFIX=$SCRIPT_DIR/cerbero/build/dist/linux_x86_64
 TOOLS_PREFIX=$SCRIPT_DIR/cerbero/build/build-tools
 
 PATH=$GST_BIN_PATH:$GST_TOOL_PATH:$PATH
-PYTHONPATH=$SCRIPT_DIR/cerbero/build/build-tools/lib/python3.8/site-packages
+PYTHON_FOLDER=$(python3 -c 'import sys; version=sys.version_info[:3]; print("python{0}.{1}".format(*version))')
+PYTHONPATH=$SCRIPT_DIR/cerbero/build/build-tools/lib/$PYTHON_FOLDER/site-packages
 PYTHONUSERBASE=$PYTHONPATH
 PKG_CONFIG_PATH=$SCRIPT_DIR/cerbero/build/dist/linux_x86_64/lib/pkgconfig
 LD_LIBRARY_PATH=$SCRIPT_DIR/cerbero/build/dist/linux_x86_64/lib
@@ -67,7 +68,8 @@ buildMake srcdir="xorgproto" prefix="$PREFIX" datarootdir="$PREFIX/lib"
 
 
 pullOrClone path="https://gitlab.freedesktop.org/xorg/lib/libxau.git" tag="libXau-1.0.10"
-buildMake srcdir="libxau" prefix="$PREFIX"
+buildMake srcdir="libxau" prefix="$PREFIX" autoreconf="true"
+
 
 pullOrClone path="https://gitlab.freedesktop.org/xorg/lib/libxcb" tag="libxcb-1.15"
 buildMake srcdir="libxcb" prefix="$PREFIX"
@@ -163,7 +165,6 @@ cd mako
 python3 setup.py install --prefix=$TOOLS_PREFIX 
 cd ..
 
-SKIP=0
 pullOrClone path="https://github.com/anholt/libepoxy.git" tag="1.5.10"
 buildMeson srcdir="libepoxy" prefix="$PREFIX" mesonargs="-Dtests=false -Degl=yes -Dglx=yes"
 #the "epoxy.pc" file is invalid if built without egl and glx. Removing invalid comma

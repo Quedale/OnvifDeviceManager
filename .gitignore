@@ -22,3 +22,5 @@ m4
 configure~
 libtool
 subprojects
+py-compile
+test-driver

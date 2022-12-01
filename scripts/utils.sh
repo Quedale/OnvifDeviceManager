@@ -257,6 +257,7 @@ buildMake() {
             printf "${RED}*****************************\n${NC}"
             printf "${RED}*** Preconfigure failed ${srcdir} ***\n${NC}"
             printf "${RED}*****************************\n${NC}"
+            checkWithUser
             return
         fi
     fi
@@ -283,6 +284,7 @@ buildMake() {
             printf "${RED}*****************************\n${NC}"
             printf "${RED}*** ./bootstrap.sh failed ${srcdir} ***\n${NC}"
             printf "${RED}*****************************\n${NC}"
+            checkWithUser
             return
         fi
     fi
@@ -299,6 +301,7 @@ buildMake() {
             printf "${RED}*****************************\n${NC}"
             printf "${RED}*** Autoreconf failed ${srcdir} ***\n${NC}"
             printf "${RED}*****************************\n${NC}"
+            checkWithUser
             return
         fi
     fi
@@ -328,6 +331,7 @@ buildMake() {
             printf "${RED}*****************************\n${NC}"
             printf "${RED}*** Autogen failed ${srcdir} ***\n${NC}"
             printf "${RED}*****************************\n${NC}"
+            checkWithUser
             return
         fi
     elif [ ! -z "${configcustom}" ]; then
@@ -466,6 +470,7 @@ buildMake() {
         printf "${RED}*****************************\n${NC}"
         printf "${RED}*** Make failed ${srcdir} ***\n${NC}"
         printf "${RED}*****************************\n${NC}"
+        checkWithUser
         return
     fi
 
@@ -542,6 +547,7 @@ buildMeson() {
                 printf "${RED}*****************************\n${NC}"
                 printf "${RED}*** Bash Setup failed ${srcdir} ***\n${NC}"
                 printf "${RED}*****************************\n${NC}"
+                checkWithUser
                 return
             fi
         fi
@@ -595,6 +601,7 @@ buildMeson() {
             printf "${RED}*****************************\n${NC}"
             printf "${RED}*** Meson Setup failed ${srcdir} ***\n${NC}"
             printf "${RED}*****************************\n${NC}"
+            checkWithUser
             return
         fi
     else
@@ -623,6 +630,7 @@ buildMeson() {
                 printf "${RED}*****************************\n${NC}"
                 printf "${RED}*** Bash Setup failed ${srcdir} ***\n${NC}"
                 printf "${RED}*****************************\n${NC}"
+                checkWithUser
                 return
             fi
         fi
@@ -677,6 +685,7 @@ buildMeson() {
             printf "${RED}*****************************\n${NC}"
             printf "${RED}*** Meson Setup failed ${srcdir} ***\n${NC}"
             printf "${RED}*****************************\n${NC}"
+            checkWithUser
             return
         fi
     fi
@@ -695,6 +704,7 @@ buildMeson() {
         printf "${RED}*****************************\n${NC}"
         printf "${RED}*** Meson Compile failed ${srcdir} ***\n${NC}"
         printf "${RED}*****************************\n${NC}"
+        checkWithUser
         return
     fi
 
@@ -713,6 +723,7 @@ buildMeson() {
         printf "${RED}*****************************\n${NC}"
         printf "${RED}*** Meson Install failed ${srcdir} ***\n${NC}"
         printf "${RED}*****************************\n${NC}"
+        checkWithUser
         return
     fi
 
