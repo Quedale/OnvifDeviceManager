@@ -11,11 +11,15 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Soap Client for Onvif Device and Media service
 - Vew RTSP Stream with backchannel
 - Prototype Soundlevel indicator
+    -- The CairOverlay causes a segmentation fault on older version of Cairo
+    -- Looking into OverlayComposition
+- WS-Security (Currently using hardcoded placeholder credentials "admin/admin")
 
 # TODO
 - WIP : WS-Security Authentication support.
     - Credential Input
     - Credential Storage 
+- EventQueue : Interupt pending events when needed
 - Display Onvif device information
 - Display Media information
 - Better Look&Feel
