@@ -30,13 +30,57 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 2. Babymonitor terminal (I hope to add common baby monitor feature like playing music)
 3. Cross-room communication terminal
 
+ 
+ 
+# How to build
+### Clone repository
+```
+git clone https://github.com/Quedale/OnvifDeviceManager.git
+cd OnvifDeviceManager
+```
+### Bootstrap using system's Gstreamer libraries
+```
+./bootstrap.sh
+```
+ 
+### [Optional] Bootstrap and build Gstreamer from source
+```
+./bootstrap.sh --with-gstreamer
+```
+### [Optional] Build GTK from source
+This is usefull when compiling using a older distribution
+```
+./build_gui_deps.sh
+```
+### Conifigure project
+This project supports out-of-tree build to keep the source directory clean.
+```
+mkdir build && cd build
+../configure --prefix=$(pwd)/build/dist
+```
+
+### Compile WS-Discovery Library
+This is usefull when compiling using a older distribution
+```
+make discolib
+make install-discolib
+```
+
+
+### Compile Onvif Soap Library
+```
+make onvifsoaplib
+make install-onvifsoaplib
+```
+
+### Compile and install GUI App
+```
+make
+make install
+```
 # Note
 I have very little spare time to work on any personal project, so this might take a while.
 This is my very first C project, so I'm learning as I go. 
- 
- 
- 
- 
  
  
 
