@@ -56,7 +56,7 @@ This is usefull when compiling using a older distribution
 This project supports out-of-tree build to keep the source directory clean.
 ```
 mkdir build && cd build
-../configure --prefix=$(pwd)/build/dist
+../configure --prefix=$(pwd)/dist
 ```
 
 ### Compile WS-Discovery Library
