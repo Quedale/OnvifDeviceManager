@@ -17,7 +17,7 @@ onvifserver_SOURCES = $(top_srcdir)/src/onvif-server.c
 onvifserver_CFLAGS = `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --cflags glib-2.0 gio-2.0 libffi gstreamer-video-1.0 gstreamer-rtsp-server-1.0 gstreamer-rtsp-1.0 gstreamer-rtp-1.0`
 onvifserver_LDFLAGS = `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --libs glib-2.0 gio-2.0 libffi gstreamer-video-1.0 gstreamer-rtsp-server-1.0 gstreamer-rtsp-1.0 gstreamer-rtp-1.0`
 
-onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c $(top_srcdir)/src/gst2/player.c $(top_srcdir)/src/queue/event_queue.c $(top_srcdir)/src/gui/gui_update_calls.c
+onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c $(top_srcdir)/src/gst2/player.c $(top_srcdir)/src/gst2/overlay.c $(top_srcdir)/src/queue/event_queue.c $(top_srcdir)/src/gui/gui_update_calls.c
 onvifmgr_CFLAGS= `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --cflags gstreamer-rtsp-server-1.0 gstreamer-video-1.0 cairo gtk+-3.0 wayland-client glib-2.0 gio-2.0` -I$(top_srcdir)/build/dist/include -I$(top_srcdir)/build/dist/include 
 onvifmgr_LDFLAGS= `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --libs gstreamer-rtsp-server-1.0 gstreamer-video-1.0 cairo gtk+-3.0 wayland-client glib-2.0 gio-2.0` -L$(top_srcdir)/build/dist/lib -lpthread -lonvifsoap -lonvifdisco 
 onvifmgr_LDADD = locked-icon.o
@@ -33,7 +33,7 @@ giftest_LDADD = loading.o
 overlaytest_SOURCES = $(top_srcdir)/src/demo/overlay-demo.c
 overlaytest_CFLAGS = `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --cflags gtk+-3.0 gstreamer-rtsp-server-1.0  gstreamer-video-1.0`
 overlaytest_LDFLAGS = -lm `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --libs gtk+-3.0 gstreamer-rtsp-server-1.0  gstreamer-video-1.0`
-overlaytest_LDADD = 
+overlaytest_LDADD =
 
 printinc$(EXEEXT):
 	@`gcc -print-prog-name=cc1` -v

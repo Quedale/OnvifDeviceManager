@@ -5,6 +5,7 @@
 #include <gst/video/videooverlay.h>
 #include <gst/video/video.h>
 #include <gdk/gdk.h>
+#include "overlay.h"
 #if defined (GDK_WINDOWING_X11)
 #include <gdk/gdkx.h>
 #elif defined (GDK_WINDOWING_WIN32)
@@ -24,6 +25,7 @@ typedef struct _OnvifPlayer {
   GstElement *src;  /* RtspSrc to support backchannel */
   GstElement *sink;  /* Video Sink */
   GstVideoOverlay *overlay; //Overlay rendered on the canvas widget
+  OverlayState *overlay_state;
 
   GstState state;                 /* Current state of the pipeline */
   OnvifDevice* device; /* Currently selected device */
@@ -35,10 +37,6 @@ typedef struct _OnvifPlayer {
   gdouble level; //Used to calculate level decay
   guint back_stream_id;
 
-  //Cairo overlay
-  int valid;//For some reason taking this out causes a segment fault, although there's no reference to it???
-  int width;
-  int height;
   pthread_mutex_t * player_lock;
 } OnvifPlayer;
 

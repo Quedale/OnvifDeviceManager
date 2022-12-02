@@ -1,4 +1,5 @@
 #include "player.h"
+#include "overlay.h"
 #include <unistd.h>
 
 /* This function is called when an error message is posted on the bus */
@@ -402,50 +403,12 @@ static void on_pad_added (GstElement *element, GstPad *pad, gpointer data){
     gst_object_unref (sinkpad);
 }
 
-static void
-prepare_overlay (GstElement * overlay, GstCaps * caps, gpointer user_data)
-{
-  OnvifPlayer *player = (OnvifPlayer *)user_data;
-  GstVideoInfo* video_info = gst_video_info_new();
-  if(!gst_video_info_from_caps(video_info,caps)){
-    g_print("failed to parse caps\n");
-    return;
-  }
-
-  player->width = video_info->width;
-  player->height = video_info->height;
-  gst_video_info_free(video_info);
-}
-
-static void
-draw_overlay (GstElement * overlay, cairo_t * cr, guint64 timestamp, 
-  guint64 duration, gpointer user_data)
-{
-  OnvifPlayer *player = (OnvifPlayer *)user_data;
-  double scale;
-
-  gdouble level = player->level;
-  gdouble margin = 10;
-  gdouble bwidth = 20;
-  // gdouble level = 100;
-  gdouble pheight = player->height - margin*2;
-  //Dont bother with the overlay if it's not visible
-  if(player->height == 0 || player->width == 0)
-    return;
-
-  gdouble bheight = level * pheight / 100;
-  gdouble diff = pheight - bheight;
-  cairo_rectangle(cr, player->width-(margin+bwidth), margin+diff, bwidth, bheight);
-  cairo_set_source_rgba (cr, 0.9, 0.0, 0.1, 0.7);
-  cairo_fill(cr);
-
-}
 
 void * create_pipeline(OnvifPlayer *self){
   GstElement *vdecoder;
   GstElement *videoqueue0;
   GstElement *videoconvert;
-  // GstElement *cairo_overlay;
+  GstElement *overlay_comp;
   GstElement *adecoder;
   GstElement *audioqueue0;
   GstElement *audioconvert;
@@ -458,7 +421,7 @@ void * create_pipeline(OnvifPlayer *self){
   vdecoder = gst_element_factory_make ("decodebin", "decodebin0");
   videoqueue0 = gst_element_factory_make ("queue", "videoqueue0");
   videoconvert = gst_element_factory_make ("videoconvert", "videoconvert0");
-  // cairo_overlay = gst_element_factory_make ("cairooverlay", "overlay");
+  overlay_comp = gst_element_factory_make ("overlaycomposition", NULL);
   self->sink = gst_element_factory_make ("autovideosink", "vsink");
   g_object_set (G_OBJECT (self->sink), "sync", FALSE, NULL);
   g_object_set (G_OBJECT (self->src), "latency", 0, NULL);
@@ -489,7 +452,7 @@ void * create_pipeline(OnvifPlayer *self){
       !vdecoder || \
       !videoqueue0 || \
       !videoconvert || \
-      /* !cairo_overlay || */ \
+      !overlay_comp || \
       !self->sink || \
       !adecoder || \
       !audioqueue0 || \
@@ -506,7 +469,7 @@ void * create_pipeline(OnvifPlayer *self){
     vdecoder, \
     videoqueue0, \
     videoconvert, \
-    /* cairo_overlay, */ \
+    overlay_comp, \
     self->sink, \
     adecoder, \
     audioqueue0, \
@@ -517,7 +480,7 @@ void * create_pipeline(OnvifPlayer *self){
   // Link confirmation
   if (!gst_element_link_many (videoqueue0, \
     videoconvert, \
-    /*cairo_overlay,*/ \
+    overlay_comp, \
     self->sink, NULL)){
       g_warning ("Linking part (A)-2 Fail...");
       return NULL;
@@ -553,17 +516,13 @@ void * create_pipeline(OnvifPlayer *self){
       g_warning ("Linking part (2) with part (B)-2 Fail...");
   }
    
+  if(! g_signal_connect (overlay_comp, "draw", G_CALLBACK (draw_overlay), self)){
+    g_warning ("overlay draw callback Fail...");
+  }
 
-//  // Dynamic Pad Creation
-//   if(! g_signal_connect (cairo_overlay, "draw", G_CALLBACK (draw_overlay), self))
-//   {
-//       g_warning ("cairo_overlay draw callback Fail...");
-//   }
-//  // Dynamic Pad Creation
-//   if(! g_signal_connect (cairo_overlay, "caps-changed", G_CALLBACK (prepare_overlay), self))
-//   {
-//       g_warning ("cairo_overlay caps-changed   callback Fail...");
-//   }
+  if(! g_signal_connect (overlay_comp, "caps-changed",G_CALLBACK (prepare_overlay), self->overlay_state)){
+    g_warning ("overlay draw callback Fail...");
+  }
 
 }
 
@@ -572,11 +531,13 @@ void OnvifPlayer__init(OnvifPlayer* self) {
     self->video_window_handle = 0;
     self->level = 0;
     self->onvifDeviceList = OnvifDeviceList__create();
-    self->width = 0;
-    self->height = 0;
     self->device = NULL;
     self->state = GST_STATE_NULL;
     self->player_lock =malloc(sizeof(pthread_mutex_t));
+
+    self->overlay_state = malloc(sizeof(OverlayState));
+    self->overlay_state->valid = 0;
+    
     pthread_mutex_init(self->player_lock, NULL);
     create_pipeline(self);
     if (!self->pipeline){
@@ -593,6 +554,9 @@ OnvifPlayer * OnvifPlayer__create() {
 }
 
 void OnvifPlayer__reset(OnvifPlayer* self) {
+    free(self->overlay_state);
+    free(self->player_lock);
+    OnvifDeviceList__destroy(self->onvifDeviceList);
 }
 
 void OnvifPlayer__destroy(OnvifPlayer* self) {
