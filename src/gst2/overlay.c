@@ -32,17 +32,14 @@ GstBuffer * create_bar_buffer(double width, double height){
   cairo_fill(cr);
 
   guchar *pixdata = cairo_image_surface_get_data(surface);
-  
-  // cairo_surface_destroy (surface);
-  cairo_destroy (cr);
 
   GstBuffer * buff = gst_buffer_new_and_alloc (height * stride);
   gst_buffer_fill (buff, 0, pixdata + 24, height * stride);
   gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE,
       GST_VIDEO_OVERLAY_COMPOSITION_FORMAT_RGB, width, height);
-
-  g_free (pixdata);
-
+  
+  cairo_destroy (cr);
+  cairo_surface_destroy (surface);
   return buff;
 }
 
@@ -86,6 +83,7 @@ draw_overlay (GstElement * overlay, GstSample * sample, gpointer user_data)
       vmeta->width, vmeta->height, GST_VIDEO_OVERLAY_FORMAT_FLAG_NONE);
   comp = gst_video_overlay_composition_new (rect);
   gst_video_overlay_rectangle_unref (rect);
-
+  
+  gst_buffer_unref(buff);
   return comp;
 }
