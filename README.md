@@ -11,12 +11,11 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Soap Client for Onvif Device and Media service
 - Vew RTSP Stream with backchannel
 - Prototype Soundlevel indicator
-- WS-Security (Currently using hardcoded placeholder credentials "admin/admin")
+- WS-Security
 
 # TODO
-- WIP : WS-Security Authentication support.
-    - Credential Input
-    - Credential Storage 
+- WIP : Use static libraries over shared to avoid version conflicts
+- Credential Storage 
 - EventQueue : Interupt pending events when needed
 - Display Onvif device information
 - Display Media information
