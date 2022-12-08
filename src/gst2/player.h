@@ -6,6 +6,8 @@
 #include <gst/video/video.h>
 #include <gdk/gdk.h>
 #include "overlay.h"
+#include "../gui/credentials_input.h"
+
 #if defined (GDK_WINDOWING_X11)
 #include <gdk/gdkx.h>
 #elif defined (GDK_WINDOWING_WIN32)
@@ -36,6 +38,7 @@ typedef struct _OnvifPlayer {
   guintptr video_window_handle;
   gdouble level; //Used to calculate level decay
   guint back_stream_id;
+  CredentialsDialog * dialog;
 
   pthread_mutex_t * player_lock;
 } OnvifPlayer;

@@ -159,19 +159,21 @@ main (int argc, char *argv[])
     //     arguments.fps,
     //     arguments.encoder); 
 
-    int ret = asprintf(&strbin, "( videotestsrc ! video/x-raw,width=%i,height=%i,framerate=%i/1,format=YUY2 ! videoconvert ! %s ! video/x-h264,profile=main ! rtph264pay name=pay0 pt=96 audiotestsrc wave=ticks apply-tick-ramp=true tick-interval=400000000 is-live=true ! mulawenc ! rtppcmupay name=pay1 )",
-        arguments.width,
-        arguments.height,
-        arguments.fps,
-        arguments.encoder); 
+    if(!strcmp(arguments.vdev,"test")){
+        asprintf(&strbin, "( videotestsrc ! video/x-raw,width=%i,height=%i,framerate=%i/1,format=YUY2 ! videoconvert ! %s ! rtph264pay name=pay0 pt=96 audiotestsrc wave=ticks apply-tick-ramp=true tick-interval=400000000 is-live=true ! mulawenc ! rtppcmupay name=pay1 )",
+            arguments.width,
+            arguments.height,
+            arguments.fps,
+            arguments.encoder); 
+    } else {
+        asprintf(&strbin, "( v4l2src device=%s ! video/x-raw,width=%i,height=%i,framerate=%i/1,format=YUY2 ! videoconvert ! %s ! rtph264pay name=pay0 pt=96 audiotestsrc ! mulawenc ! rtppcmupay name=pay1 )",
+            arguments.vdev,
+            arguments.width,
+            arguments.height,
+            arguments.fps,
+            arguments.encoder);    
+    }
 
-    // asprintf(&strbin, "( v4l2src device=%s ! video/x-raw,width=%i,height=%i,framerate=%i/1,format=YUY2 ! videoconvert ! %s ! video/x-h264,profile=main ! rtph264pay name=pay0 pt=96 audiotestsrc is-live=true ! mulawenc ! rtppcmupay name=pay1 )",
-    //     arguments.vdev,
-    //     arguments.width,
-    //     arguments.height,
-    //     arguments.fps,
-    //     arguments.encoder);
-    
     printf("strbin : %s\n",strbin);
     
     /* make a media factory for a test stream. The default media factory can use

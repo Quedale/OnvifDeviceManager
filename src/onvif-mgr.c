@@ -6,6 +6,7 @@
 #include "onvif_device.h"
 #include "queue/event_queue.h"
 #include "gui/gui_update_calls.h"
+#include "gui/credentials_input.h"
 
 #include <gtk/gtk.h>
 #include <gst/gst.h>
@@ -61,7 +62,6 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   GtkWidget *row;
   GtkWidget *grid;
   GtkWidget *label;
-  GtkWidget *handle;
   GtkWidget *image;
   GdkPixbufLoader *loader;
   GdkPixbuf *pixbuf;
@@ -93,10 +93,11 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   image = gtk_spinner_new ();
   gtk_spinner_start (GTK_SPINNER (image));
 
-  handle = gtk_event_box_new ();
-  gtk_container_add (GTK_CONTAINER (handle), image);
-  g_object_set (handle, "margin-end", 10, NULL);
-  gtk_grid_attach (GTK_GRID (grid), handle, 0, 1, 1, 3);
+  GtkWidget * thumbnail_handle = gtk_event_box_new ();
+  devp->image_handle = thumbnail_handle;
+  gtk_container_add (GTK_CONTAINER (thumbnail_handle), image);
+  g_object_set (thumbnail_handle, "margin-end", 10, NULL);
+  gtk_grid_attach (GTK_GRID (grid), thumbnail_handle, 0, 1, 1, 3);
 
   char* m_name = onvif_extract_scope("name",m);
   char* markup_name = malloc(strlen(m_name)+1+7);
@@ -133,7 +134,7 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   g_object_ref(image);
 
   //Dispatch Thread event to update GtkListRow
-  display_onvif_device_row(devp,EVENT_QUEUE,handle);
+  display_onvif_device_row(devp,EVENT_QUEUE);
 
   return row;
 }
@@ -343,12 +344,18 @@ void create_ui (OnvifPlayer* player) {
   g_signal_connect (G_OBJECT (main_window), "delete-event", G_CALLBACK (delete_event_cb), player);
 
   gtk_window_set_title (GTK_WINDOW (main_window), "Onvif Device Manager");
-  gtk_container_set_border_width (GTK_CONTAINER (main_window), 10);
+
+  GtkWidget * overlay =gtk_overlay_new();
+  gtk_container_add (GTK_CONTAINER (main_window), overlay);
 
   /* Here we construct the container that is going pack our buttons */
   grid = gtk_grid_new ();
+  gtk_container_set_border_width (GTK_CONTAINER (grid), 10);
+  gtk_overlay_add_overlay(GTK_OVERLAY(overlay),grid);
 
-  gtk_container_add (GTK_CONTAINER (main_window), grid);
+  player->dialog = CredentialsDialog__create(dialog_login_cb, dialog_cancel_cb);
+  gtk_overlay_add_overlay(GTK_OVERLAY(overlay),player->dialog->root);
+
   widget = gtk_button_new ();
   label = gtk_label_new("");
   gtk_label_set_markup (GTK_LABEL (label), "<span size=\"x-large\">Scan</span>...");

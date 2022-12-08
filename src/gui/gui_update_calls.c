@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "credentials_input.h"
 
 extern char _binary_prohibited_icon_png_size[];
 extern char _binary_prohibited_icon_png_start[];
@@ -19,13 +20,11 @@ extern char _binary_locked_icon_png_end[];
 struct DeviceInput {
   OnvifDevice * device;
   EventQueue * queue;
-  GtkWidget *thumbnail_handle;
 };
 
 
-struct DeviceInput * copy_input(struct DeviceInput * input){
+struct DeviceInput * DeviceInput_copy(struct DeviceInput * input){
   struct DeviceInput * newinput = malloc(sizeof(struct DeviceInput));
-  newinput->thumbnail_handle = input->thumbnail_handle;
   newinput->device = OnvifDevice__copy(input->device);  
   newinput->queue = input->queue;
   return newinput;
@@ -58,8 +57,8 @@ void _display_onvif_thumbnail(void * user_data){
   double newpw = 40 / ph * pw;
   pixbuf = gdk_pixbuf_scale_simple (pixbuf,newpw,40,GDK_INTERP_NEAREST);
   image = gtk_image_new_from_pixbuf (pixbuf); 
-  gtk_container_foreach (GTK_CONTAINER (input->thumbnail_handle), (void*) gtk_widget_destroy, NULL);
-  gtk_container_add (GTK_CONTAINER (input->thumbnail_handle), image);
+  gtk_container_foreach (GTK_CONTAINER (input->device->image_handle), (void*) gtk_widget_destroy, NULL);
+  gtk_container_add (GTK_CONTAINER (input->device->image_handle), image);
   gtk_widget_show (image);
   // g_object_ref(image); //We aren't going to change this picture for now
   free(input);
@@ -92,24 +91,20 @@ void _display_nslookup_hostname(void * user_data){
 
 void _display_onvif_device(void * user_data){
   struct DeviceInput * input = (struct DeviceInput *) user_data;
-
-  /* nslookup doesn't require onvif authentication. Dispatch event now. */
-  EventQueue__insert(input->queue,_display_nslookup_hostname,copy_input(input));
-
   /* Start by authenticating the device then start retrieve thumbnail */
   OnvifDevice_authenticate(input->device);
 
   /* Display row thumbnail */
-  EventQueue__insert(input->queue,_display_onvif_thumbnail,copy_input(input));
-
-  free(input);
+  _display_onvif_thumbnail(input);
 }
 
-void display_onvif_device_row(OnvifDevice * device, EventQueue * queue, GtkWidget * thumbnail_handle){
+void display_onvif_device_row(OnvifDevice * device, EventQueue * queue){
   struct DeviceInput * input = malloc(sizeof(struct DeviceInput));
-  input->thumbnail_handle = thumbnail_handle;
   input->device = device;
   input->queue = queue;
+  
+  /* nslookup doesn't require onvif authentication. Dispatch event now. */
+  EventQueue__insert(queue,_display_nslookup_hostname,DeviceInput_copy(input));
 
   EventQueue__insert(queue,_display_onvif_device,input);
 }
@@ -122,7 +117,14 @@ struct PlayStreamInput {
 struct PlayInput {
   OnvifPlayer * player;
   GtkListBoxRow * row;
+  EventQueue * queue;
 };
+
+gboolean * main_thread_dispatch (void * user_data){
+  struct PlayInput * input = (struct PlayInput *) user_data;
+  CredentialsDialog__show(input->player->dialog,input);
+  return FALSE;
+}
 
 void _play_onvif_stream(void * user_data){
   struct PlayInput * input = (struct PlayInput *) user_data;
@@ -130,6 +132,7 @@ void _play_onvif_stream(void * user_data){
   OnvifPlayer__stop(input->player);
   //Unselected. Stopping stream TODO this isn't enough
   if(input->row == NULL){
+    free(input);
     return;
   }
   int pos;
@@ -137,6 +140,7 @@ void _play_onvif_stream(void * user_data){
   
   input->player->device = input->player->onvifDeviceList->devices[pos];
   if(!input->player->device->authorized){
+    gdk_threads_add_idle((void *)main_thread_dispatch,input);
     return;
   }
 
@@ -145,13 +149,41 @@ void _play_onvif_stream(void * user_data){
   OnvifPlayer__set_playback_url(input->player,uri);
   OnvifPlayer__play(input->player);
 
+  free(input);
 }
 
+void _onvif_authentication(void * user_data){
+  LoginEvent * event = (LoginEvent *) user_data;
+  struct PlayInput * input = (struct PlayInput *) event->user_data;
+  OnvifDevice_set_credentials(input->player->device,event->user,event->pass);
+  OnvifDevice_authenticate(input->player->device);
+  if(!input->player->device->authorized){
+    return;
+  }
+  CredentialsDialog__hide(input->player->dialog);
+  EventQueue__insert(input->queue,_play_onvif_stream,input);
+  display_onvif_device_row(input->player->device,input->queue);
+}
+
+
+void dialog_cancel_cb(CredentialsDialog * dialog){
+  CredentialsDialog__hide(dialog);
+  free(dialog->user_data);
+}
+
+void dialog_login_cb(LoginEvent * event){
+  struct PlayInput * input = (struct PlayInput *) event->user_data;
+  EventQueue__insert(input->queue,_onvif_authentication,LoginEvent_copy(event));
+  free(event->dialog->user_data);
+}
+
+
 void select_onvif_device_row(OnvifPlayer * player,  GtkListBoxRow * row, EventQueue * queue){
-  printf("select_onvif_device_row %p\n",(void *)player);
   struct PlayInput * input = malloc (sizeof(struct PlayInput));
   input->player = player;
   input->row = row;
+  input->queue = queue;
+  
   EventQueue__insert(queue,_play_onvif_stream,input);
 }
 

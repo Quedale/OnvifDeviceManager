@@ -269,12 +269,12 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
     case GST_MESSAGE_REDIRECT:
       printf("msg : GST_MESSAGE_REDIRECT\n");
       break;
-    case GST_MESSAGE_DEVICE_CHANGED:
-      printf("msg : GST_MESSAGE_DEVICE_CHANGED\n");
-      break;
     //Doesnt exists in gstreamer 1.16
+    // case GST_MESSAGE_DEVICE_CHANGED:
+    //  printf("msg : GST_MESSAGE_DEVICE_CHANGED\n");
+    //  break;
     // case GST_MESSAGE_INSTANT_RATE_REQUEST:
-      // printf("msg : GST_MESSAGE_INSTANT_RATE_REQUEST\n");
+    //  printf("msg : GST_MESSAGE_INSTANT_RATE_REQUEST\n");
       break;
     case GST_MESSAGE_ANY:
       printf("msg : GST_MESSAGE_ANY\n");
