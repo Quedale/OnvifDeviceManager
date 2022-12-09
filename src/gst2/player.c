@@ -367,7 +367,7 @@ find_backchannel (GstElement * rtspsrc, guint idx, GstCaps * caps,
   GstStructure *s;
   gchar *caps_str = gst_caps_to_string (caps);
   g_free (caps_str);
-
+  printf("OnvifDevice__find_backchannel\n");
   s = gst_caps_get_structure (caps, 0);
   if (gst_structure_has_field (s, "a-sendonly")) {
     player->back_stream_id = idx;
@@ -391,6 +391,10 @@ static void on_pad_added (GstElement *element, GstPad *pad, gpointer data){
     GstStructure *new_pad_struct = NULL;
     const gchar *new_pad_type = NULL;
     gchar *capstr = NULL;
+
+    char * name = GST_ELEMENT_NAME(decoder);
+    printf("name %s\n",name);
+
     //TODO Check caps before linking (audio to vidoe and video to audio invalid linking)
     /* We can now link this pad with the rtsp-decoder sink pad */
     sinkpad = gst_element_get_static_pad (decoder, "sink");
