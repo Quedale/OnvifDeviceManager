@@ -29,6 +29,9 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "gst2/onvifinitstaticplugins.h"
+#include "gst2/sink-retriever.h"
+
 const char *argp_program_version = "0.0";
 const char *argp_program_bug_address = "<your@email.address>";
 static char doc[] = "Your program description.";
@@ -140,12 +143,16 @@ main (int argc, char *argv[])
     printf ("encoder : %s\n", arguments.encoder);
     printf ("mount : %s\n", arguments.mount);
     printf ("port : %i\n", arguments.port);
-    //return 1;
+
 
     gst_init (&argc, &argv);
 
-    loop = g_main_loop_new (NULL, FALSE);
+    onvif_init_static_plugins();
 
+    SupportedAudioSinkTypes audio_sink_type;
+    audio_sink_type = retrieve_audiosink();
+
+    loop = g_main_loop_new (NULL, FALSE);
     /* create a server instance */
     server = gst_rtsp_onvif_server_new ();
 
@@ -153,29 +160,56 @@ main (int argc, char *argv[])
     * that be used to map uri mount points to media factories */
     mounts = gst_rtsp_server_get_mount_points (server);
 
-    // asprintf(&strbin, "( videotestsrc ! video/x-raw,width=%i,height=%i,framerate=%i/1,format=YUY2 ! videoconvert ! %s ! video/x-h264,profile=main ! rtph264pay name=pay0 pt=96 )",
-    //     arguments.width,
-    //     arguments.height,
-    //     arguments.fps,
-    //     arguments.encoder); 
-
     if(!strcmp(arguments.vdev,"test")){
-        asprintf(&strbin, "( videotestsrc ! video/x-raw,width=%i,height=%i,framerate=%i/1,format=YUY2 ! videoconvert ! %s ! rtph264pay name=pay0 pt=96 audiotestsrc wave=ticks apply-tick-ramp=true tick-interval=400000000 is-live=true ! mulawenc ! rtppcmupay name=pay1 )",
+        if(!asprintf(&strbin, "( videotestsrc ! video/x-raw,width=%i,height=%i,framerate=%i/1,format=YUY2 ! videoconvert ! %s ! rtph264pay name=pay0 pt=96 audiotestsrc wave=ticks apply-tick-ramp=true tick-interval=400000000 ! mulawenc ! rtppcmupay name=pay1 )",
             arguments.width,
             arguments.height,
             arguments.fps,
-            arguments.encoder); 
+            arguments.encoder)){
+            g_critical("Unable to construct launch");
+            return -1;
+        } 
     } else {
-        asprintf(&strbin, "( v4l2src device=%s ! video/x-raw,width=%i,height=%i,framerate=%i/1,format=YUY2 ! videoconvert ! %s ! rtph264pay name=pay0 pt=96 audiotestsrc ! mulawenc ! rtppcmupay name=pay1 )",
+        if(!asprintf(&strbin, "( v4l2src device=%s ! video/x-raw,width=%i,height=%i,framerate=%i/1,format=YUY2 ! queue ! videoconvert ! %s ! rtph264pay name=pay0 pt=96 audiotestsrc wave=ticks apply-tick-ramp=true tick-interval=400000000 ! mulawenc ! rtppcmupay name=pay1 )",
             arguments.vdev,
             arguments.width,
             arguments.height,
             arguments.fps,
-            arguments.encoder);    
+            arguments.encoder)){
+            g_critical("Unable to construct lauch");
+            return -1;
+        } 
     }
 
-    printf("strbin : %s\n",strbin);
+    printf("Launch : %s\n",strbin);
     
+    // TODO handle sink override
+    char * audiosink;
+    switch(audio_sink_type){
+        case ONVIF_PULSE:
+            audiosink = "pulsesink async=false";
+            break;
+        case ONVIF_ASLA:
+            audiosink = "alsasink async=false";
+            break;
+        case ONVIF_OMX:
+            audiosink = "omxhdmiaudiosink";
+            break;
+        case ONVIF_NA:
+        default:
+            audiosink = "fakesink";
+            g_warning("No valid audio sink found for backchannel!");
+    }
+
+    //TODO use switchbin to handle LAW and AAC
+    char * backchannel_lauch;
+    if(!asprintf(&backchannel_lauch, "( capsfilter caps=\"application/x-rtp, media=audio, payload=0, clock-rate=8000, encoding-name=PCMU\" name=depay_backchannel ! rtppcmudepay ! mulawdec ! %s )",
+        audiosink)){
+        g_critical("Unable to construct backchannel");
+        return -2;
+    } 
+
+    printf("Backchannel : %s\n",backchannel_lauch);
     /* make a media factory for a test stream. The default media factory can use
     * gst-launch syntax to create pipelines.
     * any launch line works as long as it contains elements named pay%d. Each
@@ -184,12 +218,25 @@ main (int argc, char *argv[])
     gst_rtsp_media_factory_set_launch (factory,strbin);
     gst_rtsp_onvif_media_factory_set_backchannel_launch
         (GST_RTSP_ONVIF_MEDIA_FACTORY (factory),
-        "( capsfilter caps=\"application/x-rtp, media=audio, payload=0, clock-rate=8000, encoding-name=PCMU\" name=depay_backchannel ! rtppcmudepay ! autoaudiosink  )");
+        backchannel_lauch);
+
+        // Test backpipe
+        // "( capsfilter caps=\"application/x-rtp, media=audio, payload=0, clock-rate=8000, encoding-name=PCMU\" name=depay_backchannel ! fakesink async=false )");
+
+        // async-handling will make it pull buffer from appsrc.
+        // message-forward will prevent a broken pipe if the stream is used more than once
+        // For some reason, the decodebin will randomly stop pulling from appsrc after multiple re-use
+        // "( capsfilter caps=\"application/x-rtp, media=audio, payload=0, clock-rate=8000, encoding-name=PCMU\" name=depay_backchannel ! decodebin async-handling=false message-forward=true !  pulsesink async=false )"); //Works but randomly break after a few stream switch
+        
+        // Works flawlessly
+        // "( capsfilter caps=\"application/x-rtp, media=audio, payload=0, clock-rate=8000, encoding-name=PCMU\" name=depay_backchannel ! rtppcmudepay ! mulawdec ! pulsesink async=false )");
+
+        // autoaudiosink sync property doesnt seem to work. Sample queues up in appsrc.
+        // "( capsfilter caps=\"application/x-rtp, media=audio, payload=0, clock-rate=8000, encoding-name=PCMU\" name=depay_backchannel ! rtppcmudepay ! mulawdec ! autoaudiosink sync=true )"); 
     gst_rtsp_media_factory_set_shared (factory, TRUE);
     gst_rtsp_media_factory_set_media_gtype (factory, GST_TYPE_RTSP_ONVIF_MEDIA);
 
-    //TODO Set port
-    // char mount[] = "/";
+
     char * mount = malloc(strlen(arguments.mount)+2);
     strcpy(mount,"/");
     strcat(mount,arguments.mount);

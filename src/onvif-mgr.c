@@ -7,6 +7,7 @@
 #include "queue/event_queue.h"
 #include "gui/gui_update_calls.h"
 #include "gui/credentials_input.h"
+#include "gst2/onvifinitstaticplugins.h"
 
 #include <gtk/gtk.h>
 #include <gst/gst.h>
@@ -430,6 +431,7 @@ int main(int argc, char *argv[]) {
 
   /* Initialize GStreamer */
   gst_init (&argc, &argv);
+  onvif_init_static_plugins();
 
   /* Initialize our data structure */
   data = OnvifPlayer__create();
@@ -441,7 +443,6 @@ int main(int argc, char *argv[]) {
   gtk_main ();
 
   /* Free resources */
-  gst_element_set_state (data->pipeline, GST_STATE_NULL);
   gst_object_unref (data->pipeline);
   return 0;
 }

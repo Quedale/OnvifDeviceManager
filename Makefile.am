@@ -4,43 +4,54 @@ JOB_FLAG := $(filter -j%, $(subst -j ,-j,$(shell ps T | grep "^\s*$(MAKE_PID).*$
 JOBS     := $(subst -j,,$(JOB_FLAG))
 TAB  := $(NULL)<tab>$(NULL)
 
+# Extract list of compiled package
+GST_PLGS = $(shell ls $(PKG_GST_PATH) | sed -z 's/\.pc\n/ /g;s/,$$/\n/')
+GST_LIBS = $(shell ls $(PKG_PATH) | sed -z 's/\.pc\n/ /g;s/,$$/\n/')
+
 AUTOMAKE_OPTIONS = foreign subdir-objects
 
+bin_PROGRAMS = onvifmgr 
+EXTRA_PROGRAMS = onvifclient onvifserver giftest overlaytest queuetest
 
-bin_PROGRAMS = onvifclient onvifserver onvifmgr giftest overlaytest
+onvifclient_SOURCES = $(top_srcdir)/src/onvif-client.c $(top_srcdir)/src/gst2/onvifinitstaticplugins.c
+onvifclient_CFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS)` $(EXT_CFLAGS)
+onvifclient_LDFLAGS = -Wl,-Bstatic `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS)` $(EXT_STC_LIBS) -Wl,-Bdynamic $(EXT_DYN_LIBS) -lstdc++
 
-onvifclient_SOURCES = $(top_srcdir)/src/onvif-client.c
-onvifclient_CFLAGS = `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --cflags libffi gstreamer-1.0`
-onvifclient_LDFLAGS = `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --libs libffi gstreamer-1.0`
+onvifserver_SOURCES = $(top_srcdir)/src/onvif-server.c $(top_srcdir)/src/gst2/onvifinitstaticplugins.c  $(top_srcdir)/src/gst2/sink-retriever.c
+onvifserver_CFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS)` $(EXT_CFLAGS)
+onvifserver_LDFLAGS = -Wl,-Bstatic `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS)` $(EXT_STC_LIBS) -Wl,-Bdynamic $(EXT_DYN_LIBS) -lstdc++
 
-onvifserver_SOURCES = $(top_srcdir)/src/onvif-server.c
-onvifserver_CFLAGS = `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --cflags glib-2.0 gio-2.0 libffi gstreamer-video-1.0 gstreamer-rtsp-server-1.0 gstreamer-rtsp-1.0 gstreamer-rtp-1.0`
-onvifserver_LDFLAGS = `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --libs glib-2.0 gio-2.0 libffi gstreamer-video-1.0 gstreamer-rtsp-server-1.0 gstreamer-rtsp-1.0 gstreamer-rtp-1.0`
-
-onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c $(top_srcdir)/src/gst2/player.c $(top_srcdir)/src/gst2/overlay.c $(top_srcdir)/src/queue/event_queue.c $(top_srcdir)/src/gui/gui_update_calls.c $(top_srcdir)/src/gui/credentials_input.c
-onvifmgr_CFLAGS= `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --cflags gstreamer-rtsp-server-1.0 gstreamer-video-1.0 cairo gtk+-3.0 wayland-client glib-2.0 gio-2.0` -I$(top_srcdir)/build/dist/include -I$(top_srcdir)/build/dist/include 
-onvifmgr_LDFLAGS= `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --libs gstreamer-rtsp-server-1.0 gstreamer-video-1.0 cairo gtk+-3.0 wayland-client glib-2.0 gio-2.0` -L$(top_srcdir)/build/dist/lib -lpthread -lonvifsoap -lonvifdisco 
-onvifmgr_LDADD = locked-icon.o
+onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c $(top_srcdir)/src/gst2/player.c $(top_srcdir)/src/gst2/overlay.c $(top_srcdir)/src/queue/event_queue.c $(top_srcdir)/src/gui/gui_update_calls.c $(top_srcdir)/src/gui/credentials_input.c $(top_srcdir)/src/gst2/onvifinitstaticplugins.c 
+onvifmgr_CFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0` $(EXT_CFLAGS) -I$(top_srcdir)/build/dist/include
+onvifmgr_LDFLAGS = -Wl,-Bstatic `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0` $(EXT_STC_LIBS) -Wl,-Bdynamic $(EXT_DYN_LIBS) -lstdc++ -L$(top_srcdir)/build/dist/lib  -lonvifsoap -lonvifdisco
+onvifmgr_LDADD = locked-icon.o /home/quedale/git/OnvifDeviceManager/build/dist/lib/libonvifsoap.a 
 
 queuetest_SOURCES = $(top_srcdir)/src/demo/queue_test.c $(top_srcdir)/src/queue/event_queue.c
 queuetest_CFLAGS = -lpthread -Wall 
 
 giftest_SOURCES = $(top_srcdir)/src/demo/gtk-gif.c
-giftest_CFLAGS = -Wall `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --cflags gtk+-3.0`
-giftest_LDFLAGS = `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --libs gtk+-3.0`
+giftest_CFLAGS = -Wall `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags gtk+-3.0`
+giftest_LDFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs gtk+-3.0`
 giftest_LDADD = loading.o
 
 overlaytest_SOURCES = $(top_srcdir)/src/demo/overlay-demo.c
-overlaytest_CFLAGS = `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --cflags gtk+-3.0 gstreamer-rtsp-server-1.0  gstreamer-video-1.0`
-overlaytest_LDFLAGS = -lm `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --libs gtk+-3.0 gstreamer-rtsp-server-1.0  gstreamer-video-1.0`
+overlaytest_CFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS)`  -I$(top_srcdir)/build/dist/include
+overlaytest_LDFLAGS = -Wl,-Bstatic `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(GST_PLGS)` -Wl,-Bdynamic
 overlaytest_LDADD =
+
+paths$(EXEEXT):
+	@echo "PKG_FULL_PATH : $(PKG_FULL_PATH)"
+	@echo ""
+	@echo "GST_PLGS : $(GST_PLGS)"
+	@echo ""
+	@echo "GST_LIBS : $(GST_LIBS)"
 
 printinc$(EXEEXT):
 	@`gcc -print-prog-name=cc1` -v
 
 pkgpath$(EXEEXT):
-	@echo "CERBERO_PKG : $(CERBERO_PKG)"
-	@echo "CERBERO FLAGS : " `PKG_CONFIG_PATH=$(CERBERO_PKG) pkg-config --cflags gio-2.0`
+	@echo "PKG_FULL_PATH : $(PKG_FULL_PATH)"
+	@echo "CFLAGS : " `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags gio-2.0`
 
 loading.o$(EXEEXT):
 	@echo "  CCLD     loading.o"

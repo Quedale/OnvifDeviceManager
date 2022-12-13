@@ -1,4 +1,5 @@
 #include <gst/gst.h>
+#include "gst2/onvifinitstaticplugins.h"
 
 static GMainLoop *loop = NULL;
 static GstElement *backpipe = NULL;
@@ -82,7 +83,7 @@ main (int argc, char *argv[])
   const gchar *location;
 
   gst_init (&argc, &argv);
-
+  onvif_init_static_plugins();
   if (argc >= 2)
     location = argv[1];
   else

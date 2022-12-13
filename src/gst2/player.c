@@ -448,7 +448,7 @@ void * create_pipeline(OnvifPlayer *self){
 
   /* Create the empty pipeline */
   self->pipeline = malloc(sizeof(GstElement *));
-  self->pipeline = gst_pipeline_new ("test-pipeline");
+  self->pipeline = gst_pipeline_new ("onvif-pipeline");
 
   //Make sure: Every elements was created ok
   if (!self->pipeline || \
