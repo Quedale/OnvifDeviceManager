@@ -23,9 +23,23 @@ struct DeviceInput {
 };
 
 
+struct PlayInput {
+  OnvifPlayer * player;
+  GtkListBoxRow * row;
+  EventQueue * queue;
+};
+
 struct DeviceInput * DeviceInput_copy(struct DeviceInput * input){
   struct DeviceInput * newinput = malloc(sizeof(struct DeviceInput));
-  newinput->device = OnvifDevice__copy(input->device);  
+  newinput->device = input->device;//OnvifDevice__copy(input->device);  
+  newinput->queue = input->queue;
+  return newinput;
+}
+
+struct PlayInput * PlayInput_copy(struct PlayInput * input){
+  struct PlayInput * newinput = malloc(sizeof(struct PlayInput));
+  newinput->player = input->player;//OnvifDevice__copy(input->device);  
+  newinput->row = input->row;
   newinput->queue = input->queue;
   return newinput;
 }
@@ -114,11 +128,6 @@ struct PlayStreamInput {
   char * uri;
 };
 
-struct PlayInput {
-  OnvifPlayer * player;
-  GtkListBoxRow * row;
-  EventQueue * queue;
-};
 
 gboolean * main_thread_dispatch (void * user_data){
   struct PlayInput * input = (struct PlayInput *) user_data;
@@ -161,8 +170,10 @@ void _onvif_authentication(void * user_data){
     return;
   }
   CredentialsDialog__hide(input->player->dialog);
-  EventQueue__insert(input->queue,_play_onvif_stream,input);
+  EventQueue__insert(input->queue,_play_onvif_stream,PlayInput_copy(input));
   display_onvif_device_row(input->player->device,input->queue);
+  free(input);
+  free(event);
 }
 
 
@@ -174,7 +185,6 @@ void dialog_cancel_cb(CredentialsDialog * dialog){
 void dialog_login_cb(LoginEvent * event){
   struct PlayInput * input = (struct PlayInput *) event->user_data;
   EventQueue__insert(input->queue,_onvif_authentication,LoginEvent_copy(event));
-  free(event->dialog->user_data);
 }
 
 
