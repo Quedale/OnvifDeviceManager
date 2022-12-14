@@ -23,8 +23,8 @@ onvifserver_LDFLAGS = -Wl,-Bstatic `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config 
 
 onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c $(top_srcdir)/src/gst2/player.c $(top_srcdir)/src/gst2/overlay.c $(top_srcdir)/src/queue/event_queue.c $(top_srcdir)/src/gui/gui_update_calls.c $(top_srcdir)/src/gui/credentials_input.c $(top_srcdir)/src/gst2/onvifinitstaticplugins.c 
 onvifmgr_CFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0` $(EXT_CFLAGS) -I$(top_srcdir)/build/dist/include
-onvifmgr_LDFLAGS = -Wl,-Bstatic `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0` $(EXT_STC_LIBS) -Wl,-Bdynamic $(EXT_DYN_LIBS) -lstdc++ -L$(top_srcdir)/build/dist/lib  -lonvifsoap -lonvifdisco
-onvifmgr_LDADD = locked-icon.o /home/quedale/git/OnvifDeviceManager/build/dist/lib/libonvifsoap.a 
+onvifmgr_LDFLAGS = -Wl,-Bstatic `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0` $(EXT_STC_LIBS) -Wl,-Bdynamic $(EXT_DYN_LIBS) -lstdc++ -L$(top_srcdir)/build/dist/lib  -lonvifsoap -lonvifdisco -z noexecstack
+onvifmgr_LDADD = locked-icon.o
 
 queuetest_SOURCES = $(top_srcdir)/src/demo/queue_test.c $(top_srcdir)/src/queue/event_queue.c
 queuetest_CFLAGS = -lpthread -Wall 
@@ -62,33 +62,33 @@ locked-icon.o$(EXEEXT):
 	@cd $(abs_top_srcdir)/images && ld -r -b binary -o $(abs_builddir)/locked-icon.o locked-icon.png && cd ..
 
 uninstall-onvifsoaplib$(EXEEXT):
-	cd OnvifSoapLib && $(MAKE) $(JOB_FLAG) uninstall GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd ..
+	cd subprojects/OnvifSoapLib && $(MAKE) $(JOB_FLAG) uninstall GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd ..
 
 install-onvifsoaplib$(EXEEXT):
-	cd OnvifSoapLib && $(MAKE) $(JOB_FLAG) install GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd ..
+	cd subprojects/OnvifSoapLib && $(MAKE) $(JOB_FLAG) install GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd ..
 
 clean-onvifsoaplib$(EXEEXT):
-	cd OnvifSoapLib && $(MAKE) $(JOB_FLAG) clean GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd ..
+	cd subprojects/OnvifSoapLib && $(MAKE) $(JOB_FLAG) clean GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd ..
 
 onvifsoaplib$(EXEEXT):
 	echo "soap dir : " $(GSOAP_SRC_DIR)
-	cd OnvifSoapLib && $(MAKE) $(JOB_FLAG) GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd ..
+	cd subprojects/OnvifSoapLib && $(MAKE) $(JOB_FLAG) GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd ..
 
 uninstall-discolib$(EXEEXT):
 	echo "soap dir : " $(GSOAP_SRC_DIR)
-	cd OnvifDiscoveryLib && $(MAKE) $(JOB_FLAG) uninstall GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd .. 
+	cd subprojects/OnvifDiscoveryLib && $(MAKE) $(JOB_FLAG) uninstall GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd .. 
 
 install-discolib$(EXEEXT):
 	echo "soap dir : " $(GSOAP_SRC_DIR)
-	cd OnvifDiscoveryLib && $(MAKE) $(JOB_FLAG) install GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd .. 
+	cd subprojects/OnvifDiscoveryLib && $(MAKE) $(JOB_FLAG) install GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd .. 
 	
 clean-discolib$(EXEEXT):
 	echo "soap dir : " $(GSOAP_SRC_DIR)
-	cd OnvifDiscoveryLib && $(MAKE) $(JOB_FLAG) clean GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd .. 
+	cd subprojects/OnvifDiscoveryLib && $(MAKE) $(JOB_FLAG) clean GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd .. 
 
 discolib$(EXEEXT):
 	echo "soap dir : " $(GSOAP_SRC_DIR)
-	cd OnvifDiscoveryLib && $(MAKE) $(JOB_FLAG) GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd .. 
+	cd subprojects/OnvifDiscoveryLib && $(MAKE) $(JOB_FLAG) GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd .. 
 
 clean-gsoaplib$(EXEEXT):
 	cd $(GSOAP_SRC_DIR) && $(MAKE) $(JOB_FLAG) clean && cd .. 

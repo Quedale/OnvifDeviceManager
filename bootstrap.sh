@@ -1,18 +1,23 @@
+#!/bin/bash
 SKIP_GSOAP=0
 SKIP_DISCOVERY=0
 SKIP_ONVIFLIB=0
 SKIP_GSTREAMER=0
 i=1;
+
 for arg in "$@" 
 do
-    if [ $arg == "--skip-gsoap" ]; then
+    shift
+    if [ "$arg" == "--skip-gsoap" ]; then
         SKIP_GSOAP=1
-    elif [ $arg == "--skip-discovery" ]; then
+    elif [ "$arg" == "--skip-discovery" ]; then
         SKIP_DISCOVERY=1
-    elif [ $arg == "--skip-onviflib" ]; then
+    elif [ "$arg" == "--skip-onviflib" ]; then
         SKIP_ONVIFLIB=1
-    elif [ $arg == "--skip-gstreamer" ]; then
+    elif [ "$arg" == "--skip-gstreamer" ]; then
         SKIP_GSTREAMER=1
+    else
+        set -- "$@" "$arg"
     fi
     i=$((i + 1));
 done
@@ -32,7 +37,7 @@ cd $SCRT_DIR
 # sudo apt install bison
 # sudo apt install flex
 
-mkdir $SCRT_DIR/subprojects
+mkdir -p $SCRT_DIR/subprojects
 cd $SCRT_DIR/subprojects
 
 if [ $SKIP_GSTREAMER -eq 0 ]; then
@@ -115,7 +120,7 @@ if [ $SKIP_GSTREAMER -eq 0 ]; then
     #We used the shared libs to recompile gst-omx plugins
     rm -rf $GST_DIR/build/dist/lib/*.so
     rm -rf $GST_DIR/build/dist/lib/gstreamer-1.0/*.so
-
+    cd ..
 fi
 
 if [ $SKIP_GSOAP -eq 0 ]; then
@@ -133,7 +138,6 @@ if [ $SKIP_GSOAP -eq 0 ]; then
     make install
     cd ..
 fi
-cd ..
 
 if [ $SKIP_DISCOVERY -eq 0 ]; then
     echo "-- Bootrap OnvifDiscoveryLib  --"
@@ -146,7 +150,7 @@ if [ $SKIP_ONVIFLIB -eq 0 ]; then
     git -C OnvifSoapLib pull 2> /dev/null || git clone https://github.com/Quedale/OnvifSoapLib.git
     GSOAP_SRC_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/subprojects/gsoap-2.8 OnvifSoapLib/bootstrap.sh --skip-gsoap
 fi
-
+cd ..
 
 aclocal
 autoconf
@@ -167,3 +171,6 @@ autoreconf -i
 #sudo apt update
 #echo $'\n'"export HOST_IP=\"\$(ip route |awk '/^default/{print \$3}')\""  >> ~/.bashrc
 #echo "export PULSE_SERVER=\"tcp:\$HOST_IP\""  >> ~/.bashrc
+
+cd $WORK_DIR
+$SCRT_DIR/configure $@

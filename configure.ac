@@ -11,13 +11,13 @@ AC_SUBST(PKG_GST_PATH, '$(abs_srcdir)/subprojects/gstreamer/build/dist/lib/gstre
 AC_SUBST(PKG_FULL_PATH, '$(PKG_PATH):$(PKG_GST_PATH)')
 
 AC_CONFIG_SUBDIRS([
-    OnvifDiscoveryLib
-    OnvifSoapLib
+    subprojects/OnvifDiscoveryLib
+    subprojects/OnvifSoapLib
 ])
 
 AC_CONFIG_FILES([
-    OnvifDiscoveryLib/Makefile
-    OnvifSoapLib/Makefile
+    subprojects/OnvifDiscoveryLib/Makefile
+    subprojects/OnvifSoapLib/Makefile
     Makefile
 ])
 
