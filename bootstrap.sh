@@ -3,6 +3,7 @@ SKIP_GSOAP=0
 SKIP_DISCOVERY=0
 SKIP_ONVIFLIB=0
 SKIP_GSTREAMER=0
+ENABLE_LIBAV=0
 i=1;
 
 for arg in "$@" 
@@ -16,6 +17,9 @@ do
         SKIP_ONVIFLIB=1
     elif [ "$arg" == "--skip-gstreamer" ]; then
         SKIP_GSTREAMER=1
+    elif [ "$arg" == "--enable-libav" ]; then
+        ENABLE_LIBAV=1
+        set -- "$@" "$arg"
     else
         set -- "$@" "$arg"
     fi
@@ -29,13 +33,6 @@ WORK_DIR=$(pwd)
 SCRT_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 cd $SCRT_DIR
 
-# sudo apt install automake autoconf gcc make pkg-config
-# sudo apt install libxml2-dev libgtk-3-dev
-# sudo apt install unzip
-# # sudo apt install meson
-# sudo apt install libssl-dev
-# sudo apt install bison
-# sudo apt install flex
 
 mkdir -p $SCRT_DIR/subprojects
 cd $SCRT_DIR/subprojects
@@ -43,18 +40,16 @@ cd $SCRT_DIR/subprojects
 if [ $SKIP_GSTREAMER -eq 0 ]; then
     git -C gstreamer pull 2> /dev/null || git clone -b 1.21.3 https://gitlab.freedesktop.org/gstreamer/gstreamer.git
     cd gstreamer
-    rm -rf build
 
     GST_DIR=$(pwd)
 
     MESON_PARAMS=""
     #Force disable
     MESON_PARAMS="$MESON_PARAMS -Dglib:tests=false"
-    MESON_PARAMS="$MESON_PARAMS -Dlibdrm:cairo-tests=disabled"
+    MESON_PARAMS="$MESON_PARAMS -Dlibdrm:cairo-tests=false"
     MESON_PARAMS="$MESON_PARAMS -Dx264:cli=false"
 
     #Enabled features
-    MESON_PARAMS="$MESON_PARAMS -Dlibav=enabled"
     MESON_PARAMS="$MESON_PARAMS -Dbase=enabled"
     MESON_PARAMS="$MESON_PARAMS -Dgood=enabled"
     MESON_PARAMS="$MESON_PARAMS -Dbad=enabled"
@@ -102,7 +97,7 @@ if [ $SKIP_GSTREAMER -eq 0 ]; then
     MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:mpegtsdemux=enabled"
     MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-ugly:x264=enabled"
 
-
+    rm -rf build
     meson setup build \
     --buildtype=release \
     --strip \
@@ -112,12 +107,69 @@ if [ $SKIP_GSTREAMER -eq 0 ]; then
     $MESON_PARAMS \
     --prefix=$GST_DIR/build/dist \
     --libdir=lib
-
     meson compile -C build
     meson install -C build
 
+    if [ $ENABLE_LIBAV -eq 1 ]; then
+        cd ..
+        #######################
+        #
+        # Custom FFmpeg build
+        #   For some reason, Gstreamer's meson dep doesn't build any codecs
+        #
+        #######################
+        git -C FFmpeg pull 2> /dev/null || git clone -b n5.1.2 https://github.com/FFmpeg/FFmpeg.git
+        cd FFmpeg
+
+        ./configure --prefix=$(pwd)/dist \
+            --enable-libdrm \
+            --disable-lzma \
+            --disable-doc \
+            --disable-shared \
+            --enable-static \
+            --enable-nonfree \
+            --enable-version3 \
+            --enable-gpl 
+        make -j$(nproc)
+        make install
+        rm -rf dist/lib/*.so
+        cd ..
+
+        #######################
+        #
+        # Rebuild gstreamer with libav with nofallback
+        #
+        #######################
+        #Rebuild with custom ffmpeg build
+        cd gstreamer
+        MESON_PARAMS="-Dlibav=enabled"
+        rm -rf libav_build
+        LIBRARY_PATH=$LIBRARY_PATH:$GST_DIR/build/dist/lib:/home/quedale/git/OnvifDeviceManager/subprojects/FFmpeg/dist/lib \
+        LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GST_DIR/build/dist/lib:/home/quedale/git/OnvifDeviceManager/subprojects/FFmpeg/dist/lib \
+        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_DIR/build/dist/lib/pkgconfig:/home/quedale/git/OnvifDeviceManager/subprojects/FFmpeg/dist/lib/pkgconfig \
+        meson setup libav_build \
+        --buildtype=release \
+        --strip \
+        --default-library=static \
+        --wrap-mode=nofallback \
+        -Dauto_features=disabled \
+        $MESON_PARAMS \
+        --prefix=$GST_DIR/libav_build/dist \
+        --libdir=lib
+        LIBRARY_PATH=$LIBRARY_PATH:$GST_DIR/build/dist/lib:/home/quedale/git/OnvifDeviceManager/subprojects/FFmpeg/dist/lib \
+        LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GST_DIR/build/dist/lib:/home/quedale/git/OnvifDeviceManager/subprojects/FFmpeg/dist/lib \
+        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_DIR/build/dist/lib/pkgconfig:/home/quedale/git/OnvifDeviceManager/subprojects/FFmpeg/dist/lib/pkgconfig \
+        meson compile -C libav_build
+        LIBRARY_PATH=$LIBRARY_PATH:$GST_DIR/build/dist/lib:/home/quedale/git/OnvifDeviceManager/subprojects/FFmpeg/dist/lib \
+        LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GST_DIR/build/dist/lib:/home/quedale/git/OnvifDeviceManager/subprojects/FFmpeg/dist/lib \
+        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_DIR/build/dist/lib/pkgconfig:/home/quedale/git/OnvifDeviceManager/subprojects/FFmpeg/dist/lib/pkgconfig \
+        meson install -C libav_build
+
+        #Remove shared lib to force static resolution to .a
+        rm -rf $GST_DIR/libav_build/dist/lib/*.so
+        rm -rf $GST_DIR/libav_build/dist/lib/gstreamer-1.0/*.so
+    fi
     #Remove shared lib to force static resolution to .a
-    #We used the shared libs to recompile gst-omx plugins
     rm -rf $GST_DIR/build/dist/lib/*.so
     rm -rf $GST_DIR/build/dist/lib/gstreamer-1.0/*.so
     cd ..

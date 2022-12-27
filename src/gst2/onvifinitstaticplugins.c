@@ -70,6 +70,9 @@ GST_PLUGIN_STATIC_DECLARE(level); // gstlevel
 GST_PLUGIN_STATIC_DECLARE(omx);
 GST_PLUGIN_STATIC_DECLARE(rpicamsrc); 
 #endif
+#ifdef ENABLELIBAV
+GST_PLUGIN_STATIC_DECLARE(libav);
+#endif
 // GST_PLUGIN_STATIC_DECLARE(replaygain); gstreplaygain
 GST_PLUGIN_STATIC_DECLARE(rtp);
 GST_PLUGIN_STATIC_DECLARE(rtpmanager);
@@ -196,7 +199,6 @@ GST_PLUGIN_STATIC_DECLARE(asf);
 GST_PLUGIN_STATIC_DECLARE(x264);
 #ifndef ENABLERPI
 GST_PLUGIN_STATIC_DECLARE(pulseaudio);
-GST_PLUGIN_STATIC_DECLARE(libav);
 #endif
 // GST_PLUGIN_STATIC_DECLARE(rtspclientsink);
 // GST_PLUGIN_STATIC_DECLARE(nle); gstnle
@@ -277,6 +279,9 @@ onvif_init_static_plugins (void)
 #ifdef ENABLERPI
     GST_PLUGIN_STATIC_REGISTER(omx);
     GST_PLUGIN_STATIC_REGISTER(rpicamsrc);
+#endif
+#ifdef ENABLELIBAV
+    GST_PLUGIN_STATIC_REGISTER(libav);
 #endif
     // GST_PLUGIN_STATIC_REGISTER(replaygain); gstreplaygain
     GST_PLUGIN_STATIC_REGISTER(rtp);
@@ -404,7 +409,6 @@ onvif_init_static_plugins (void)
     GST_PLUGIN_STATIC_REGISTER(x264);
 #ifndef ENABLERPI
     GST_PLUGIN_STATIC_REGISTER(pulseaudio);
-    GST_PLUGIN_STATIC_REGISTER(libav);
 #endif
     // GST_PLUGIN_STATIC_REGISTER(rtspclientsink);
     // GST_PLUGIN_STATIC_REGISTER(nle); gstnle
