@@ -144,9 +144,9 @@ if [ $SKIP_GSTREAMER -eq 0 ]; then
         cd gstreamer
         MESON_PARAMS="-Dlibav=enabled"
         rm -rf libav_build
-        LIBRARY_PATH=$LIBRARY_PATH:$GST_DIR/build/dist/lib:/home/quedale/git/OnvifDeviceManager/subprojects/FFmpeg/dist/lib \
-        LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GST_DIR/build/dist/lib:/home/quedale/git/OnvifDeviceManager/subprojects/FFmpeg/dist/lib \
-        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_DIR/build/dist/lib/pkgconfig:/home/quedale/git/OnvifDeviceManager/subprojects/FFmpeg/dist/lib/pkgconfig \
+        LIBRARY_PATH=$LIBRARY_PATH:$GST_DIR/build/dist/lib:$SCRT_DIR/subprojects/FFmpeg/dist/lib \
+        LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GST_DIR/build/dist/lib:$SCRT_DIR/subprojects/FFmpeg/dist/lib \
+        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_DIR/build/dist/lib/pkgconfig:$SCRT_DIR/subprojects/FFmpeg/dist/lib/pkgconfig \
         meson setup libav_build \
         --buildtype=release \
         --strip \
@@ -156,13 +156,13 @@ if [ $SKIP_GSTREAMER -eq 0 ]; then
         $MESON_PARAMS \
         --prefix=$GST_DIR/libav_build/dist \
         --libdir=lib
-        LIBRARY_PATH=$LIBRARY_PATH:$GST_DIR/build/dist/lib:/home/quedale/git/OnvifDeviceManager/subprojects/FFmpeg/dist/lib \
-        LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GST_DIR/build/dist/lib:/home/quedale/git/OnvifDeviceManager/subprojects/FFmpeg/dist/lib \
-        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_DIR/build/dist/lib/pkgconfig:/home/quedale/git/OnvifDeviceManager/subprojects/FFmpeg/dist/lib/pkgconfig \
+        LIBRARY_PATH=$LIBRARY_PATH:$GST_DIR/build/dist/lib:$SCRT_DIR/subprojects/FFmpeg/dist/lib \
+        LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GST_DIR/build/dist/lib:$SCRT_DIR/subprojects/FFmpeg/dist/lib \
+        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_DIR/build/dist/lib/pkgconfig:$SCRT_DIR/subprojects/FFmpeg/dist/lib/pkgconfig \
         meson compile -C libav_build
-        LIBRARY_PATH=$LIBRARY_PATH:$GST_DIR/build/dist/lib:/home/quedale/git/OnvifDeviceManager/subprojects/FFmpeg/dist/lib \
-        LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GST_DIR/build/dist/lib:/home/quedale/git/OnvifDeviceManager/subprojects/FFmpeg/dist/lib \
-        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_DIR/build/dist/lib/pkgconfig:/home/quedale/git/OnvifDeviceManager/subprojects/FFmpeg/dist/lib/pkgconfig \
+        LIBRARY_PATH=$LIBRARY_PATH:$GST_DIR/build/dist/lib:$SCRT_DIR/subprojects/FFmpeg/dist/lib \
+        LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$GST_DIR/build/dist/lib:$SCRT_DIR/subprojects/FFmpeg/dist/lib \
+        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_DIR/build/dist/lib/pkgconfig:$SCRT_DIR/subprojects/FFmpeg/dist/lib/pkgconfig \
         meson install -C libav_build
 
         #Remove shared lib to force static resolution to .a
