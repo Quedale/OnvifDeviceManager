@@ -24,11 +24,6 @@
 
 EventQueue* EVENT_QUEUE;
 
-/* This function is called when the PLAY button is clicked */
-static void play_cb (GtkButton *button, OnvifPlayer *data) {
-  gst_element_set_state (data->pipeline, GST_STATE_PLAYING);
-}
-
 /* This function is called when the STOP button is clicked */
 static void stop_cb (GtkButton *button, OnvifPlayer *data) {
   OnvifPlayer__stop(data);
@@ -64,8 +59,6 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   GtkWidget *grid;
   GtkWidget *label;
   GtkWidget *image;
-  GdkPixbufLoader *loader;
-  GdkPixbuf *pixbuf;
 
   // int i;
   // printf("--- Prob -------\n");
@@ -186,8 +179,6 @@ void
 onvif_scan (GtkWidget *widget,
              OnvifPlayer *player)
 {
-  gchar *text;
-  GtkWidget *row;
 
   gtk_widget_set_sensitive(widget,FALSE);
 
@@ -222,29 +213,28 @@ GtkWidget * add_label_entry(GtkWidget * grid, int row, char* lbl){
 
 GtkWidget * create_info_ui(OnvifPlayer *player){
     GtkWidget *grid;
-    GtkWidget * widget;
 
     grid = gtk_grid_new ();
 
-    widget = add_label_entry(grid,0,"Hostname : ");
+    add_label_entry(grid,0,"Hostname : ");
 
-    widget = add_label_entry(grid,1,"Location : ");
+    add_label_entry(grid,1,"Location : ");
 
-    widget = add_label_entry(grid,2,"Manufacturer : ");
+    add_label_entry(grid,2,"Manufacturer : ");
 
-    widget = add_label_entry(grid,3,"Model : ");
+    add_label_entry(grid,3,"Model : ");
 
-    widget = add_label_entry(grid,4,"Hardware : ");
+    add_label_entry(grid,4,"Hardware : ");
 
-    widget = add_label_entry(grid,5,"Firmware : ");
+    add_label_entry(grid,5,"Firmware : ");
 
-    widget = add_label_entry(grid,6,"IP Address : ");
+    add_label_entry(grid,6,"IP Address : ");
 
-    widget = add_label_entry(grid,7,"MAC Address : ");
+    add_label_entry(grid,7,"MAC Address : ");
 
-    widget = add_label_entry(grid,8,"ONVIF Version : ");
+    add_label_entry(grid,8,"ONVIF Version : ");
 
-    widget = add_label_entry(grid,9,"URI : ");
+    add_label_entry(grid,9,"URI : ");
 
     return grid;
 }
@@ -283,7 +273,6 @@ static void switch_detail_page (GtkNotebook* self, GtkWidget* page, guint page_n
 
 
 GtkWidget * create_details_ui (OnvifPlayer *player){
-  GtkWidget * notebook;
   GtkWidget * widget;
   GtkWidget *label;
   char * TITLE_STR = "Information";

@@ -19,7 +19,6 @@ void prepare_overlay (GstElement * overlay, GstCaps * caps, gint window_width,
 GstBuffer * create_bar_buffer(double width, double height){
 
   guint stride;
-  cairo_format_t format;
   cairo_surface_t *surface;
   cairo_t *cr;
 

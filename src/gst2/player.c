@@ -50,12 +50,11 @@ gboolean level_handler(GstBus * bus, GstMessage * message, OnvifPlayer *player, 
 
   gint channels;
   GstClockTime endtime;
-  gdouble rms_dB, peak_dB, decay_dB;
-  gdouble rms;
+  gdouble rms_dB;
   gdouble output = 0;
   const GValue *array_val;
   const GValue *value;
-  GValueArray *rms_arr, *peak_arr, *decay_arr;
+  GValueArray *rms_arr;
   gint i;
 
   if (!gst_structure_get_clock_time (s, "endtime", &endtime))
@@ -64,12 +63,6 @@ gboolean level_handler(GstBus * bus, GstMessage * message, OnvifPlayer *player, 
   /* the values are packed into GValueArrays with the value per channel */
   array_val = gst_structure_get_value (s, "rms");
   rms_arr = (GValueArray *) g_value_get_boxed (array_val);
-
-  array_val = gst_structure_get_value (s, "peak");
-  peak_arr = (GValueArray *) g_value_get_boxed (array_val);
-
-  array_val = gst_structure_get_value (s, "decay");
-  decay_arr = (GValueArray *) g_value_get_boxed (array_val);
 
 //No control over the use of GValueArray over GArray since its constructed by gstreamer libs
 //Depracation can't be fixed until Gstreamer update this library
@@ -82,19 +75,7 @@ gboolean level_handler(GstBus * bus, GstMessage * message, OnvifPlayer *player, 
     value = g_value_array_get_nth (rms_arr, i);
     rms_dB = g_value_get_double (value);
 
-    value = g_value_array_get_nth (peak_arr, i);
-    peak_dB = g_value_get_double (value);
-
-    value = g_value_array_get_nth (decay_arr, i);
-    decay_dB = g_value_get_double (value);
-
-    //-700 db is no sound? .. and + 100 to revert the percentag #TODO add possible positive db offset
     output = output + 100 + rms_dB / 7; 
-    // g_print ("    RMS: %f dB, peak: %f dB, decay: %f dB\n",rms_dB, peak_dB, decay_dB);
-    //Beep
-    //-12.267482 dB, peak: -2.016216 dB, decay: -2.016216 dB
-    //Quiet
-    //-700.000000 dB, peak: -350.000000 dB, decay: -2.016216 dB
   }
 #pragma GCC diagnostic pop
   output = output / channels;
@@ -308,7 +289,7 @@ static void realize_cb (GtkWidget *widget, OnvifPlayer *data) {
   gst_bus_set_sync_handler (bus, (GstBusSyncHandler) bus_sync_handler, data,NULL);
   //TODO clean up watch
   //Registering message_handler after realize since nested pointers will be assigned after creation
-  guint watch_id = gst_bus_add_watch (bus, message_handler, data);
+  gst_bus_add_watch (bus, message_handler, data);
   gst_object_unref (bus);
 
 }
@@ -344,7 +325,6 @@ void
 setup_backchannel_shoveler (OnvifPlayer * player, GstCaps * caps)
 {
   GstElement *appsink;
-  GstElement *backpipe;
   
   player->backpipe = gst_parse_launch ("audiotestsrc is-live=true wave=red-noise ! "
       "mulawenc ! rtppcmupay ! appsink name=out", NULL);
@@ -387,10 +367,6 @@ static void on_pad_added (GstElement *element, GstPad *pad, gpointer data){
     GstPad *sinkpad;
     GstPadLinkReturn ret;
     GstElement *decoder = (GstElement *) data;
-    GstCaps *new_pad_caps = NULL;
-    GstStructure *new_pad_struct = NULL;
-    const gchar *new_pad_type = NULL;
-    gchar *capstr = NULL;
 
     char * name = GST_ELEMENT_NAME(decoder);
     printf("name %s\n",name);
@@ -408,7 +384,7 @@ static void on_pad_added (GstElement *element, GstPad *pad, gpointer data){
 }
 
 
-void * create_pipeline(OnvifPlayer *self){
+void create_pipeline(OnvifPlayer *self){
   GstElement *vdecoder;
   GstElement *videoqueue0;
   GstElement *videoconvert;
@@ -427,12 +403,12 @@ void * create_pipeline(OnvifPlayer *self){
   videoconvert = gst_element_factory_make ("videoconvert", "videoconvert0");
   overlay_comp = gst_element_factory_make ("overlaycomposition", NULL);
   self->sink = gst_element_factory_make ("autovideosink", "vsink");
-  g_object_set (G_OBJECT (self->sink), "sync", FALSE, NULL);
+  // g_object_set (G_OBJECT (self->sink), "sync", FALSE, NULL);
   g_object_set (G_OBJECT (self->src), "latency", 0, NULL);
-  g_object_set (G_OBJECT (self->src), "teardown-timeout", 0, NULL); 
+  g_object_set (G_OBJECT (self->src), "teardown-timeout", 1, NULL); 
   g_object_set (G_OBJECT (self->src), "backchannel", 1, NULL);
   g_object_set (G_OBJECT (self->src), "user-agent", "OnvifDeviceManager-Linux-0.0", NULL);
-  g_object_set (G_OBJECT (self->src), "do-retransmission", FALSE, NULL);
+  g_object_set (G_OBJECT (self->src), "do-retransmission", TRUE, NULL);
   g_object_set (G_OBJECT (self->src), "onvif-mode", TRUE, NULL);
 
   //Audio pipe
@@ -441,7 +417,7 @@ void * create_pipeline(OnvifPlayer *self){
   audioconvert = gst_element_factory_make ("audioconvert", "audioconvert0");
   level = gst_element_factory_make("level","level0");
   audio_sink = gst_element_factory_make ("autoaudiosink", "autoaudiosink0");
-  g_object_set (G_OBJECT (audio_sink), "sync", FALSE, NULL);
+  // g_object_set (G_OBJECT (audio_sink), "sync", FALSE, NULL);
   g_object_set (G_OBJECT (level), "post-messages", TRUE, NULL);
   //For smoother responsiveness and more accurate value, lowered interval by 2x
   g_object_set (G_OBJECT (level), "interval", 50000000, NULL);
@@ -464,7 +440,7 @@ void * create_pipeline(OnvifPlayer *self){
       !level || \
       !audio_sink) {
       g_printerr ("One of the elements wasn't created... Exiting\n");
-      return NULL;
+      return;
   }
 
   // Add Elements to the Bin
@@ -487,13 +463,13 @@ void * create_pipeline(OnvifPlayer *self){
     overlay_comp, \
     self->sink, NULL)){
       g_warning ("Linking part (A)-2 Fail...");
-      return NULL;
+      return;
   }
 
   // Link confirmation
   if (!gst_element_link_many (audioqueue0, audioconvert, level, audio_sink, NULL)){
       g_warning ("Linking part (B)-2 Fail...");
-      return NULL;
+      return;
   }
 
   // Dynamic Pad Creation
@@ -527,7 +503,6 @@ void * create_pipeline(OnvifPlayer *self){
   if(! g_signal_connect (overlay_comp, "caps-changed",G_CALLBACK (prepare_overlay), self->overlay_state)){
     g_warning ("overlay draw callback Fail...");
   }
-
 }
 
 void OnvifPlayer__init(OnvifPlayer* self) {

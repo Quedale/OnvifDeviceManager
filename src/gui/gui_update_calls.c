@@ -64,7 +64,7 @@ void _display_onvif_thumbnail(void * user_data){
   }
 
   loader = gdk_pixbuf_loader_new ();
-  gdk_pixbuf_loader_write (loader, imgdata, size, NULL);
+  gdk_pixbuf_loader_write (loader, (unsigned char *)imgdata, size, NULL);
   pixbuf = gdk_pixbuf_loader_get_pixbuf (loader);
   double ph = gdk_pixbuf_get_height (pixbuf);
   double pw = gdk_pixbuf_get_width (pixbuf);
