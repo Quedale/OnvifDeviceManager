@@ -306,7 +306,13 @@ GtkWidget * create_nvt_ui (OnvifPlayer *player){
   gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
   g_object_unref (cssProvider);  
 
-  return grid;
+  GtkWidget * overlay =gtk_overlay_new();
+  gtk_container_add (GTK_CONTAINER (overlay), grid);
+
+  // widget = create_controls_overlay();
+
+  // gtk_overlay_add_overlay(GTK_OVERLAY(overlay),widget);
+  return overlay;
 }
 
 void switch_ui_page (GtkNotebook* self, GtkWidget* page, guint page_num, OnvifPlayer * player) {

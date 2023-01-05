@@ -24,7 +24,7 @@ onvifserver_LDFLAGS = -Wl,-Bstatic `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config 
 onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c $(top_srcdir)/src/gst2/player.c $(top_srcdir)/src/gst2/overlay.c $(top_srcdir)/src/queue/event_queue.c $(top_srcdir)/src/gui/gui_update_calls.c $(top_srcdir)/src/gui/credentials_input.c $(top_srcdir)/src/gst2/onvifinitstaticplugins.c 
 onvifmgr_CFLAGS = -Wall $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0` $(EXT_CFLAGS) -I$(top_srcdir)/build/dist/include
 onvifmgr_LDFLAGS = -Wl,-Bstatic `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0` $(EXT_STC_LIBS) -Wl,-Bdynamic $(EXT_DYN_LIBS) -lstdc++ -L$(top_srcdir)/build/dist/lib  -lonvifsoap -lonvifdisco -z noexecstack
-onvifmgr_LDADD = locked-icon.o
+onvifmgr_LDADD = locked-icon.o microphone.o
 
 queuetest_SOURCES = $(top_srcdir)/src/demo/queue_test.c $(top_srcdir)/src/queue/event_queue.c
 queuetest_CFLAGS = -Wall -lpthread -Wall 
@@ -56,6 +56,10 @@ pkgpath$(EXEEXT):
 loading.o$(EXEEXT):
 	@echo "  CCLD     loading.o"
 	@cd $(abs_top_srcdir)/images && ld -r -b binary -o $(abs_builddir)/loading.o loading.gif && cd ..
+
+microphone.o$(EXEEXT):
+	@echo "  CCLD     microphone.o"
+	@cd $(abs_top_srcdir)/images && ld -r -b binary -o $(abs_builddir)/microphone.o microphone.png && cd ..
 
 locked-icon.o$(EXEEXT):
 	@echo "  CCLD     locked-icon.o"

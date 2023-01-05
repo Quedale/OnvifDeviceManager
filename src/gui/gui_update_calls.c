@@ -17,6 +17,11 @@ extern char _binary_locked_icon_png_size[];
 extern char _binary_locked_icon_png_start[];
 extern char _binary_locked_icon_png_end[];
 
+extern char _binary_microphone_png_size[];
+extern char _binary_microphone_png_start[];
+extern char _binary_microphone_png_end[];
+
+
 struct DeviceInput {
   OnvifDevice * device;
   EventQueue * queue;
@@ -204,4 +209,24 @@ void _stop_onvif_stream(void * user_data){
 
 void stop_onvif_stream(OnvifPlayer * player, EventQueue * queue){
   EventQueue__insert(queue,_stop_onvif_stream,player);
+}
+
+GtkWidget * create_controls_overlay(){
+
+  GdkPixbufLoader *loader = gdk_pixbuf_loader_new ();
+  gdk_pixbuf_loader_write (loader, (unsigned char *)_binary_microphone_png_start, _binary_microphone_png_end - _binary_microphone_png_start, NULL);
+
+  GdkPixbuf *pixbuf = gdk_pixbuf_loader_get_pixbuf (loader);
+  double ph = gdk_pixbuf_get_height (pixbuf);
+  double pw = gdk_pixbuf_get_width (pixbuf);
+  double newpw = 30 / ph * pw;
+  pixbuf = gdk_pixbuf_scale_simple (pixbuf,newpw,30,GDK_INTERP_NEAREST);
+  GtkWidget * image = gtk_image_new_from_pixbuf (pixbuf); 
+
+  GtkWidget * widget = gtk_button_new ();
+  gtk_button_set_image (GTK_BUTTON (widget), image);
+
+  GtkWidget * fixed = gtk_fixed_new();
+  gtk_fixed_put(GTK_FIXED(fixed),widget,10,10); 
+  return fixed;
 }

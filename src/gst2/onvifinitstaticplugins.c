@@ -95,7 +95,7 @@ GST_PLUGIN_STATIC_DECLARE(video4linux2);
 // GST_PLUGIN_STATIC_DECLARE(ximagesrc); gstximagesrc
 // GST_PLUGIN_STATIC_DECLARE(adaptivedemux2); gstadaptivedemux2
 // GST_PLUGIN_STATIC_DECLARE(cairo);
-// GST_PLUGIN_STATIC_DECLARE(gdkpixbuf); gstgdkpixbuf
+GST_PLUGIN_STATIC_DECLARE(gdkpixbuf); // gstgdkpixbuf
 // GST_PLUGIN_STATIC_DECLARE(gtk); gstgtk
 // GST_PLUGIN_STATIC_DECLARE(jpeg); gstjpeg
 // GST_PLUGIN_STATIC_DECLARE(lame); gstlame 
@@ -305,7 +305,7 @@ onvif_init_static_plugins (void)
     // GST_PLUGIN_STATIC_REGISTER(ximagesrc); gstximagesrc
     // GST_PLUGIN_STATIC_REGISTER(adaptivedemux2); gstadaptivedemux2
     // GST_PLUGIN_STATIC_REGISTER(cairo);
-    // GST_PLUGIN_STATIC_REGISTER(gdkpixbuf); gstgdkpixbuf
+    GST_PLUGIN_STATIC_REGISTER(gdkpixbuf); // gstgdkpixbuf
     // GST_PLUGIN_STATIC_REGISTER(gtk); gstgtk
     // GST_PLUGIN_STATIC_REGISTER(jpeg); gstjpeg
     // GST_PLUGIN_STATIC_REGISTER(lame); gstlame 

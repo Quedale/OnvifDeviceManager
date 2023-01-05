@@ -420,6 +420,7 @@ if [ $SKIP_GSTREAMER -eq 0 ]; then
     MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:interleave=enabled"
     MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:audioparsers=enabled"
     MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:level=enabled"
+    MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:gdk-pixbuf=enabled"
     MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:openh264=enabled"
     MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:nvcodec=enabled"
     MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:v4l2codecs=enabled"

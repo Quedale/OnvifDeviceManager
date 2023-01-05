@@ -15,14 +15,16 @@ static void error_cb (GstBus *bus, GstMessage *msg, OnvifPlayer *data) {
   g_free (debug_info);
 
   /* Set the pipeline to READY (which stops playback) */
-  gst_element_set_state (data->sink, GST_STATE_READY);
+  gst_element_set_state (data->backpipe, GST_STATE_READY);
+  gst_element_set_state (data->pipeline, GST_STATE_READY);
 }
 
 /* This function is called when an End-Of-Stream message is posted on the bus.
  * We just set the pipeline to READY (which stops playback) */
 static void eos_cb (GstBus *bus, GstMessage *msg, OnvifPlayer *data) {
   g_print ("End-Of-Stream reached.\n");
-  gst_element_set_state (data->sink, GST_STATE_READY);
+  gst_element_set_state (data->backpipe, GST_STATE_READY);
+  gst_element_set_state (data->pipeline, GST_STATE_READY);
 }
 
 
@@ -45,6 +47,105 @@ static void eos_cb (GstBus *bus, GstMessage *msg, OnvifPlayer *data) {
   return GST_BUS_DROP;
  }
 
+void pix_handler(GstBus * bus, GstMessage * message, OnvifPlayer *player, const GstStructure *s){
+  /* only interested in element messages from our gdkpixbufsink */
+  if (message->src != GST_OBJECT_CAST (player->sink))
+    return;
+
+  const GstStructure * structure = gst_message_get_structure (message);
+  const GValue *val = gst_structure_get_value (structure, "pixbuf");
+  g_return_if_fail (val != NULL);
+  
+  GstPad * sinkpad = gst_element_get_static_pad (player->sink, "sink");
+  GstCaps * sink_caps = gst_pad_get_current_caps(sinkpad);
+  GstStructure *sink_struct = gst_caps_get_structure (sink_caps, 0);
+
+  //Get stream resolution from caps
+  gint caps_width;
+  gint caps_height;
+  if (gst_structure_has_field (sink_struct, "width")) {
+    gst_structure_get_int(sink_struct,"width",&caps_width);
+  } else {
+    GST_ERROR("No width in sink caps.");
+    return;
+  }
+  if (gst_structure_has_field (sink_struct, "height")) {
+    gst_structure_get_int(sink_struct,"height",&caps_height);
+  } else {
+    GST_ERROR("No height in sink caps.");
+    return;
+  }
+
+  //Clear previous content
+  gtk_image_clear(GTK_IMAGE(player->canvas_img));
+
+  //Extract widget size
+  GtkAllocation allocation;
+  gtk_widget_get_allocation(player->canvas,&allocation);
+  
+  
+  //Extract frame
+  GdkPixbuf *pixbuf = GDK_PIXBUF (g_value_dup_object (val));
+
+  //Extract window measurements
+  GtkWidget *root = gtk_widget_get_toplevel (GTK_WIDGET (player->canvas));
+  GtkAllocation window_allocation;
+  gtk_widget_get_allocation(root,&window_allocation);
+  
+  //Caculate widget size. (WINDOWSIZE - WIDGETPOSITION - MARGINTOEDGE) TODO Find the margin programatically
+  int actual_wwidth = window_allocation.width - allocation.x - 10;
+  int actual_wheight = window_allocation.height - allocation.y - 10;
+
+  //Minumin size check
+  GtkRequisition min;
+  gtk_widget_get_preferred_size(gtk_widget_get_parent(gtk_widget_get_parent(player->canvas)), &min, NULL);
+  if(actual_wwidth < min.width){
+    actual_wwidth = min.width;
+  }
+
+  if(actual_wheight < min.height){
+    actual_wheight = min.height;
+  }
+
+  double set_w;
+  double set_h;
+
+  //Scale up and down
+  set_h=  caps_height * (double)actual_wwidth / caps_width;
+  set_w = caps_width * (double)actual_wheight / caps_height;
+
+  // //Scale down only
+  // if(caps_width > actual_wwidth){
+  //   set_h=  caps_height * (double)actual_wwidth / caps_width;
+  // } else {
+  //   set_h = caps_height;
+  // }
+  // if(caps_height > actual_wheight){
+  //   set_w = caps_width * (double)actual_wheight / caps_height;
+  // } else {
+  //   // set_w = caps_width;
+  // }
+
+  if(set_h > actual_wheight){
+    set_h = actual_wheight;
+  }
+
+  if(set_w > actual_wwidth){
+    set_w = actual_wwidth;
+  }
+  
+  //Rescale and keep original pointer for cleanup
+  GdkPixbuf * npixbuf = gdk_pixbuf_scale_simple (pixbuf,set_w,set_h,GDK_INTERP_NEAREST); 
+  
+  //Clean up
+  g_object_unref (pixbuf);
+
+  //Update image on screen
+  gtk_image_set_from_pixbuf (GTK_IMAGE (player->canvas_img), npixbuf);
+
+  //Clean up
+  g_object_unref (npixbuf);
+}
 
 gboolean level_handler(GstBus * bus, GstMessage * message, OnvifPlayer *player, const GstStructure *s){
 
@@ -116,11 +217,11 @@ state_changed_cb (GstBus * bus, GstMessage * msg, OnvifPlayer * data)
   }
 }
 
-int
+static void 
 message_handler (GstBus * bus, GstMessage * message, gpointer p)
 { 
   OnvifPlayer *player = (OnvifPlayer *) p;
-  switch(message->type){
+  switch(GST_MESSAGE_TYPE(message)){
     case GST_MESSAGE_UNKNOWN:
       printf("msg : GST_MESSAGE_UNKNOWN\n");
       break;
@@ -178,12 +279,13 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
     case GST_MESSAGE_APPLICATION:
       printf("msg : GST_MESSAGE_APPLICATION\n");
       break;
-    case GST_MESSAGE_ELEMENT: ;
+    case GST_MESSAGE_ELEMENT:
       const GstStructure *s = gst_message_get_structure (message);
       const gchar *name = gst_structure_get_name (s);
-
       if (strcmp (name, "level") == 0) {
-        return level_handler(bus,message,player,s);
+        level_handler(bus,message,player,s);
+      } else if (!strcmp (name, "pixbuf") || !strcmp (name, "preroll-pixbuf")) {
+        pix_handler(bus,message,player,s);
       } else if (strcmp (name, "GstNavigationMessage") == 0 || 
                 strcmp (name, "application/x-rtp-source-sdes") == 0){
         //Ignore intentionally left unhandled for now
@@ -206,6 +308,7 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
       printf("msg : GST_MESSAGE_ASYNC_START\n");
       break;
     case GST_MESSAGE_ASYNC_DONE:
+      printf("msg : GST_MESSAGE_ASYNC_DONE\n");
       break;
     case GST_MESSAGE_REQUEST_STATE:
       printf("msg : GST_MESSAGE_REQUEST_STATE\n");
@@ -264,34 +367,6 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
       printf("msg : default....");
 
   }
-
-  return TRUE;
-}
-
-/* This function is called when the GUI toolkit creates the physical window that will hold the video.
- * At this point we can retrieve its handler (which has a different meaning depending on the windowing system)
- * and pass it to GStreamer through the VideoOverlay interface. */
-static void realize_cb (GtkWidget *widget, OnvifPlayer *data) {
-  GdkWindow *window = gtk_widget_get_window (widget);
-  if (!gdk_window_ensure_native (window))
-    g_error ("Couldn't create native window needed for GstVideoOverlay!");
-
-  /* Retrieve window handler from GDK */
-#if defined (GDK_WINDOWING_WIN32)
-  data->video_window_handle = (guintptr)GDK_WINDOW_HWND (window);
-#elif defined (GDK_WINDOWING_QUARTZ)
-  data->video_window_handle = gdk_quartz_window_get_nsview (window);
-#elif defined (GDK_WINDOWING_X11)
-  data->video_window_handle = GDK_WINDOW_XID (window);
-#endif
-  // //Register bus signal watch to set GstVideoOver now that we have the video handle
-  GstBus *bus = gst_pipeline_get_bus (GST_PIPELINE (data->pipeline));
-  gst_bus_set_sync_handler (bus, (GstBusSyncHandler) bus_sync_handler, data,NULL);
-  //TODO clean up watch
-  //Registering message_handler after realize since nested pointers will be assigned after creation
-  gst_bus_add_watch (bus, message_handler, data);
-  gst_object_unref (bus);
-
 }
 
 
@@ -315,8 +390,16 @@ new_sample (GstElement * appsink, OnvifPlayer * player)
   if (!sample)
     goto out;
 
-  g_signal_emit_by_name (player->src, "push-backchannel-buffer", player->back_stream_id, sample, &ret);
+  // g_signal_emit_by_name (player->src, "push-backchannel-buffer", player->back_stream_id, sample, &ret);
 
+  g_signal_emit_by_name (player->src, "push-backchannel-sample", player->back_stream_id, sample, &ret);
+
+  //I know this was added in version 1.21, but it generates //gst_mini_object_unlock: assertion 'state >= SHARE_ONE' failed
+  /* Action signal callbacks don't take ownership of the arguments passed, so we must unref the sample here.
+   * (The "push-backchannel-buffer" callback unrefs the sample, which is wrong and doesn't work with bindings
+   * but could not be changed, hence the new "push-backchannel-sample" callback that behaves correctly.)  */
+  // gst_sample_unref (sample);
+  
 out:
   return ret;
 }
@@ -326,7 +409,7 @@ setup_backchannel_shoveler (OnvifPlayer * player, GstCaps * caps)
 {
   GstElement *appsink;
   
-  player->backpipe = gst_parse_launch ("audiotestsrc is-live=true wave=red-noise ! "
+  player->backpipe = gst_parse_launch ("autoaudiosrc ! "
       "mulawenc ! rtppcmupay ! appsink name=out", NULL);
   if (!player->backpipe)
     g_error ("Could not setup backchannel pipeline");
@@ -368,8 +451,6 @@ static void on_pad_added (GstElement *element, GstPad *pad, gpointer data){
     GstPadLinkReturn ret;
     GstElement *decoder = (GstElement *) data;
 
-    char * name = GST_ELEMENT_NAME(decoder);
-    printf("name %s\n",name);
 
     //TODO Check caps before linking (audio to vidoe and video to audio invalid linking)
     /* We can now link this pad with the rtsp-decoder sink pad */
@@ -377,12 +458,11 @@ static void on_pad_added (GstElement *element, GstPad *pad, gpointer data){
     ret = gst_pad_link (pad, sinkpad);
 
     if (GST_PAD_LINK_FAILED (ret)) {
-      g_print("failed to link dynamically\n");
+      g_print("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(decoder));
     }
 
     gst_object_unref (sinkpad);
 }
-
 
 void create_pipeline(OnvifPlayer *self){
   GstElement *vdecoder;
@@ -396,13 +476,13 @@ void create_pipeline(OnvifPlayer *self){
   GstElement *audio_sink;
 
   /* Create the elements */
-  self->src = gst_element_factory_make ("rtspsrc", "src");
+  self->src = gst_element_factory_make ("rtspsrc", "rtspsrc");
   //Video pipe
-  vdecoder = gst_element_factory_make ("decodebin", "decodebin0");
+  vdecoder = gst_element_factory_make ("decodebin", "videodecodebin");
   videoqueue0 = gst_element_factory_make ("queue", "videoqueue0");
   videoconvert = gst_element_factory_make ("videoconvert", "videoconvert0");
   overlay_comp = gst_element_factory_make ("overlaycomposition", NULL);
-  self->sink = gst_element_factory_make ("autovideosink", "vsink");
+  self->sink = gst_element_factory_make ("gdkpixbufsink", "vsink");
   // g_object_set (G_OBJECT (self->sink), "sync", FALSE, NULL);
   g_object_set (G_OBJECT (self->src), "latency", 0, NULL);
   g_object_set (G_OBJECT (self->src), "teardown-timeout", 1, NULL); 
@@ -410,9 +490,10 @@ void create_pipeline(OnvifPlayer *self){
   g_object_set (G_OBJECT (self->src), "user-agent", "OnvifDeviceManager-Linux-0.0", NULL);
   g_object_set (G_OBJECT (self->src), "do-retransmission", TRUE, NULL);
   g_object_set (G_OBJECT (self->src), "onvif-mode", TRUE, NULL);
+  g_object_set (self->sink, "qos", FALSE, "max-lateness", (gint64) - 1, NULL);
 
   //Audio pipe
-  adecoder = gst_element_factory_make ("decodebin", "decodebin1");
+  adecoder = gst_element_factory_make ("decodebin", "audiodecodebin");
   audioqueue0 = gst_element_factory_make ("queue", "audioqueue0");
   audioconvert = gst_element_factory_make ("audioconvert", "audioconvert0");
   level = gst_element_factory_make("level","level0");
@@ -503,6 +584,12 @@ void create_pipeline(OnvifPlayer *self){
   if(! g_signal_connect (overlay_comp, "caps-changed",G_CALLBACK (prepare_overlay), self->overlay_state)){
     g_warning ("overlay draw callback Fail...");
   }
+
+  /* set up bus */
+  GstBus *bus = gst_element_get_bus (self->pipeline);
+  gst_bus_add_signal_watch (bus);
+  g_signal_connect (bus, "message", G_CALLBACK (message_handler), self);
+  gst_object_unref (bus);
 }
 
 void OnvifPlayer__init(OnvifPlayer* self) {
@@ -622,31 +709,18 @@ void OnvifPlayer__play(OnvifPlayer* self){
   pthread_mutex_unlock(self->player_lock);
 }
 
-static gboolean draw_cb (GtkWidget *widget, cairo_t *cr, OnvifPlayer *data) {
-  if (data->state < GST_STATE_PAUSED) {
-    GtkAllocation allocation;
-    /* Cairo is a 2D graphics library which we use here to clean the video window.
-     * It is used by GStreamer for other reasons, so it will always be available to us. */
-    gtk_widget_get_allocation (widget, &allocation);
-    cairo_set_source_rgb (cr, 0, 0, 0);
-    cairo_rectangle (cr, 0, 0, allocation.width, allocation.height);
-    cairo_fill (cr);
-  }
-
-  return FALSE;
-}
-
 GtkWidget * OnvifDevice__createCanvas(OnvifPlayer *self){
 
-  self->canvas = gtk_drawing_area_new ();
+  /*
+    Creating a GtkImage and GtkEventBox which will later be used
+      in the gdkpixbuffsink message handler to display the content
+
+      TODO : Test GtkDrawingArea as better alternative
+  */ 
+  self->canvas = gtk_event_box_new ();
   gtk_widget_set_visible(self->canvas, FALSE);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-  //TODO Support Gl. Currently not well supported by WSL
-  gtk_widget_set_double_buffered (self->canvas, FALSE);
-#pragma GCC diagnostic pop
-  g_signal_connect (self->canvas, "draw", G_CALLBACK (draw_cb), self);
-  g_signal_connect (self->canvas, "realize", G_CALLBACK (realize_cb), self);
+  self->canvas_img = gtk_image_new();
+  gtk_container_add (GTK_CONTAINER (self->canvas), self->canvas_img);
   g_signal_connect (self->src, "select-stream", G_CALLBACK (find_backchannel),self);
   return self->canvas;
 }

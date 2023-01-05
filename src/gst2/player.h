@@ -35,6 +35,7 @@ typedef struct _OnvifPlayer {
   GtkWidget *listbox;
   GtkWidget *details_notebook;
   GtkWidget *canvas;
+  GtkWidget *canvas_img;
   guintptr video_window_handle;
   gdouble level; //Used to calculate level decay
   guint back_stream_id;
