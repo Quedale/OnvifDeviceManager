@@ -28,25 +28,6 @@ static void eos_cb (GstBus *bus, GstMessage *msg, OnvifPlayer *data) {
 }
 
 
- GstBusSyncReply
- bus_sync_handler (GstBus * bus, GstMessage * message, OnvifPlayer * player)
- {
-  // ignore anything but 'prepare-window-handle' element messages
-  if (!gst_is_video_overlay_prepare_window_handle_message (message))
-    return GST_BUS_PASS;
-
-  if (player->video_window_handle != 0) {
-    // GST_MESSAGE_SRC (message) will be the video sink element
-    player->overlay = GST_VIDEO_OVERLAY (GST_MESSAGE_SRC (message));
-    gst_video_overlay_set_window_handle (player->overlay, player->video_window_handle);
-  } else {
-    g_warning ("Should have obtained video_window_handle by now!");
-  }
-
-  gst_message_unref (message);
-  return GST_BUS_DROP;
- }
-
 void pix_handler(GstBus * bus, GstMessage * message, OnvifPlayer *player, const GstStructure *s){
   /* only interested in element messages from our gdkpixbufsink */
   if (message->src != GST_OBJECT_CAST (player->sink))
@@ -409,7 +390,7 @@ setup_backchannel_shoveler (OnvifPlayer * player, GstCaps * caps)
 {
   GstElement *appsink;
   
-  player->backpipe = gst_parse_launch ("autoaudiosrc ! "
+  player->backpipe = gst_parse_launch ("autoaudiosrc ! volume name=vol ! "
       "mulawenc ! rtppcmupay ! appsink name=out", NULL);
   if (!player->backpipe)
     g_error ("Could not setup backchannel pipeline");
@@ -417,10 +398,29 @@ setup_backchannel_shoveler (OnvifPlayer * player, GstCaps * caps)
   appsink = gst_bin_get_by_name (GST_BIN (player->backpipe), "out");
   g_object_set (G_OBJECT (appsink), "caps", caps, "emit-signals", TRUE, NULL);
 
+  player->mic_volume_element = gst_bin_get_by_name (GST_BIN (player->backpipe), "vol");
+  g_object_set (G_OBJECT (player->mic_volume_element), "mute", TRUE, NULL);
+
   g_signal_connect (appsink, "new-sample", G_CALLBACK (new_sample), player);
 
   g_print ("Playing backchannel shoveler\n");
   gst_element_set_state (player->backpipe, GST_STATE_PLAYING);
+}
+
+gboolean OnvifPlayer__is_mic_mute(OnvifPlayer* self) {
+  if(GST_IS_ELEMENT(self->mic_volume_element)){
+    gboolean v;
+    g_object_get (G_OBJECT (self->mic_volume_element), "mute", &v, NULL);
+    return v;
+  } else {
+    return TRUE;
+  }
+}
+
+void OnvifPlayer__mic_mute(OnvifPlayer* self, gboolean mute) {
+  if(GST_IS_ELEMENT(self->mic_volume_element)){
+    g_object_set (G_OBJECT (self->mic_volume_element), "mute", mute, NULL);
+  }
 }
 
 gboolean
@@ -594,10 +594,10 @@ void create_pipeline(OnvifPlayer *self){
 
 void OnvifPlayer__init(OnvifPlayer* self) {
 
-    self->video_window_handle = 0;
     self->level = 0;
     self->onvifDeviceList = OnvifDeviceList__create();
     self->device = NULL;
+    self->mic_volume_element = NULL;
     self->state = GST_STATE_NULL;
     self->player_lock =malloc(sizeof(pthread_mutex_t));
 

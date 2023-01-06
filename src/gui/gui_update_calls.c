@@ -211,7 +211,18 @@ void stop_onvif_stream(OnvifPlayer * player, EventQueue * queue){
   EventQueue__insert(queue,_stop_onvif_stream,player);
 }
 
-GtkWidget * create_controls_overlay(){
+gboolean
+toggle_mic_cb (GtkWidget *widget, gpointer * p, gpointer * p2){
+  OnvifPlayer * player = (OnvifPlayer *) p2;
+  if(OnvifPlayer__is_mic_mute(player)){
+    OnvifPlayer__mic_mute(player,FALSE);
+  } else {
+    OnvifPlayer__mic_mute(player,TRUE);
+  }
+  return FALSE;
+}
+
+GtkWidget * create_controls_overlay(OnvifPlayer *player){
 
   GdkPixbufLoader *loader = gdk_pixbuf_loader_new ();
   gdk_pixbuf_loader_write (loader, (unsigned char *)_binary_microphone_png_start, _binary_microphone_png_end - _binary_microphone_png_start, NULL);
@@ -224,6 +235,9 @@ GtkWidget * create_controls_overlay(){
   GtkWidget * image = gtk_image_new_from_pixbuf (pixbuf); 
 
   GtkWidget * widget = gtk_button_new ();
+  g_signal_connect (widget, "button-press-event", G_CALLBACK (toggle_mic_cb), player);
+  g_signal_connect (widget, "button-release-event", G_CALLBACK (toggle_mic_cb), player);
+
   gtk_button_set_image (GTK_BUTTON (widget), image);
 
   GtkWidget * fixed = gtk_fixed_new();

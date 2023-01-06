@@ -309,9 +309,9 @@ GtkWidget * create_nvt_ui (OnvifPlayer *player){
   GtkWidget * overlay =gtk_overlay_new();
   gtk_container_add (GTK_CONTAINER (overlay), grid);
 
-  // widget = create_controls_overlay();
+  widget = create_controls_overlay(player);
 
-  // gtk_overlay_add_overlay(GTK_OVERLAY(overlay),widget);
+  gtk_overlay_add_overlay(GTK_OVERLAY(overlay),widget);
   return overlay;
 }
 
