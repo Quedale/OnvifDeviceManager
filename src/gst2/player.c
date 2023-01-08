@@ -1,6 +1,7 @@
 #include "player.h"
 #include "overlay.h"
 #include <unistd.h>
+#include "gtk/gstgtkbasesink.h"
 
 /* This function is called when an error message is posted on the bus */
 static void error_cb (GstBus *bus, GstMessage *msg, OnvifPlayer *data) {
@@ -194,7 +195,7 @@ state_changed_cb (GstBus * bus, GstMessage * msg, OnvifPlayer * data)
     } else {
       gtk_widget_set_visible(data->canvas, FALSE);
     }
-    g_print ("State set to %s\n", gst_element_state_get_name (new_state));
+    printf ("State set to %s\n", gst_element_state_get_name (new_state));
   }
 }
 
@@ -482,15 +483,14 @@ void create_pipeline(OnvifPlayer *self){
   videoqueue0 = gst_element_factory_make ("queue", "videoqueue0");
   videoconvert = gst_element_factory_make ("videoconvert", "videoconvert0");
   overlay_comp = gst_element_factory_make ("overlaycomposition", NULL);
-  self->sink = gst_element_factory_make ("gdkpixbufsink", "vsink");
+  self->sink = gst_element_factory_make ("gtkcustomsink", "vsink");
   // g_object_set (G_OBJECT (self->sink), "sync", FALSE, NULL);
   g_object_set (G_OBJECT (self->src), "latency", 0, NULL);
-  g_object_set (G_OBJECT (self->src), "teardown-timeout", 1, NULL); 
+  g_object_set (G_OBJECT (self->src), "teardown-timeout", 0, NULL); 
   g_object_set (G_OBJECT (self->src), "backchannel", 1, NULL);
   g_object_set (G_OBJECT (self->src), "user-agent", "OnvifDeviceManager-Linux-0.0", NULL);
   g_object_set (G_OBJECT (self->src), "do-retransmission", TRUE, NULL);
   g_object_set (G_OBJECT (self->src), "onvif-mode", TRUE, NULL);
-  g_object_set (self->sink, "qos", FALSE, "max-lateness", (gint64) - 1, NULL);
 
   //Audio pipe
   adecoder = gst_element_factory_make ("decodebin", "audiodecodebin");
@@ -681,16 +681,6 @@ void OnvifPlayer__stop(OnvifPlayer* self){
         return;
     }
 
-    //Restore READY state to dispatch state_changed event
-    ret = gst_element_set_state (self->pipeline, GST_STATE_READY);
-    if (ret == GST_STATE_CHANGE_FAILURE) {
-        g_printerr ("Unable to set the pipeline to the ready state.\n");
-        gst_object_unref (self->pipeline);
-        pthread_mutex_unlock(self->player_lock);
-        return;
-    } else {
-      printf("pipeline state set to GST_STATE_READY.\n");
-    }
     pthread_mutex_unlock(self->player_lock);
     // gtk_widget_set_visible(self->canvas, FALSE);
 }
@@ -711,16 +701,8 @@ void OnvifPlayer__play(OnvifPlayer* self){
 
 GtkWidget * OnvifDevice__createCanvas(OnvifPlayer *self){
 
-  /*
-    Creating a GtkImage and GtkEventBox which will later be used
-      in the gdkpixbuffsink message handler to display the content
+  self->canvas = gtk_grid_new ();
 
-      TODO : Test GtkDrawingArea as better alternative
-  */ 
-  self->canvas = gtk_event_box_new ();
-  gtk_widget_set_visible(self->canvas, FALSE);
-  self->canvas_img = gtk_image_new();
-  gtk_container_add (GTK_CONTAINER (self->canvas), self->canvas_img);
-  g_signal_connect (self->src, "select-stream", G_CALLBACK (find_backchannel),self);
+  gst_gtk_base_custom_sink_set_parent(GST_GTK_BASE_CUSTOM_SINK(self->sink),self->canvas);
   return self->canvas;
 }
