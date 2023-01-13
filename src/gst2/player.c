@@ -384,8 +384,6 @@ static GstElement * create_audio_bin(OnvifPlayer * self){
   level = gst_element_factory_make("level",NULL);
   sink = gst_element_factory_make ("autoaudiosink", NULL);
 
-  g_object_set (G_OBJECT (sink), "async", FALSE, NULL);
-
   if (!self->audio_bin ||
       !decoder ||
       !convert ||
