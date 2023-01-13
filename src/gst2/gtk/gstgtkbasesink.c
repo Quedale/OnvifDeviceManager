@@ -197,6 +197,26 @@ widget_destroy_cb (GtkWidget * widget, GstGtkBaseCustomSink * gtk_sink)
 // }
 
 GtkGstBaseCustomWidget *
+gst_gtk_base_custom_sink_set_widget (GstGtkBaseCustomSink * gtk_sink,GtkGstBaseCustomWidget * widget)
+{
+  if (gtk_sink->widget != NULL)
+    g_object_unref (gtk_sink->widget);
+
+  /* Ensure GTK is initialized, this has no side effect if it was already
+  * initialized. Also, we do that lazily, so the application can be first */
+  if (!gtk_init_check (NULL, NULL)) {
+    GST_INFO_OBJECT (gtk_sink, "Could not ensure GTK initialization.");
+    return NULL;
+  }
+
+  GST_OBJECT_LOCK (gtk_sink);
+  gtk_sink->widget = widget;
+  GST_OBJECT_UNLOCK (gtk_sink);
+
+  return widget;
+}
+
+GtkGstBaseCustomWidget *
 gst_gtk_base_custom_sink_get_widget (GstGtkBaseCustomSink * gtk_sink)
 {
   if (gtk_sink->widget != NULL)

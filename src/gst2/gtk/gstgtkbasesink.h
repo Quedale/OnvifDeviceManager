@@ -101,6 +101,9 @@ gst_gtk_base_custom_sink_acquire_widget (GstGtkBaseCustomSink * gtk_sink);
 GtkGstBaseCustomWidget *
 gst_gtk_base_custom_sink_get_widget (GstGtkBaseCustomSink * gtk_sink);
 
+GtkGstBaseCustomWidget *
+gst_gtk_base_custom_sink_set_widget (GstGtkBaseCustomSink * gtk_sink,GtkGstBaseCustomWidget * widget);
+
 void
 gst_gtk_base_custom_sink_set_parent (GstGtkBaseCustomSink * gtk_sink, GtkWidget * parent);
 G_END_DECLS

@@ -13,9 +13,9 @@ AUTOMAKE_OPTIONS = foreign subdir-objects
 bin_PROGRAMS = onvifmgr 
 EXTRA_PROGRAMS = onvifclient onvifserver giftest overlaytest queuetest
 
-onvifclient_SOURCES = $(top_srcdir)/src/onvif-client.c $(top_srcdir)/src/gst2/onvifinitstaticplugins.c
-onvifclient_CFLAGS = -Wall $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS)` $(EXT_CFLAGS)
-onvifclient_LDFLAGS = -Wl,-Bstatic `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS)` $(EXT_STC_LIBS) -Wl,-Bdynamic $(EXT_DYN_LIBS) -lstdc++ -L/usr/lib/x86_64-linux-gnu -lnvcuvid -lnvidia-encode
+onvifclient_SOURCES = $(top_srcdir)/src/onvif-client.c $(top_srcdir)/src/gst2/onvifinitstaticplugins.c $(top_srcdir)/src/gst2/gtk/gstgtkbasesink.c $(top_srcdir)/src/gst2/gtk/gstgtksink.c $(top_srcdir)/src/gst2/gtk/gstgtkutils.c $(top_srcdir)/src/gst2/gtk/gtkgstbasewidget.c $(top_srcdir)/src/gst2/gtk/gtkgstwidget.c $(top_srcdir)/src/gst2/gtk/gstplugin.c
+onvifclient_CFLAGS = -DHAVE_CONFIG_H -Wall $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0` $(EXT_CFLAGS)
+onvifclient_LDFLAGS = -Wl,-Bstatic `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0` $(EXT_STC_LIBS) -Wl,-Bdynamic $(EXT_DYN_LIBS) -lstdc++ -L/usr/lib/x86_64-linux-gnu -lnvcuvid -lnvidia-encode
 
 onvifserver_SOURCES = $(top_srcdir)/src/onvif-server.c $(top_srcdir)/src/gst2/onvifinitstaticplugins.c  $(top_srcdir)/src/gst2/sink-retriever.c
 onvifserver_CFLAGS = -Wall $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS)` $(EXT_CFLAGS)

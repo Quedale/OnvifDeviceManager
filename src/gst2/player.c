@@ -10,123 +10,28 @@ static void error_cb (GstBus *bus, GstMessage *msg, OnvifPlayer *data) {
 
   /* Print error details on the screen */
   gst_message_parse_error (msg, &err, &debug_info);
-  g_printerr ("Error received from element %s: %s\n", GST_OBJECT_NAME (msg->src), err->message);
-  g_printerr ("Debugging information: %s\n", debug_info ? debug_info : "none");
+  GST_ERROR ("Error received from element %s: %s\n", GST_OBJECT_NAME (msg->src), err->message);
+  GST_ERROR ("Debugging information: %s\n", debug_info ? debug_info : "none");
   g_clear_error (&err);
   g_free (debug_info);
 
-  /* Set the pipeline to READY (which stops playback) */
-  gst_element_set_state (data->backpipe, GST_STATE_READY);
-  gst_element_set_state (data->pipeline, GST_STATE_READY);
+
+  if(GST_IS_ELEMENT(msg->src)){
+    if(GST_IS_ELEMENT(data->backpipe)){
+      gst_element_set_state (data->backpipe, GST_STATE_NULL);
+    }
+    gst_element_set_state (data->pipeline, GST_STATE_NULL);
+  }
 }
 
 /* This function is called when an End-Of-Stream message is posted on the bus.
  * We just set the pipeline to READY (which stops playback) */
 static void eos_cb (GstBus *bus, GstMessage *msg, OnvifPlayer *data) {
-  g_print ("End-Of-Stream reached.\n");
-  gst_element_set_state (data->backpipe, GST_STATE_READY);
-  gst_element_set_state (data->pipeline, GST_STATE_READY);
-}
-
-
-void pix_handler(GstBus * bus, GstMessage * message, OnvifPlayer *player, const GstStructure *s){
-  /* only interested in element messages from our gdkpixbufsink */
-  if (message->src != GST_OBJECT_CAST (player->sink))
-    return;
-
-  const GstStructure * structure = gst_message_get_structure (message);
-  const GValue *val = gst_structure_get_value (structure, "pixbuf");
-  g_return_if_fail (val != NULL);
-  
-  GstPad * sinkpad = gst_element_get_static_pad (player->sink, "sink");
-  GstCaps * sink_caps = gst_pad_get_current_caps(sinkpad);
-  GstStructure *sink_struct = gst_caps_get_structure (sink_caps, 0);
-
-  //Get stream resolution from caps
-  gint caps_width;
-  gint caps_height;
-  if (gst_structure_has_field (sink_struct, "width")) {
-    gst_structure_get_int(sink_struct,"width",&caps_width);
-  } else {
-    GST_ERROR("No width in sink caps.");
-    return;
+  GST_ERROR ("End-Of-Stream reached.\n");
+  if(GST_IS_ELEMENT(data->backpipe)){
+    gst_element_set_state (data->backpipe, GST_STATE_NULL);
   }
-  if (gst_structure_has_field (sink_struct, "height")) {
-    gst_structure_get_int(sink_struct,"height",&caps_height);
-  } else {
-    GST_ERROR("No height in sink caps.");
-    return;
-  }
-
-  //Clear previous content
-  gtk_image_clear(GTK_IMAGE(player->canvas_img));
-
-  //Extract widget size
-  GtkAllocation allocation;
-  gtk_widget_get_allocation(player->canvas,&allocation);
-  
-  
-  //Extract frame
-  GdkPixbuf *pixbuf = GDK_PIXBUF (g_value_dup_object (val));
-
-  //Extract window measurements
-  GtkWidget *root = gtk_widget_get_toplevel (GTK_WIDGET (player->canvas));
-  GtkAllocation window_allocation;
-  gtk_widget_get_allocation(root,&window_allocation);
-  
-  //Caculate widget size. (WINDOWSIZE - WIDGETPOSITION - MARGINTOEDGE) TODO Find the margin programatically
-  int actual_wwidth = window_allocation.width - allocation.x - 10;
-  int actual_wheight = window_allocation.height - allocation.y - 10;
-
-  //Minumin size check
-  GtkRequisition min;
-  gtk_widget_get_preferred_size(gtk_widget_get_parent(gtk_widget_get_parent(player->canvas)), &min, NULL);
-  if(actual_wwidth < min.width){
-    actual_wwidth = min.width;
-  }
-
-  if(actual_wheight < min.height){
-    actual_wheight = min.height;
-  }
-
-  double set_w;
-  double set_h;
-
-  //Scale up and down
-  set_h=  caps_height * (double)actual_wwidth / caps_width;
-  set_w = caps_width * (double)actual_wheight / caps_height;
-
-  // //Scale down only
-  // if(caps_width > actual_wwidth){
-  //   set_h=  caps_height * (double)actual_wwidth / caps_width;
-  // } else {
-  //   set_h = caps_height;
-  // }
-  // if(caps_height > actual_wheight){
-  //   set_w = caps_width * (double)actual_wheight / caps_height;
-  // } else {
-  //   // set_w = caps_width;
-  // }
-
-  if(set_h > actual_wheight){
-    set_h = actual_wheight;
-  }
-
-  if(set_w > actual_wwidth){
-    set_w = actual_wwidth;
-  }
-  
-  //Rescale and keep original pointer for cleanup
-  GdkPixbuf * npixbuf = gdk_pixbuf_scale_simple (pixbuf,set_w,set_h,GDK_INTERP_NEAREST); 
-  
-  //Clean up
-  g_object_unref (pixbuf);
-
-  //Update image on screen
-  gtk_image_set_from_pixbuf (GTK_IMAGE (player->canvas_img), npixbuf);
-
-  //Clean up
-  g_object_unref (npixbuf);
+  gst_element_set_state (data->pipeline, GST_STATE_NULL);
 }
 
 gboolean level_handler(GstBus * bus, GstMessage * message, OnvifPlayer *player, const GstStructure *s){
@@ -188,14 +93,17 @@ state_changed_cb (GstBus * bus, GstMessage * msg, OnvifPlayer * data)
 {
   GstState old_state, new_state, pending_state;
   gst_message_parse_state_changed (msg, &old_state, &new_state, &pending_state);
-  if (GST_MESSAGE_SRC (msg) == GST_OBJECT (data->pipeline)) {
+  /* Using video_bin for state change since the pipeline is PLAYING before the videosink */
+  if (data->video_bin != NULL 
+        && GST_IS_OBJECT(data->video_bin) 
+        &&  GST_MESSAGE_SRC (msg) == GST_OBJECT (data->video_bin)) {
     data->state = new_state;
     if(data->state == GST_STATE_PLAYING){
       gtk_widget_set_visible(data->canvas, TRUE);
     } else {
       gtk_widget_set_visible(data->canvas, FALSE);
     }
-    printf ("State set to %s\n", gst_element_state_get_name (new_state));
+    printf ("State set to %s for %s\n", gst_element_state_get_name (new_state), GST_OBJECT_NAME (msg->src));
   }
 }
 
@@ -208,10 +116,10 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
       printf("msg : GST_MESSAGE_UNKNOWN\n");
       break;
     case GST_MESSAGE_EOS:
-      error_cb(bus,message,player);
+      eos_cb(bus,message,player);
       break;
     case GST_MESSAGE_ERROR:
-      eos_cb(bus,message,player);
+      error_cb(bus,message,player);
       break;
     case GST_MESSAGE_WARNING:
       printf("msg : GST_MESSAGE_WARNING\n");
@@ -266,8 +174,6 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
       const gchar *name = gst_structure_get_name (s);
       if (strcmp (name, "level") == 0) {
         level_handler(bus,message,player,s);
-      } else if (!strcmp (name, "pixbuf") || !strcmp (name, "preroll-pixbuf")) {
-        pix_handler(bus,message,player,s);
       } else if (strcmp (name, "GstNavigationMessage") == 0 || 
                 strcmp (name, "application/x-rtp-source-sdes") == 0){
         //Ignore intentionally left unhandled for now
@@ -447,16 +353,18 @@ find_backchannel (GstElement * rtspsrc, guint idx, GstCaps * caps,
 }
 
 /* Dynamically link */
-static void on_pad_added (GstElement *element, GstPad *pad, gpointer data){
+static void on_pad_added (GstElement *element, GstPad *new_pad, gpointer data){
     GstPad *sinkpad;
     GstPadLinkReturn ret;
     GstElement *decoder = (GstElement *) data;
 
+    // GstCaps * pad_caps = gst_pad_get_current_caps(new_pad);
+    // gchar * caps_str = gst_caps_serialize(pad_caps,0);
+    // printf("on_pad_added caps_str : %s\n",caps_str);
 
-    //TODO Check caps before linking (audio to vidoe and video to audio invalid linking)
     /* We can now link this pad with the rtsp-decoder sink pad */
     sinkpad = gst_element_get_static_pad (decoder, "sink");
-    ret = gst_pad_link (pad, sinkpad);
+    ret = gst_pad_link (new_pad, sinkpad);
 
     if (GST_PAD_LINK_FAILED (ret)) {
       g_print("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(decoder));
@@ -465,125 +373,237 @@ static void on_pad_added (GstElement *element, GstPad *pad, gpointer data){
     gst_object_unref (sinkpad);
 }
 
-void create_pipeline(OnvifPlayer *self){
-  GstElement *vdecoder;
-  GstElement *videoqueue0;
-  GstElement *videoconvert;
-  GstElement *overlay_comp;
-  GstElement *adecoder;
-  GstElement *audioqueue0;
-  GstElement *audioconvert;
-  GstElement *level;
-  GstElement *audio_sink;
+static GstElement * create_audio_bin(OnvifPlayer * self){
+  GstPad *pad, *ghostpad;
+  GstElement *decoder, *convert, *level, *sink;
 
-  /* Create the elements */
-  self->src = gst_element_factory_make ("rtspsrc", "rtspsrc");
-  //Video pipe
-  vdecoder = gst_element_factory_make ("decodebin", "videodecodebin");
-  videoqueue0 = gst_element_factory_make ("queue", "videoqueue0");
-  videoconvert = gst_element_factory_make ("videoconvert", "videoconvert0");
-  overlay_comp = gst_element_factory_make ("overlaycomposition", NULL);
-  self->sink = gst_element_factory_make ("gtkcustomsink", "vsink");
-  // g_object_set (G_OBJECT (self->sink), "sync", FALSE, NULL);
-  g_object_set (G_OBJECT (self->src), "latency", 0, NULL);
-  g_object_set (G_OBJECT (self->src), "teardown-timeout", 0, NULL); 
-  g_object_set (G_OBJECT (self->src), "backchannel", 1, NULL);
-  g_object_set (G_OBJECT (self->src), "user-agent", "OnvifDeviceManager-Linux-0.0", NULL);
-  g_object_set (G_OBJECT (self->src), "do-retransmission", TRUE, NULL);
-  g_object_set (G_OBJECT (self->src), "onvif-mode", TRUE, NULL);
+  self->audio_bin = gst_bin_new("audiobin");
 
-  //Audio pipe
-  adecoder = gst_element_factory_make ("decodebin", "audiodecodebin");
-  audioqueue0 = gst_element_factory_make ("queue", "audioqueue0");
-  audioconvert = gst_element_factory_make ("audioconvert", "audioconvert0");
-  level = gst_element_factory_make("level","level0");
-  audio_sink = gst_element_factory_make ("autoaudiosink", "autoaudiosink0");
-  // g_object_set (G_OBJECT (audio_sink), "sync", FALSE, NULL);
-  g_object_set (G_OBJECT (level), "post-messages", TRUE, NULL);
-  //For smoother responsiveness and more accurate value, lowered interval by 2x
-  g_object_set (G_OBJECT (level), "interval", 50000000, NULL);
+  decoder = gst_element_factory_make ("decodebin", NULL);
+  convert = gst_element_factory_make ("audioconvert", NULL);
+  level = gst_element_factory_make("level",NULL);
+  sink = gst_element_factory_make ("autoaudiosink", NULL);
 
-  /* Create the empty pipeline */
-  self->pipeline = malloc(sizeof(GstElement *));
-  self->pipeline = gst_pipeline_new ("onvif-pipeline");
+  g_object_set (G_OBJECT (sink), "async", FALSE, NULL);
 
-  //Make sure: Every elements was created ok
-  if (!self->pipeline || \
-      !self->src || \
-      !vdecoder || \
-      !videoqueue0 || \
-      !videoconvert || \
-      !overlay_comp || \
-      !self->sink || \
-      !adecoder || \
-      !audioqueue0 || \
-      !audioconvert || \
-      !level || \
-      !audio_sink) {
-      g_printerr ("One of the elements wasn't created... Exiting\n");
-      return;
+  if (!self->audio_bin ||
+      !decoder ||
+      !convert ||
+      !level ||
+      !sink) {
+      GST_ERROR ("One of the video elements wasn't created... Exiting\n");
+      return NULL;
   }
 
   // Add Elements to the Bin
-  gst_bin_add_many (GST_BIN (self->pipeline), \
-    self->src, \
-    vdecoder, \
-    videoqueue0, \
-    videoconvert, \
-    overlay_comp, \
-    self->sink, \
-    adecoder, \
-    audioqueue0, \
-    audioconvert, \
-    level, \
-    audio_sink, NULL);
+  gst_bin_add_many (GST_BIN (self->audio_bin),
+    decoder,
+    convert,
+    level,
+    sink, NULL);
 
   // Link confirmation
-  if (!gst_element_link_many (videoqueue0, \
-    videoconvert, \
-    overlay_comp, \
-    self->sink, NULL)){
-      g_warning ("Linking part (A)-2 Fail...");
-      return;
-  }
-
-  // Link confirmation
-  if (!gst_element_link_many (audioqueue0, audioconvert, level, audio_sink, NULL)){
-      g_warning ("Linking part (B)-2 Fail...");
-      return;
+  if (!gst_element_link_many (convert,
+    level,
+    sink, NULL)){
+      g_warning ("Linking video part (A)-2 Fail...");
+      return NULL;
   }
 
   // Dynamic Pad Creation
-  if(! g_signal_connect (self->src, "pad-added", G_CALLBACK (on_pad_added),vdecoder))
-  {
-      g_warning ("Linking part (1) with part (A)-1 Fail...");
-  }
-
-  // Dynamic Pad Creation
-  if(! g_signal_connect (vdecoder, "pad-added", G_CALLBACK (on_pad_added),videoqueue0))
+  if(! g_signal_connect (decoder, "pad-added", G_CALLBACK (on_pad_added),convert))
   {
       g_warning ("Linking part (2) with part (A)-2 Fail...");
   }
 
-  // Dynamic Pad Creation
-  if(! g_signal_connect (self->src, "pad-added", G_CALLBACK (on_pad_added),adecoder))
-  {
-      g_warning ("Linking part (1) with part (B)-1 Fail...");
+  pad = gst_element_get_static_pad (decoder, "sink");
+  if (!pad) {
+      // TODO gst_object_unref 
+      GST_ERROR("unable to get decoder static sink pad");
+      return NULL;
   }
 
-   // Dynamic Pad Creation
-  if(! g_signal_connect (adecoder, "pad-added", G_CALLBACK (on_pad_added),audioqueue0))
-  {
-      g_warning ("Linking part (2) with part (B)-2 Fail...");
+  ghostpad = gst_ghost_pad_new ("bin_sink", pad);
+  gst_element_add_pad (self->audio_bin, ghostpad);
+  gst_object_unref (pad);
+
+  return self->audio_bin;
+}
+
+static GstElement * create_video_bin(OnvifPlayer * self){
+  GstElement *vdecoder, *videoconvert, *overlay_comp;
+  GstPad *pad, *ghostpad;
+
+  self->video_bin = gst_bin_new("video_bin");
+  vdecoder = gst_element_factory_make ("decodebin", NULL);
+  videoconvert = gst_element_factory_make ("videoconvert", NULL);
+  overlay_comp = gst_element_factory_make ("overlaycomposition", NULL);
+  self->sink = gst_element_factory_make ("gtkcustomsink", NULL);
+
+  if (!self->video_bin ||
+      // !capsfilter ||
+      !vdecoder ||
+      !videoconvert ||
+      !overlay_comp ||
+      !self->sink) {
+      GST_ERROR ("One of the video elements wasn't created... Exiting\n");
+      return NULL;
   }
-   
+
+  // Add Elements to the Bin
+  gst_bin_add_many (GST_BIN (self->video_bin),
+    vdecoder,
+    videoconvert,
+    overlay_comp,
+    self->sink, NULL);
+
+  // Link confirmation
+  if (!gst_element_link_many (videoconvert,
+    overlay_comp,
+    self->sink, NULL)){
+      g_warning ("Linking video part (A)-2 Fail...");
+      return NULL;
+  }
+
+  // Dynamic Pad Creation
+  if(! g_signal_connect (vdecoder, "pad-added", G_CALLBACK (on_pad_added),videoconvert))
+  {
+      g_warning ("Linking part (2) with part (A)-2 Fail...");
+  }
+
+  pad = gst_element_get_static_pad (vdecoder, "sink");
+  if (!pad) {
+      // TODO gst_object_unref 
+      GST_ERROR("unable to get decoder static sink pad");
+      return NULL;
+  }
+
   if(! g_signal_connect (overlay_comp, "draw", G_CALLBACK (draw_overlay), self)){
-    g_warning ("overlay draw callback Fail...");
+    GST_ERROR ("overlay draw callback Fail...");
   }
 
   if(! g_signal_connect (overlay_comp, "caps-changed",G_CALLBACK (prepare_overlay), self->overlay_state)){
-    g_warning ("overlay draw callback Fail...");
+    GST_ERROR ("overlay draw callback Fail...");
+    return NULL;
   }
+
+  ghostpad = gst_ghost_pad_new ("bin_sink", pad);
+  gst_element_add_pad (self->video_bin, ghostpad);
+  gst_object_unref (pad);
+
+  if(!self->canvas){
+    self->canvas = gst_gtk_base_custom_sink_acquire_widget(GST_GTK_BASE_CUSTOM_SINK(self->sink));
+  } else {
+    gst_gtk_base_custom_sink_set_widget(GST_GTK_BASE_CUSTOM_SINK(self->sink),GTK_GST_BASE_CUSTOM_WIDGET(self->canvas));
+  }
+  gst_gtk_base_custom_sink_set_parent(GST_GTK_BASE_CUSTOM_SINK(self->sink),self->canvas_handle);
+
+  return self->video_bin;
+}
+
+/* Dynamically link */
+static void on_rtsp_pad_added (GstElement *element, GstPad *new_pad, OnvifPlayer * data){
+  g_print ("Received new pad '%s' from '%s':\n", GST_PAD_NAME (new_pad), GST_ELEMENT_NAME (element));
+
+  GstPadLinkReturn pad_ret;
+  GstPad *sink_pad = NULL;
+  GstCaps *new_pad_caps = NULL;
+  GstStructure *new_pad_struct = NULL;
+
+  /* Check the new pad's type */
+  new_pad_caps = gst_pad_get_current_caps (new_pad);
+  new_pad_struct = gst_caps_get_structure (new_pad_caps, 0);
+  
+
+  gint payload_v;
+  gst_structure_get_int(new_pad_struct,"payload", &payload_v);
+
+  // gchar * caps_str = gst_caps_serialize(new_pad_caps,0);
+  // gchar * new_pad_type = gst_structure_get_name (new_pad_struct);
+  // printf("caps_str : %s\n",caps_str);
+
+  if (payload_v == 96) {
+    gst_event_new_flush_stop(0);
+    GstElement * video_bin = create_video_bin(data);
+
+    gst_bin_add_many (GST_BIN (data->pipeline), video_bin, NULL);
+
+    sink_pad = gst_element_get_static_pad (video_bin, "bin_sink");
+
+    pad_ret = gst_pad_link (new_pad, sink_pad);
+    if (GST_PAD_LINK_FAILED (pad_ret)) {
+      g_printerr ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(video_bin));
+      goto exit;
+    }
+
+    gst_element_sync_state_with_parent(video_bin);
+  } else if (payload_v == 0) {
+    const gchar * audio_format_v = gst_structure_get_string(new_pad_struct,"encoding-name");
+    if(!strcmp(audio_format_v,"PCMU")){
+      GstElement * audio_bin = create_audio_bin(data);
+
+      gst_bin_add_many (GST_BIN (data->pipeline), audio_bin, NULL);
+
+      sink_pad = gst_element_get_static_pad (audio_bin, "bin_sink");
+      pad_ret = gst_pad_link (new_pad, sink_pad);
+      if (GST_PAD_LINK_FAILED (pad_ret)) {
+        g_printerr ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(audio_bin));
+        goto exit;
+      }
+
+      gst_element_sync_state_with_parent(audio_bin);
+    } else {
+      GST_FIXME("Add support to other audio format...\n");
+    }
+  } else {
+    GST_FIXME("Support other payload formats\n");
+  }
+
+exit:
+  /* Unreference the new pad's caps, if we got them */
+  if (new_pad_caps != NULL)
+    gst_caps_unref (new_pad_caps);
+  if (sink_pad != NULL)
+    gst_object_unref (sink_pad);
+}
+
+void create_pipeline(OnvifPlayer *self){
+
+  /* Create the empty pipeline */
+  self->pipeline = gst_pipeline_new ("onvif-pipeline");
+
+  /* Create the elements */
+  self->src = gst_element_factory_make ("rtspsrc", "rtspsrc");
+
+  if (!self->pipeline
+    || !self->src){
+      GST_ERROR ("One of the elements wasn't created... Exiting\n");
+      return;
+  }
+
+  // Add Elements to the Bin
+  gst_bin_add_many (GST_BIN (self->pipeline), self->src, NULL);
+
+  // Dynamic Pad Creation
+  if(! g_signal_connect (self->src, "pad-added", G_CALLBACK (on_rtsp_pad_added),self))
+  {
+      g_warning ("Linking part (1) with part (A)-1 Fail...");
+  }
+
+  if(!g_signal_connect (self->src, "select-stream", G_CALLBACK (find_backchannel),self))
+  {
+      GST_WARNING ("Fail to connect select-stream signal...");
+  }
+
+
+  g_object_set (G_OBJECT (self->src), "buffer-mode", 0, NULL);
+  g_object_set (G_OBJECT (self->src), "latency", 0, NULL);
+  g_object_set (G_OBJECT (self->src), "teardown-timeout", 0, NULL); 
+  g_object_set (G_OBJECT (self->src), "backchannel", 1, NULL);
+  g_object_set (G_OBJECT (self->src), "user-agent", "OnvifDeviceManager-Linux-0.0", NULL);
+  g_object_set (G_OBJECT (self->src), "do-retransmission", FALSE, NULL);
+  g_object_set (G_OBJECT (self->src), "onvif-mode", TRUE, NULL);
+  g_object_set (G_OBJECT (self->src), "is-live", TRUE, NULL);
 
   /* set up bus */
   GstBus *bus = gst_element_get_bus (self->pipeline);
@@ -603,7 +623,11 @@ void OnvifPlayer__init(OnvifPlayer* self) {
 
     self->overlay_state = malloc(sizeof(OverlayState));
     self->overlay_state->valid = 0;
-    
+    self->canvas_handle = NULL;
+    self->canvas = NULL;
+    self->video_bin = NULL;
+    self->audio_bin = NULL;
+
     pthread_mutex_init(self->player_lock, NULL);
     create_pipeline(self);
     if (!self->pipeline){
@@ -639,50 +663,40 @@ void OnvifPlayer__set_playback_url(OnvifPlayer* self, char *url) {
 
 void OnvifPlayer__stop(OnvifPlayer* self){
     printf("OnvifPlayer__stop \n");
-    if(self->state <= GST_STATE_READY){
-      return; //Ignore stop call if not playing
-    }
-    
+
     pthread_mutex_lock(self->player_lock);
     GstStateChangeReturn ret;
-    ret = gst_element_set_state (self->pipeline, GST_STATE_READY);
-    if (ret == GST_STATE_CHANGE_FAILURE) {
-      g_printerr ("Unable to set the pipeline to the ready state.\n");
-      gst_object_unref (self->pipeline);
-      pthread_mutex_unlock(self->player_lock);
-      return;
-    }
 
     //Backchannel clean up
     if(GST_IS_ELEMENT(self->backpipe)){
-      ret = gst_element_set_state (self->backpipe, GST_STATE_READY);
-      if (ret == GST_STATE_CHANGE_FAILURE) {
-          g_printerr ("Unable to set the backpipe to the ready state.\n");
-          gst_object_unref (self->pipeline);
-          pthread_mutex_unlock(self->player_lock);
-          return;
-      }
       ret = gst_element_set_state (self->backpipe, GST_STATE_NULL);
       gst_object_unref (self->backpipe);
       if (ret == GST_STATE_CHANGE_FAILURE) {
-          g_printerr ("Unable to set the backpipe to the ready state.\n");
-          gst_object_unref (self->pipeline);
-          pthread_mutex_unlock(self->player_lock);
-          return;
+          GST_ERROR ("Unable to set the backpipe to the ready state.\n");
+          goto stop_out;
       }
     }
 
     //Set NULL state to clear buffers
-    ret = gst_element_set_state (self->pipeline, GST_STATE_NULL);
-    if (ret == GST_STATE_CHANGE_FAILURE) {
-        g_printerr ("Unable to set the pipeline to the ready state.\n");
-        gst_object_unref (self->pipeline);
-        pthread_mutex_unlock(self->player_lock);
-        return;
+    if(GST_IS_ELEMENT(self->pipeline)){
+      ret = gst_element_set_state (self->pipeline, GST_STATE_NULL);
+      if (ret == GST_STATE_CHANGE_FAILURE) {
+          GST_ERROR ("Unable to set the pipeline to the ready state.\n");
+          goto stop_out;
+      }
     }
+stop_out: 
 
-    pthread_mutex_unlock(self->player_lock);
-    // gtk_widget_set_visible(self->canvas, FALSE);
+  //Destroy old pipeline
+  gst_object_unref (self->pipeline);
+  if(GST_IS_ELEMENT(self->backpipe)){
+    gst_object_unref (self->backpipe);
+  }
+
+  // Create new pipeline
+  create_pipeline(self);
+
+  pthread_mutex_unlock(self->player_lock);
 }
 
 void OnvifPlayer__play(OnvifPlayer* self){
@@ -691,7 +705,7 @@ void OnvifPlayer__play(OnvifPlayer* self){
   GstStateChangeReturn ret;
   ret = gst_element_set_state (self->pipeline, GST_STATE_PLAYING);
   if (ret == GST_STATE_CHANGE_FAILURE) {
-      g_printerr ("Unable to set the pipeline to the playing state.\n");
+      GST_ERROR ("Unable to set the pipeline to the playing state.\n");
       gst_object_unref (self->pipeline);
       pthread_mutex_unlock(self->player_lock);
       return;
@@ -701,8 +715,6 @@ void OnvifPlayer__play(OnvifPlayer* self){
 
 GtkWidget * OnvifDevice__createCanvas(OnvifPlayer *self){
 
-  self->canvas = gtk_grid_new ();
-
-  gst_gtk_base_custom_sink_set_parent(GST_GTK_BASE_CUSTOM_SINK(self->sink),self->canvas);
-  return self->canvas;
+  self->canvas_handle = gtk_grid_new ();
+  return self->canvas_handle;
 }

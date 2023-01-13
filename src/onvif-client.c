@@ -1,109 +1,168 @@
+/*
+ * 
+ * Utility design to test various pipeline and elements
+ * Useful to test pipeline re-usability
+ *  
+ *  ./onvifclient rtsp://localhost:8556/test rtsp://remote:8554/test
+ * 
+ */ 
+
+
 #include <gst/gst.h>
+#include <gst/video/gstvideodecoder.h>
+#include "gst2/gtk/gstgtkbasesink.h"
 #include "gst2/onvifinitstaticplugins.h"
+#include <gtk/gtk.h>
+#include<unistd.h>
 
-static GMainLoop *loop = NULL;
-static GstElement *backpipe = NULL;
-static gint stream_id = -1;
+typedef struct {
+  GstElement * pipeline;
+  GstElement * sink;
+  GstElement *rtspsrc;
+  GtkWidget * canvas;
+  GtkWidget * container;
+  int url_count;
+  int current_url_index;
+  char ** urls;
+} AppData;
 
-#define PCMU_CAPS "application/x-rtp, media=audio, payload=0, clock-rate=8000, encoding-name=PCMU"
 
-static GstFlowReturn
-new_sample (GstElement * appsink, GstElement * rtspsrc)
+void
+create_pipeline (AppData * data)
 {
-  GstSample *sample;
-  GstFlowReturn ret = GST_FLOW_OK;
+  // data->pipeline = gst_parse_launch ("rtspsrc buffer-mode=0 do-retransmission=false is-live=true teardown-timeout=0 name=r "
+  //     " ! rtph264depay ! h264parse name=parser ! avdec_h264 name=decoder ! videoconvert ! ximagesink "
+  data->pipeline = gst_parse_launch ("rtspsrc name=r teardown-timeout=0 ! rtph264depay ! h264parse ! openh264dec ! videoconvert ! gtkcustomsink name=sink"
+      , NULL);
+  // data->pipeline = gst_parse_launch ("videotestsrc ! ximagesink"
+  //     , NULL);
+  if (!data->pipeline)
+    g_error ("Failed to parse pipeline");
 
-  g_assert (stream_id != -1);
-
-  g_signal_emit_by_name (appsink, "pull-sample", &sample);
-
-  if (!sample)
-    goto out;
-
-  g_signal_emit_by_name (rtspsrc, "push-backchannel-buffer", stream_id, sample,
-      &ret);
-
-out:
-  return ret;
+  data->rtspsrc = gst_bin_get_by_name (GST_BIN (data->pipeline), "r");
+  data->sink = gst_bin_get_by_name (GST_BIN (data->pipeline), "sink");
 }
 
-static void
-setup_backchannel_shoveler (GstElement * rtspsrc, GstCaps * caps)
-{
-  GstElement *appsink;
-
-  backpipe = gst_parse_launch ("audiotestsrc is-live=true wave=red-noise ! "
-      "mulawenc ! rtppcmupay ! appsink name=out", NULL);
-  if (!backpipe)
-    g_error ("Could not setup backchannel pipeline");
-
-  appsink = gst_bin_get_by_name (GST_BIN (backpipe), "out");
-  g_object_set (G_OBJECT (appsink), "caps", caps, "emit-signals", TRUE, NULL);
-
-  g_signal_connect (appsink, "new-sample", G_CALLBACK (new_sample), rtspsrc);
-
-  g_print ("Playing backchannel shoveler\n");
-  gst_element_set_state (backpipe, GST_STATE_PLAYING);
+/* This function is called when the main window is closed */
+static void delete_event_cb (GtkWidget *widget, GdkEvent *event, AppData * appdata) {
+  gst_element_set_state (appdata->pipeline, GST_STATE_READY);
+  gst_element_set_state (appdata->pipeline, GST_STATE_NULL);
+  gtk_main_quit ();
 }
 
-static gboolean
-remove_extra_fields (GQuark field_id, GValue * value G_GNUC_UNUSED,
-    gpointer user_data G_GNUC_UNUSED)
-{
-  return !g_str_has_prefix (g_quark_to_string (field_id), "a-");
+/* This function is called when the STOP button is clicked */
+static void stop_cb (GtkButton *button, AppData * appdata) {
+  gst_element_set_state (appdata->pipeline, GST_STATE_NULL);
+
+  appdata->canvas = gst_gtk_base_custom_sink_acquire_widget(GST_GTK_BASE_CUSTOM_SINK(appdata->sink));
+  
+  gst_object_unref (appdata->pipeline);
+  
+  create_pipeline(appdata);
 }
 
-static gboolean
-find_backchannel (GstElement * rtspsrc, guint idx, GstCaps * caps,
-    gpointer user_data G_GNUC_UNUSED)
-{
-  GstStructure *s;
-  gchar *caps_str = gst_caps_to_string (caps);
-  g_print ("Selecting stream idx %u, caps %s\n", idx, caps_str);
-  g_free (caps_str);
-
-  s = gst_caps_get_structure (caps, 0);
-  if (gst_structure_has_field (s, "a-sendonly")) {
-    stream_id = idx;
-    caps = gst_caps_new_empty ();
-    s = gst_structure_copy (s);
-    gst_structure_set_name (s, "application/x-rtp");
-    gst_structure_filter_and_map_in_place (s, remove_extra_fields, NULL);
-    gst_caps_append_structure (caps, s);
-    setup_backchannel_shoveler (rtspsrc, caps);
+/* This function is called when the STOP button is clicked */
+static void play_cb (GtkButton *button, AppData * appdata) {
+  stop_cb(button,appdata);
+  gst_gtk_base_custom_sink_set_parent(GST_GTK_BASE_CUSTOM_SINK(appdata->sink),appdata->container);
+  gst_gtk_base_custom_sink_set_widget(GST_GTK_BASE_CUSTOM_SINK(appdata->sink),GTK_GST_BASE_CUSTOM_WIDGET(appdata->canvas));
+  if(appdata->current_url_index == appdata->url_count-1){
+    appdata->current_url_index = 1;
+  } else {
+    appdata->current_url_index++;
   }
 
-  return TRUE;
+  printf("playing %s\n",appdata->urls[appdata->current_url_index]);
+  g_object_set (G_OBJECT (appdata->rtspsrc), "location", appdata->urls[appdata->current_url_index], NULL);
+  gst_element_set_state (appdata->pipeline, GST_STATE_PLAYING);
+}
+
+
+void
+create_control_window(AppData * appdata){
+  GtkWidget * main_window, *widget, *grid;
+
+  main_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);  
+  g_signal_connect (G_OBJECT (main_window), "delete-event", G_CALLBACK (delete_event_cb), appdata);
+
+  gtk_window_set_title (GTK_WINDOW (main_window), "Gstreamer Controls");
+
+  grid = gtk_grid_new ();
+  gtk_container_set_border_width (GTK_CONTAINER (grid), 20);
+
+  gtk_container_add(GTK_CONTAINER(main_window),grid);
+
+  widget = gtk_button_new_with_label ("Play Next");
+  gtk_widget_set_vexpand (widget, FALSE);
+  gtk_widget_set_hexpand (widget, FALSE);
+  g_signal_connect (G_OBJECT(widget), "clicked", G_CALLBACK (play_cb), appdata);
+  gtk_grid_attach (GTK_GRID (grid), widget, 0, 0, 1, 1);
+  
+  widget = gtk_button_new_with_label ("Stop");
+  gtk_widget_set_vexpand (widget, FALSE);
+  gtk_widget_set_hexpand (widget, FALSE);
+  g_signal_connect (G_OBJECT(widget), "clicked", G_CALLBACK (stop_cb), appdata);
+  gtk_grid_attach (GTK_GRID (grid), widget, 1, 0, 1, 1);
+
+  appdata->container  = gtk_grid_new();
+  gtk_grid_attach (GTK_GRID (grid), appdata->container, 0, 1, 2, 1);
+
+  gtk_window_set_default_size(GTK_WINDOW(main_window),400,300);
+  gtk_widget_show_all (main_window);
+}
+
+char **copy_argv(int argc, char *argv[]) {
+  // calculate the contiguous argv buffer size
+  int length=0;
+  size_t ptr_args = argc + 1;
+  for (int i = 0; i < argc; i++)
+  {
+    length += (strlen(argv[i]) + 1);
+  }
+  char** new_argv = (char**)malloc((ptr_args) * sizeof(char*) + length);
+  // copy argv into the contiguous buffer
+  length = 0;
+  for (int i = 0; i < argc; i++)
+  {
+    new_argv[i] = &(((char*)new_argv)[(ptr_args * sizeof(char*)) + length]);
+    strcpy(new_argv[i], argv[i]);
+    length += (strlen(argv[i]) + 1);
+  }
+  // insert NULL terminating ptr at the end of the ptr array
+  new_argv[ptr_args-1] = NULL;
+  return (new_argv);
 }
 
 int
 main (int argc, char *argv[])
 {
-  GstElement *pipeline, *rtspsrc;
-  const gchar *location;
-
+  /* Initialize Gstreamer and static plugins */
   gst_init (&argc, &argv);
   onvif_init_static_plugins();
-  if (argc >= 2)
-    location = argv[1];
-  else
-    location = "rtsp://127.0.0.1:8554/test";
 
-  loop = g_main_loop_new (NULL, FALSE);
+  /* Initialize GTK */
+  gtk_init (&argc, &argv);
 
-  pipeline = gst_parse_launch ("rtspsrc backchannel=onvif debug=true name=r "
-      "r. ! queue ! decodebin ! queue ! autovideosink "
-      "r. ! queue ! decodebin ! queue ! autoaudiosink ", NULL);
-  if (!pipeline)
-    g_error ("Failed to parse pipeline");
+  if (argc < 1) {
+    printf("error : Two parameters rtsp url are required.");
+    return 1;
+  }
 
-  rtspsrc = gst_bin_get_by_name (GST_BIN (pipeline), "r");
-  g_object_set (G_OBJECT (rtspsrc), "location", location, NULL);
-  g_signal_connect (rtspsrc, "select-stream", G_CALLBACK (find_backchannel),
-      NULL);
+  /* Initialize Application data structure */
+  AppData * data = malloc(sizeof(AppData));
+  data->url_count = argc;
+  data->urls = copy_argv(argc,argv);
+  data->pipeline = NULL;
+  data->current_url_index = 0;
 
-  gst_element_set_state (pipeline, GST_STATE_PLAYING);
+  create_pipeline(data);
 
-  g_main_loop_run (loop);
-  return 0;
+
+  create_control_window(data);
+
+  gtk_main ();
+  
+  gst_element_set_state (data->pipeline, GST_STATE_NULL);
+  gst_object_unref (data->pipeline);
+  free(data);
 }

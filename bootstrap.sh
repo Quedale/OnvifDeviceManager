@@ -421,6 +421,7 @@ if [ $SKIP_GSTREAMER -eq 0 ]; then
     MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:audioparsers=enabled"
     MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:level=enabled"
     MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:gdk-pixbuf=enabled"
+    # MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:gtk3=enabled"
     MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:openh264=enabled"
     MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:nvcodec=enabled"
     MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:v4l2codecs=enabled"
@@ -512,6 +513,8 @@ if [ $SKIP_GSTREAMER -eq 0 ]; then
     rm -rf $GST_DIR/build/dist/lib/*.so
     rm -rf $GST_DIR/build/dist/lib/gstreamer-1.0/*.so
     cd ..
+else
+    rm -rf libav_build
 fi
 
 if [ $SKIP_GSOAP -eq 0 ]; then

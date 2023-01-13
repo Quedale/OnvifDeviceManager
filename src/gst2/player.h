@@ -27,6 +27,8 @@ typedef struct _OnvifPlayer {
   GstElement *src;  /* RtspSrc to support backchannel */
   GstElement *sink;  /* Video Sink */
   GstElement *mic_volume_element;
+  GstElement * video_bin;
+  GstElement * audio_bin;
   GstVideoOverlay *overlay; //Overlay rendered on the canvas widget
   OverlayState *overlay_state;
 
@@ -35,8 +37,8 @@ typedef struct _OnvifPlayer {
   OnvifDeviceList* onvifDeviceList;
   GtkWidget *listbox;
   GtkWidget *details_notebook;
+  GtkWidget *canvas_handle;
   GtkWidget *canvas;
-  GtkWidget *canvas_img;
   gdouble level; //Used to calculate level decay
   guint back_stream_id;
   CredentialsDialog * dialog;
