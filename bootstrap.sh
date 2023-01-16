@@ -525,7 +525,7 @@ if [ $SKIP_GSOAP -eq 0 ]; then
     rm download
     cd gsoap-2.8
     mkdir build
-    ./configure --with-openssl=/usr/lib/ssl --prefix=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/build
+    ./configure --with-openssl=/usr/lib/ssl --prefix=$(pwd)/build
     LIBRARY_PATH="$(pkg-config --variable=libdir openssl):$LIBRARY_PATH" \
     LD_LIBRARY_PATH="$(pkg-config --variable=libdir openssl):$LD_LIBRARY_PATH" \
         make -j$(nproc)

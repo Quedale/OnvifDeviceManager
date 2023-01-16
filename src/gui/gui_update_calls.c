@@ -51,36 +51,57 @@ struct PlayInput * PlayInput_copy(struct PlayInput * input){
 
 void _display_onvif_thumbnail(void * user_data){
   GtkWidget *image;
-  GdkPixbufLoader *loader;
+  GdkPixbufLoader *loader = NULL;
   GdkPixbuf *pixbuf;
+  GdkPixbuf *scaled_pixbuf = NULL;
 
   struct DeviceInput * input = (struct DeviceInput *) user_data;
   double size;
   char * imgdata;
-
+  int freeimgdata = 0;
   if(input->device->authorized){
     struct chunk * imgchunk = OnvifDevice__media_getSnapshot(input->device);
+    if(!imgchunk){
+      //TODO Set error image
+      printf("Error retrieve snapshot.");
+      return;
+    }
     imgdata = imgchunk->buffer;
     size = imgchunk->size;
+    freeimgdata = 1;
     free(imgchunk);
   } else {
     imgdata = _binary_locked_icon_png_start;
     size = _binary_locked_icon_png_end - _binary_locked_icon_png_start;
   }
 
+  //If the gtk handle is destoyed by the time its ready
+  if(!GTK_IS_CONTAINER(input->device->image_handle)){
+    goto exit;
+  }
   loader = gdk_pixbuf_loader_new ();
   gdk_pixbuf_loader_write (loader, (unsigned char *)imgdata, size, NULL);
   pixbuf = gdk_pixbuf_loader_get_pixbuf (loader);
   double ph = gdk_pixbuf_get_height (pixbuf);
   double pw = gdk_pixbuf_get_width (pixbuf);
   double newpw = 40 / ph * pw;
-  pixbuf = gdk_pixbuf_scale_simple (pixbuf,newpw,40,GDK_INTERP_NEAREST);
-  image = gtk_image_new_from_pixbuf (pixbuf); 
+  scaled_pixbuf = gdk_pixbuf_scale_simple (pixbuf,newpw,40,GDK_INTERP_NEAREST);
+  image = gtk_image_new_from_pixbuf (scaled_pixbuf); 
   gtk_container_foreach (GTK_CONTAINER (input->device->image_handle), (void*) gtk_widget_destroy, NULL);
   gtk_container_add (GTK_CONTAINER (input->device->image_handle), image);
   gtk_widget_show (image);
-  // g_object_ref(image); //We aren't going to change this picture for now
-  free(input);
+  
+exit:
+  if(loader){
+    gdk_pixbuf_loader_close(loader,NULL);
+    g_object_unref(loader);
+  }
+  if(scaled_pixbuf){
+    g_object_unref(scaled_pixbuf);
+  }
+  if(freeimgdata){
+    free(imgdata);
+  }
 }
 
 void _display_nslookup_hostname(void * user_data){
@@ -115,6 +136,8 @@ void _display_onvif_device(void * user_data){
 
   /* Display row thumbnail */
   _display_onvif_thumbnail(input);
+
+  free(input);
 }
 
 void display_onvif_device_row(OnvifDevice * device, EventQueue * queue){

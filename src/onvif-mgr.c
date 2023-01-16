@@ -53,7 +53,7 @@ void row_selected_cb (GtkWidget *widget,   GtkListBoxRow* row,
 }
 
 static GtkWidget *
-create_row (struct ProbMatch * m, OnvifPlayer *player)
+create_row (ProbMatch * m, OnvifPlayer *player)
 {
   GtkWidget *row;
   GtkWidget *grid;
@@ -71,9 +71,8 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   //   printf("\t\tScope : %s\n",m->scopes[i]);
   // }
   
-  OnvifDevice dev = OnvifDevice__create(m->addr);
-  OnvifDevice * devp = OnvifDevice__copy(&dev);//malloc copy
-  OnvifDeviceList__insert_element(player->onvifDeviceList,devp,player->onvifDeviceList->device_count);
+  OnvifDevice * dev = OnvifDevice__create(g_strdup(m->addr));
+  OnvifDeviceList__insert_element(player->onvifDeviceList,dev,player->onvifDeviceList->device_count);
   int b;
   for (b=0;b<player->onvifDeviceList->device_count;b++){
     printf("DEBUG List Record :[%i] %s:%s\n",b,player->onvifDeviceList->devices[b]->ip,player->onvifDeviceList->devices[b]->port);
@@ -88,7 +87,7 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   gtk_spinner_start (GTK_SPINNER (image));
 
   GtkWidget * thumbnail_handle = gtk_event_box_new ();
-  devp->image_handle = thumbnail_handle;
+  dev->image_handle = thumbnail_handle;
   gtk_container_add (GTK_CONTAINER (thumbnail_handle), image);
   g_object_set (thumbnail_handle, "margin-end", 10, NULL);
   gtk_grid_attach (GTK_GRID (grid), thumbnail_handle, 0, 1, 1, 3);
@@ -104,7 +103,7 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   gtk_widget_set_hexpand (label, TRUE);
   gtk_grid_attach (GTK_GRID (grid), label, 0, 0, 2, 1);
 
-  label = gtk_label_new (dev.ip);
+  label = gtk_label_new (dev->ip);
   g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
   gtk_widget_set_hexpand (label, TRUE);
   gtk_grid_attach (GTK_GRID (grid), label, 1, 1, 1, 1);
@@ -128,7 +127,7 @@ create_row (struct ProbMatch * m, OnvifPlayer *player)
   g_object_ref(image);
 
   //Dispatch Thread event to update GtkListRow
-  display_onvif_device_row(devp,EVENT_QUEUE);
+  display_onvif_device_row(dev,EVENT_QUEUE);
 
   return row;
 }
@@ -145,7 +144,7 @@ finished_discovery (void * e)
   struct DiscoveryInput * disco_in = (struct DiscoveryInput * ) event->data;
   
   gtk_widget_set_sensitive(disco_in->widget,TRUE);
-
+  free(disco_in);
   return FALSE;
 }
 static gboolean * 
@@ -157,16 +156,16 @@ found_server (void * e)
   DiscoveredServer * server = event->server;
   struct DiscoveryInput * disco_in = (struct DiscoveryInput * ) event->data;
 
-  struct ProbMatch m;
+  ProbMatch * m;
   int i;
   
-  printf("Found server ---------------- %i\n",server->match_count);
-  for (i = 0 ; i < server->match_count ; ++i) {
-    m = server->matches[i];
+  printf("Found server ---------------- %i\n",server->matches->match_count);
+  for (i = 0 ; i < server->matches->match_count ; ++i) {
+    m = server->matches->matches[i];
 
     // Create GtkListBoxRow and add it
     printf("Prob Match #%i ----------------\n",i);
-    row = create_row (&m,disco_in->player);
+    row = create_row (m,disco_in->player);
     gtk_list_box_insert (GTK_LIST_BOX (disco_in->player->listbox), row, -1);  
   }
   //Display new content
