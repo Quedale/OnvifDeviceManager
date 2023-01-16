@@ -375,16 +375,17 @@ static void on_pad_added (GstElement *element, GstPad *new_pad, gpointer data){
 
 static GstElement * create_audio_bin(OnvifPlayer * self){
   GstPad *pad, *ghostpad;
-  GstElement *decoder, *convert, *level, *sink;
+  GstElement *aqueue, *decoder, *convert, *level, *sink;
 
   self->audio_bin = gst_bin_new("audiobin");
-
+  aqueue = gst_element_factory_make ("queue", NULL);
   decoder = gst_element_factory_make ("decodebin", NULL);
   convert = gst_element_factory_make ("audioconvert", NULL);
   level = gst_element_factory_make("level",NULL);
   sink = gst_element_factory_make ("autoaudiosink", NULL);
 
   if (!self->audio_bin ||
+      !aqueue ||
       !decoder ||
       !convert ||
       !level ||
@@ -393,28 +394,39 @@ static GstElement * create_audio_bin(OnvifPlayer * self){
       return NULL;
   }
 
+  g_object_set (G_OBJECT (aqueue), "flush-on-eos", TRUE, NULL);
+  g_object_set (G_OBJECT (aqueue), "max-size-buffers", 1, NULL);
+
   // Add Elements to the Bin
   gst_bin_add_many (GST_BIN (self->audio_bin),
+    aqueue,
     decoder,
     convert,
     level,
     sink, NULL);
 
   // Link confirmation
+  if (!gst_element_link_many (aqueue,
+    decoder, NULL)){
+      g_warning ("Linking audio part (A)-1 Fail...");
+      return NULL;
+  }
+
+  // Link confirmation
   if (!gst_element_link_many (convert,
     level,
     sink, NULL)){
-      g_warning ("Linking video part (A)-2 Fail...");
+      g_warning ("Linking audio part (A)-2 Fail...");
       return NULL;
   }
 
   // Dynamic Pad Creation
   if(! g_signal_connect (decoder, "pad-added", G_CALLBACK (on_pad_added),convert))
   {
-      g_warning ("Linking part (2) with part (A)-2 Fail...");
+      g_warning ("Linking (A)-1 part (2) with part (A)-2 Fail...");
   }
 
-  pad = gst_element_get_static_pad (decoder, "sink");
+  pad = gst_element_get_static_pad (aqueue, "sink");
   if (!pad) {
       // TODO gst_object_unref 
       GST_ERROR("unable to get decoder static sink pad");
@@ -429,10 +441,11 @@ static GstElement * create_audio_bin(OnvifPlayer * self){
 }
 
 static GstElement * create_video_bin(OnvifPlayer * self){
-  GstElement *vdecoder, *videoconvert, *overlay_comp;
+  GstElement *vqueue, *vdecoder, *videoconvert, *overlay_comp;
   GstPad *pad, *ghostpad;
 
   self->video_bin = gst_bin_new("video_bin");
+  vqueue = gst_element_factory_make ("queue", NULL);
   vdecoder = gst_element_factory_make ("decodebin", NULL);
   videoconvert = gst_element_factory_make ("videoconvert", NULL);
   overlay_comp = gst_element_factory_make ("overlaycomposition", NULL);
@@ -440,6 +453,7 @@ static GstElement * create_video_bin(OnvifPlayer * self){
 
   if (!self->video_bin ||
       // !capsfilter ||
+      !vqueue ||
       !vdecoder ||
       !videoconvert ||
       !overlay_comp ||
@@ -448,12 +462,24 @@ static GstElement * create_video_bin(OnvifPlayer * self){
       return NULL;
   }
 
+
+  g_object_set (G_OBJECT (vqueue), "flush-on-eos", TRUE, NULL);
+  g_object_set (G_OBJECT (vqueue), "max-size-buffers", 1, NULL);
+
   // Add Elements to the Bin
   gst_bin_add_many (GST_BIN (self->video_bin),
+    vqueue,
     vdecoder,
     videoconvert,
     overlay_comp,
     self->sink, NULL);
+
+  // Link confirmation
+  if (!gst_element_link_many (vqueue,
+    vdecoder, NULL)){
+      g_warning ("Linking video part (A)-1 Fail...");
+      return NULL;
+  }
 
   // Link confirmation
   if (!gst_element_link_many (videoconvert,
@@ -466,10 +492,10 @@ static GstElement * create_video_bin(OnvifPlayer * self){
   // Dynamic Pad Creation
   if(! g_signal_connect (vdecoder, "pad-added", G_CALLBACK (on_pad_added),videoconvert))
   {
-      g_warning ("Linking part (2) with part (A)-2 Fail...");
+      g_warning ("Linking (A)-1 part with part (A)-2 Fail...");
   }
 
-  pad = gst_element_get_static_pad (vdecoder, "sink");
+  pad = gst_element_get_static_pad (vqueue, "sink");
   if (!pad) {
       // TODO gst_object_unref 
       GST_ERROR("unable to get decoder static sink pad");
@@ -481,7 +507,7 @@ static GstElement * create_video_bin(OnvifPlayer * self){
   }
 
   if(! g_signal_connect (overlay_comp, "caps-changed",G_CALLBACK (prepare_overlay), self->overlay_state)){
-    GST_ERROR ("overlay draw callback Fail...");
+    GST_ERROR ("overlay caps-changed callback Fail...");
     return NULL;
   }
 
@@ -593,8 +619,7 @@ void create_pipeline(OnvifPlayer *self){
       GST_WARNING ("Fail to connect select-stream signal...");
   }
 
-
-  g_object_set (G_OBJECT (self->src), "buffer-mode", 0, NULL);
+  g_object_set (G_OBJECT (self->src), "buffer-mode", 1, NULL);
   g_object_set (G_OBJECT (self->src), "latency", 0, NULL);
   g_object_set (G_OBJECT (self->src), "teardown-timeout", 0, NULL); 
   g_object_set (G_OBJECT (self->src), "backchannel", 1, NULL);
