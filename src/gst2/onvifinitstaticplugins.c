@@ -2,6 +2,9 @@
 #include <gst/gst.h>
 
 
+GST_PLUGIN_STATIC_DECLARE(gtknew);
+
+#ifdef STATIC_BUILD
 
 
 
@@ -89,15 +92,14 @@ GST_PLUGIN_STATIC_DECLARE(udp);
 // GST_PLUGIN_STATIC_DECLARE(wavparse); gstwavparse
 // GST_PLUGIN_STATIC_DECLARE(xingmux); gstxingmux
 // GST_PLUGIN_STATIC_DECLARE(y4menc); gsty4menc
-GST_PLUGIN_STATIC_DECLARE(ossaudio);
-GST_PLUGIN_STATIC_DECLARE(oss4);
+// GST_PLUGIN_STATIC_DECLARE(ossaudio);
+// GST_PLUGIN_STATIC_DECLARE(oss4);
 GST_PLUGIN_STATIC_DECLARE(video4linux2);
 // GST_PLUGIN_STATIC_DECLARE(ximagesrc); gstximagesrc
 // GST_PLUGIN_STATIC_DECLARE(adaptivedemux2); gstadaptivedemux2
 // GST_PLUGIN_STATIC_DECLARE(cairo);
-GST_PLUGIN_STATIC_DECLARE(gdkpixbuf); // gstgdkpixbuf
+// GST_PLUGIN_STATIC_DECLARE(gdkpixbuf); // gstgdkpixbuf
 // GST_PLUGIN_STATIC_DECLARE(gtk); // gstgtk
-GST_PLUGIN_STATIC_DECLARE(gtknew);
 // GST_PLUGIN_STATIC_DECLARE(jpeg); gstjpeg
 // GST_PLUGIN_STATIC_DECLARE(lame); gstlame 
 // GST_PLUGIN_STATIC_DECLARE(dv); gstdv
@@ -143,8 +145,8 @@ GST_PLUGIN_STATIC_DECLARE(asfmux);
 // GST_PLUGIN_STATIC_DECLARE(midi); gstmidi 
 // GST_PLUGIN_STATIC_DECLARE(mpegpsdemux); gstmpegpsdemux
 // GST_PLUGIN_STATIC_DECLARE(mpegpsmux); gstmpegpsmux
-GST_PLUGIN_STATIC_DECLARE(mpegtsdemux);
-GST_PLUGIN_STATIC_DECLARE(mpegtsmux);
+// GST_PLUGIN_STATIC_DECLARE(mpegtsdemux);
+// GST_PLUGIN_STATIC_DECLARE(mpegtsmux);
 // GST_PLUGIN_STATIC_DECLARE(mxf); gstmxf
 // GST_PLUGIN_STATIC_DECLARE(netsim); gstnetsim
 GST_PLUGIN_STATIC_DECLARE(rtponvif);
@@ -162,7 +164,7 @@ GST_PLUGIN_STATIC_DECLARE(rtponvif);
 // GST_PLUGIN_STATIC_DECLARE(smooth); gstsmooth
 // GST_PLUGIN_STATIC_DECLARE(speed); gstspeed
 // GST_PLUGIN_STATIC_DECLARE(subenc); gstsubenc
-GST_PLUGIN_STATIC_DECLARE(switchbin);
+// GST_PLUGIN_STATIC_DECLARE(switchbin);
 // GST_PLUGIN_STATIC_DECLARE(timecode); gsttimecode
 // GST_PLUGIN_STATIC_DECLARE(transcode);
 // GST_PLUGIN_STATIC_DECLARE(videofiltersbad); gstvideofiltersbad
@@ -197,7 +199,7 @@ GST_PLUGIN_STATIC_DECLARE(asf);
 // GST_PLUGIN_STATIC_DECLARE(dvdlpcmdec); gstdvdlpcmdec
 // GST_PLUGIN_STATIC_DECLARE(dvdsub); gstdvdsub
 // GST_PLUGIN_STATIC_DECLARE(realmedia); gstrealmedia
-GST_PLUGIN_STATIC_DECLARE(x264);
+// GST_PLUGIN_STATIC_DECLARE(x264);
 #ifndef ENABLERPI
 GST_PLUGIN_STATIC_DECLARE(pulseaudio);
 #endif
@@ -207,13 +209,16 @@ GST_PLUGIN_STATIC_DECLARE(pulseaudio);
 // extern void g_io_environmentproxy_load (gpointer data);
 // extern void g_io_openssl_load (gpointer data);
 
+#endif
 void
 onvif_init_static_plugins (void)
 {
   static gsize initialization_value = 0;
   if (g_once_init_enter (&initialization_value)) {
     
-    
+    GST_PLUGIN_STATIC_REGISTER(gtknew);
+
+#ifdef STATIC_BUILD
     
     
     GST_PLUGIN_STATIC_REGISTER(coreelements);
@@ -300,15 +305,14 @@ onvif_init_static_plugins (void)
     // GST_PLUGIN_STATIC_REGISTER(wavparse); gstwavparse
     // GST_PLUGIN_STATIC_REGISTER(xingmux); gstxingmux
     // GST_PLUGIN_STATIC_REGISTER(y4menc); gsty4menc
-    GST_PLUGIN_STATIC_REGISTER(ossaudio);
-    GST_PLUGIN_STATIC_REGISTER(oss4);
+    // GST_PLUGIN_STATIC_REGISTER(ossaudio);
+    // GST_PLUGIN_STATIC_REGISTER(oss4);
     GST_PLUGIN_STATIC_REGISTER(video4linux2);
     // GST_PLUGIN_STATIC_REGISTER(ximagesrc); gstximagesrc
     // GST_PLUGIN_STATIC_REGISTER(adaptivedemux2); gstadaptivedemux2
     // GST_PLUGIN_STATIC_REGISTER(cairo);
-    GST_PLUGIN_STATIC_REGISTER(gdkpixbuf); // gstgdkpixbuf
+    // GST_PLUGIN_STATIC_REGISTER(gdkpixbuf); // gstgdkpixbuf
     // GST_PLUGIN_STATIC_REGISTER(gtk); // gstgtk
-    GST_PLUGIN_STATIC_REGISTER(gtknew);
     // GST_PLUGIN_STATIC_REGISTER(jpeg); gstjpeg
     // GST_PLUGIN_STATIC_REGISTER(lame); gstlame 
     // GST_PLUGIN_STATIC_REGISTER(dv); gstdv
@@ -354,8 +358,8 @@ onvif_init_static_plugins (void)
     // GST_PLUGIN_STATIC_REGISTER(midi); gstmidi
     // GST_PLUGIN_STATIC_REGISTER(mpegpsdemux); gstmpegpsdemux
     // GST_PLUGIN_STATIC_REGISTER(mpegpsmux); gstmpegpsmux
-    GST_PLUGIN_STATIC_REGISTER(mpegtsdemux);
-    GST_PLUGIN_STATIC_REGISTER(mpegtsmux);
+    // GST_PLUGIN_STATIC_REGISTER(mpegtsdemux);
+    // GST_PLUGIN_STATIC_REGISTER(mpegtsmux);
     // GST_PLUGIN_STATIC_REGISTER(mxf); gstmxf
     // GST_PLUGIN_STATIC_REGISTER(netsim); gstnetsim
     GST_PLUGIN_STATIC_REGISTER(rtponvif);
@@ -373,7 +377,7 @@ onvif_init_static_plugins (void)
     // GST_PLUGIN_STATIC_REGISTER(smooth); gstsmooth
     // GST_PLUGIN_STATIC_REGISTER(speed); gstspeed
     // GST_PLUGIN_STATIC_REGISTER(subenc); gstsubenc
-    GST_PLUGIN_STATIC_REGISTER(switchbin);
+    // GST_PLUGIN_STATIC_REGISTER(switchbin);
     // GST_PLUGIN_STATIC_REGISTER(timecode); gsttimecode
     // GST_PLUGIN_STATIC_REGISTER(transcode);
     // GST_PLUGIN_STATIC_REGISTER(videofiltersbad); gstvideofiltersbad
@@ -408,7 +412,7 @@ onvif_init_static_plugins (void)
     // GST_PLUGIN_STATIC_REGISTER(dvdlpcmdec); gstdvdlpcmdec
     // GST_PLUGIN_STATIC_REGISTER(dvdsub); gstdvdsub
     // GST_PLUGIN_STATIC_REGISTER(realmedia); gstrealmedia
-    GST_PLUGIN_STATIC_REGISTER(x264);
+    // GST_PLUGIN_STATIC_REGISTER(x264);
 #ifndef ENABLERPI
     GST_PLUGIN_STATIC_REGISTER(pulseaudio);
 #endif
@@ -417,7 +421,7 @@ onvif_init_static_plugins (void)
     // GST_PLUGIN_STATIC_REGISTER(ges); gstges
     // g_io_environmentproxy_load (NULL);
     // g_io_openssl_load (NULL);
-
+#endif
     g_once_init_leave (&initialization_value, 1);
   }
 }

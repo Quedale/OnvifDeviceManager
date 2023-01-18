@@ -5,8 +5,8 @@ JOBS     := $(subst -j,,$(JOB_FLAG))
 TAB  := $(NULL)<tab>$(NULL)
 
 # Extract list of compiled package
-GST_PLGS = $(shell ls $(PKG_GST_PATH) | sed -z 's/\.pc\n/ /g;s/,$$/\n/')
-GST_LIBS = $(shell ls $(PKG_PATH) | sed -z 's/\.pc\n/ /g;s/,$$/\n/')
+# GST_PLGS = $(shell ls $(PKG_GST_PATH) | sed -z 's/\.pc\n/ /g;s/,$$/\n/')
+# GST_LIBS = $(shell ls $(PKG_PATH) | sed -z 's/\.pc\n/ /g;s/,$$/\n/')
 
 AUTOMAKE_OPTIONS = foreign subdir-objects
 
@@ -14,16 +14,16 @@ bin_PROGRAMS = onvifmgr
 EXTRA_PROGRAMS = onvifclient onvifserver giftest overlaytest queuetest
 
 onvifclient_SOURCES = $(top_srcdir)/src/onvif-client.c $(top_srcdir)/src/gst2/onvifinitstaticplugins.c $(top_srcdir)/src/gst2/gtk/gstgtkbasesink.c $(top_srcdir)/src/gst2/gtk/gstgtksink.c $(top_srcdir)/src/gst2/gtk/gstgtkutils.c $(top_srcdir)/src/gst2/gtk/gtkgstbasewidget.c $(top_srcdir)/src/gst2/gtk/gtkgstwidget.c $(top_srcdir)/src/gst2/gtk/gstplugin.c
-onvifclient_CFLAGS = -DHAVE_CONFIG_H -Wall $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0` $(EXT_CFLAGS)
-onvifclient_LDFLAGS = -Wl,-Bstatic `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0` $(EXT_STC_LIBS) -Wl,-Bdynamic $(EXT_DYN_LIBS) -lstdc++ -L/usr/lib/x86_64-linux-gnu -lnvcuvid -lnvidia-encode
+onvifclient_CFLAGS = -DHAVE_CONFIG_H -Wall $(GST_STATIC_FLAG) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0` $(EXT_CFLAGS)
+onvifclient_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0` $(EXT_STC_LIBS) -Wl,-Bdynamic $(EXT_DYN_LIBS) -lstdc++ -L/usr/lib/x86_64-linux-gnu -lnvcuvid -lnvidia-encode
 
 onvifserver_SOURCES = $(top_srcdir)/src/onvif-server.c $(top_srcdir)/src/gst2/onvifinitstaticplugins.c  $(top_srcdir)/src/gst2/sink-retriever.c
-onvifserver_CFLAGS = -Wall $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS)` $(EXT_CFLAGS)
-onvifserver_LDFLAGS = -Wl,-Bstatic `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS)` $(EXT_STC_LIBS) -Wl,-Bdynamic $(EXT_DYN_LIBS) -lstdc++
+onvifserver_CFLAGS = -Wall $(GST_STATIC_FLAG) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS)` $(EXT_CFLAGS)
+onvifserver_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS)` $(EXT_STC_LIBS) -Wl,-Bdynamic $(EXT_DYN_LIBS) -lstdc++
 
 onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c $(top_srcdir)/src/gst2/player.c $(top_srcdir)/src/gst2/overlay.c $(top_srcdir)/src/queue/event_queue.c $(top_srcdir)/src/gui/gui_update_calls.c $(top_srcdir)/src/gui/credentials_input.c $(top_srcdir)/src/gst2/onvifinitstaticplugins.c $(top_srcdir)/src/gst2/gtk/gstgtkbasesink.c $(top_srcdir)/src/gst2/gtk/gstgtksink.c $(top_srcdir)/src/gst2/gtk/gstgtkutils.c $(top_srcdir)/src/gst2/gtk/gtkgstbasewidget.c $(top_srcdir)/src/gst2/gtk/gtkgstwidget.c $(top_srcdir)/src/gst2/gtk/gstplugin.c
-onvifmgr_CFLAGS = -DHAVE_CONFIG_H -Wall $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0` $(EXT_CFLAGS) -I$(top_srcdir)/build/dist/include
-onvifmgr_LDFLAGS = -Wl,-Bstatic `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0` $(EXT_STC_LIBS) -Wl,-Bdynamic $(EXT_DYN_LIBS) -lstdc++ -L$(top_srcdir)/build/dist/lib  -lonvifsoap -lonvifdisco -z noexecstack
+onvifmgr_CFLAGS = -DHAVE_CONFIG_H -Wall $(GST_STATIC_FLAG) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0` $(EXT_CFLAGS) -I$(top_srcdir)/build/dist/include
+onvifmgr_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0` $(EXT_STC_LIBS) -Wl,-Bdynamic $(EXT_DYN_LIBS) -lstdc++ -L$(top_srcdir)/build/dist/lib  -lonvifsoap -lonvifdisco -z noexecstack
 onvifmgr_LDADD = locked-icon.o microphone.o
 
 queuetest_SOURCES = $(top_srcdir)/src/demo/queue_test.c $(top_srcdir)/src/queue/event_queue.c

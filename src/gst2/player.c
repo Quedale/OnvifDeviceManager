@@ -278,10 +278,11 @@ new_sample (GstElement * appsink, OnvifPlayer * player)
   if (!sample)
     goto out;
 
-  // g_signal_emit_by_name (player->src, "push-backchannel-buffer", player->back_stream_id, sample, &ret);
-
+#if (GST_PLUGINS_BASE_VERSION_MAJOR >= 1) && (GST_PLUGINS_BASE_VERSION_MINOR >= 21) //GST_PLUGINS_BASE_VERSION_MICRO
   g_signal_emit_by_name (player->src, "push-backchannel-sample", player->back_stream_id, sample, &ret);
-
+#else
+  g_signal_emit_by_name (player->src, "push-backchannel-buffer", player->back_stream_id, sample, &ret);
+#endif
   //I know this was added in version 1.21, but it generates //gst_mini_object_unlock: assertion 'state >= SHARE_ONE' failed
   /* Action signal callbacks don't take ownership of the arguments passed, so we must unref the sample here.
    * (The "push-backchannel-buffer" callback unrefs the sample, which is wrong and doesn't work with bindings

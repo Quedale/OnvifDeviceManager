@@ -30,6 +30,7 @@
 
 #include "gstgtkbasesink.h"
 #include "gstgtkutils.h"
+#include "gst/pbutils/gstpluginsbaseversion.h"
 
 GST_DEBUG_CATEGORY (gst_debug_gtk_base_custom_sink);
 #define GST_CAT_DEFAULT gst_debug_gtk_base_custom_sink
@@ -341,7 +342,7 @@ gst_gtk_base_custom_sink_set_property (GObject * object, guint prop_id,
       break;
   }
 }
-
+#if (GST_PLUGINS_BASE_VERSION_MAJOR >= 1) && (GST_PLUGINS_BASE_VERSION_MINOR >= 21)
 static void
 gst_gtk_base_custom_sink_navigation_send_event (GstNavigation * navigation,
     GstEvent * event)
@@ -381,11 +382,13 @@ gst_gtk_base_custom_sink_navigation_send_event (GstNavigation * navigation,
     gst_object_unref (pad);
   }
 }
-
+#endif
 static void
 gst_gtk_base_custom_sink_navigation_interface_init (GstNavigationInterface * iface)
 {
+#if (GST_PLUGINS_BASE_VERSION_MAJOR >= 1) && (GST_PLUGINS_BASE_VERSION_MINOR >= 21)
   iface->send_event_simple = gst_gtk_base_custom_sink_navigation_send_event;
+#endif
 }
 
 static gboolean

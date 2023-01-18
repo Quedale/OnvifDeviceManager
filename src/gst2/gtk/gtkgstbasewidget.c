@@ -264,6 +264,7 @@ gtk_gst_base_custom_widget_get_property (GObject * object, guint prop_id,
   }
 }
 
+#if (GST_PLUGINS_BASE_VERSION_MAJOR >= 1) && (GST_PLUGINS_BASE_VERSION_MINOR >= 21)
 static const gchar *
 _gdk_key_to_navigation_string (guint keyval)
 {
@@ -281,10 +282,12 @@ _gdk_key_to_navigation_string (guint keyval)
       return NULL;
   }
 }
+#endif
 
 static gboolean
 gtk_gst_base_custom_widget_key_event (GtkWidget * widget, GdkEventKey * event)
 {
+#if (GST_PLUGINS_BASE_VERSION_MAJOR >= 1) && (GST_PLUGINS_BASE_VERSION_MINOR >= 21)
   GtkGstBaseCustomWidget *base_widget = GTK_GST_BASE_CUSTOM_WIDGET (widget);
   GstElement *element;
 
@@ -302,7 +305,7 @@ gtk_gst_base_custom_widget_key_event (GtkWidget * widget, GdkEventKey * event)
     }
     g_object_unref (element);
   }
-
+#endif
   return FALSE;
 }
 
@@ -375,6 +378,7 @@ gtk_gst_base_custom_widget_display_size_to_stream_size (GtkGstBaseCustomWidget *
 static gboolean
 gtk_gst_base_custom_widget_button_event (GtkWidget * widget, GdkEventButton * event)
 {
+#if (GST_PLUGINS_BASE_VERSION_MAJOR >= 1) && (GST_PLUGINS_BASE_VERSION_MINOR >= 21)
   GtkGstBaseCustomWidget *base_widget = GTK_GST_BASE_CUSTOM_WIDGET (widget);
   GstElement *element;
 
@@ -389,13 +393,14 @@ gtk_gst_base_custom_widget_button_event (GtkWidget * widget, GdkEventButton * ev
     }
     g_object_unref (element);
   }
-
+#endif
   return FALSE;
 }
 
 static gboolean
 gtk_gst_base_custom_widget_motion_event (GtkWidget * widget, GdkEventMotion * event)
 {
+#if (GST_PLUGINS_BASE_VERSION_MAJOR >= 1) && (GST_PLUGINS_BASE_VERSION_MINOR >= 21)
   GtkGstBaseCustomWidget *base_widget = GTK_GST_BASE_CUSTOM_WIDGET (widget);
   GstElement *element;
 
@@ -407,13 +412,14 @@ gtk_gst_base_custom_widget_motion_event (GtkWidget * widget, GdkEventMotion * ev
     }
     g_object_unref (element);
   }
-
+#endif
   return FALSE;
 }
 
 static gboolean
 gtk_gst_base_custom_widget_scroll_event (GtkWidget * widget, GdkEventScroll * event)
 {
+#if (GST_PLUGINS_BASE_VERSION_MAJOR >= 1) && (GST_PLUGINS_BASE_VERSION_MINOR >= 21)
   GtkGstBaseCustomWidget *base_widget = GTK_GST_BASE_CUSTOM_WIDGET (widget);
   GstElement *element;
 
@@ -453,12 +459,14 @@ gtk_gst_base_custom_widget_scroll_event (GtkWidget * widget, GdkEventScroll * ev
     }
     g_object_unref (element);
   }
+#endif
   return FALSE;
 }
 
 static gboolean
 gtk_gst_base_custom_widget_touch_event (GtkWidget * widget, GdkEventTouch * event)
 {
+#if (GST_PLUGINS_BASE_VERSION_MAJOR >= 1) && (GST_PLUGINS_BASE_VERSION_MINOR >= 21)
   GtkGstBaseCustomWidget *base_widget = GTK_GST_BASE_CUSTOM_WIDGET (widget);
   GstElement *element;
 
@@ -504,7 +512,7 @@ gtk_gst_base_custom_widget_touch_event (GtkWidget * widget, GdkEventTouch * even
     }
     g_object_unref (element);
   }
-
+#endif
   return FALSE;
 }
 
