@@ -712,16 +712,16 @@ pkg-config --exists --print-errors "gsoap >= 2.8.123"
 ret=$?
 if [ $ret != 0 ]; then 
 
-  SSL_PREFIX=$(pkg-config --variable=prefix openssl)
-  if [ $SSL_PREFIX -ne "/usr" ]; then
-    SSL_INCLUDE=$(pkg-config --variable=includedir openssl)
-    SSL_LIBS=$(pkg-config --variable=libdir openssl)
+  SSL_PREFIX=$(PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG pkg-config --variable=prefix openssl)
+  if [ "$SSL_PREFIX" != "/usr" ]; then
+    SSL_INCLUDE=$(PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG pkg-config --variable=includedir openssl)
+    SSL_LIBS=$(PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG pkg-config --variable=libdir openssl)
   fi
-
-  ZLIB_PREFIX==$(pkg-config --variable=prefix zlib)
-  if [ $SSL_PREFIX -ne "/usr" ]; then
-    ZLIB_INCLUDE=$(pkg-config --variable=includedir zlib)
-    ZLIB_LIBS=$(pkg-config --variable=libdir zlib)
+  
+  ZLIB_PREFIX=$(PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$ZLIB_PKG pkg-config --variable=prefix zlib)
+  if [ "$ZLIB_PREFIX" != "/usr" ]; then
+    ZLIB_INCLUDE=$(PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$ZLIB_PKG pkg-config --variable=includedir zlib)
+    ZLIB_LIBS=$(PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$ZLIB_PKG pkg-config --variable=libdir zlib)
   fi
 
   echo "-- Building gsoap libgsoap-dev --"
