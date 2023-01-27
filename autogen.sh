@@ -209,7 +209,7 @@ pullOrClone (){
 #
 ############################################
 buildMakeProject(){
-  local srcdir prefix autogen autoreconf configure make cmakedir cmakeargs installargs bootstrap
+  local srcdir prefix autogen autoreconf configure make cmakedir cmakeargs installargs bootstrap configcustom
   local "${@}"
 
   build_start=$SECONDS
@@ -228,6 +228,22 @@ buildMakeProject(){
 
   curr_dir=$(pwd)
   cd ${srcdir}
+
+  if [ -f "./bootstrap" ]; then
+    printf "${ORANGE}*****************************\n${NC}"
+    printf "${ORANGE}*** bootstrap ${srcdir} ***\n${NC}"
+    printf "${ORANGE}*****************************\n${NC}"
+    ./bootstrap ${bootstrap}
+    status=$?
+    if [ $status -ne 0 ]; then
+        printf "${RED}*****************************\n${NC}"
+        printf "${RED}*** ./bootstrap failed ${srcdir} ***\n${NC}"
+        printf "${RED}*****************************\n${NC}"
+        FAILED=1
+        cd $curr_dir
+        return
+    fi
+  fi
 
   if [ -f "./bootstrap.sh" ]; then
     printf "${ORANGE}*****************************\n${NC}"
@@ -297,6 +313,23 @@ buildMakeProject(){
     fi
   fi
 
+  if [ ! -z "${configcustom}" ]; then
+    printf "${ORANGE}*****************************\n${NC}"
+    printf "${ORANGE}*** custom config ${srcdir} ***\n${NC}"
+    printf "${ORANGE}*** ${configcustom} ***\n${NC}"
+    printf "${ORANGE}*****************************\n${NC}"
+      bash -c "${configcustom}"
+    status=$?
+    if [ $status -ne 0 ]; then
+      printf "${RED}*****************************\n${NC}"
+      printf "${RED}*** Custom Config failed ${srcdir} ***\n${NC}"
+      printf "${RED}*****************************\n${NC}"
+      FAILED=1
+      cd $curr_dir
+      return
+    fi
+  fi
+
   if [ -f "./configure" ]; then
     printf "${ORANGE}*****************************\n${NC}"
     printf "${ORANGE}*** configure ${srcdir} ***\n${NC}"
@@ -309,7 +342,6 @@ buildMakeProject(){
       printf "${RED}*****************************\n${NC}"
       printf "${RED}*** ./configure failed ${srcdir} ***\n${NC}"
       printf "${RED}*****************************\n${NC}"
-      echo "PATH?? $(pwd)"
       FAILED=1
       cd $curr_dir
       return
@@ -454,6 +486,7 @@ buildMesonProject() {
           printf "${RED}*****************************\n${NC}"
           printf "${RED}*** Meson Setup failed ${srcdir} ***\n${NC}"
           printf "${RED}*****************************\n${NC}"
+          rm -rf $build_dir
           FAILED=1
           cd $curr_dir
           return
@@ -502,6 +535,7 @@ buildMesonProject() {
           printf "${RED}*****************************\n${NC}"
           printf "${RED}*** Meson Setup failed ${srcdir} ***\n${NC}"
           printf "${RED}*****************************\n${NC}"
+          rm -rf $build_dir
           FAILED=1
           cd $curr_dir
           return
@@ -577,6 +611,16 @@ if [ -z "$(checkProg name='ninja' args='--version' path=$PATH)" ]; then
   echo "ninja build utility not found! Aborting..."
 fi
 
+if [ -z "$(checkProg name='bison' args='--version' path=$PATH)" ]; then
+  MISSING_DEP=1
+  echo "bison build utility not found! Aborting..."
+fi
+
+if [ -z "$(checkProg name='flex' args='--version' path=$PATH)" ]; then
+  MISSING_DEP=1
+  echo "flex build utility not found! Aborting..."
+fi
+
 if [ -z "$(checkProg name='automake' args='--version' path=$PATH)" ]; then
   MISSING_DEP=1
   echo "automake build utility not found! Aborting..."
@@ -596,6 +640,14 @@ if [ -z "$(checkProg name='pkg-config' args='--version' path=$PATH)" ]; then
   MISSING_DEP=1
   echo "pkg-config build utility not found! Aborting..."
 fi
+
+pkg-config --exists "gtk+-3.0"
+ret=$?
+if [ $ret != 0 ]; then
+  MISSING_DEP=1
+  echo "libgtk-3-dev build utility not found! Aborting..."
+fi
+
 
 if [ $MISSING_DEP -eq 1 ]; then
   exit 1
@@ -622,6 +674,35 @@ cd $SUBPROJECT_DIR
 
 ################################################################
 # 
+#    Build Openssl for gsoap, onvifdisco and onvifsoap
+#       
+################################################################
+OPENSSL_PKG=$SUBPROJECT_DIR/openssl/build/dist/lib/pkgconfig
+PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG \
+pkg-config --exists --print-errors "libcrypto >= 1.1.1q"
+ret=$?
+if [ $ret != 0 ]; then 
+  pullOrClone path="https://github.com/openssl/openssl.git" tag="OpenSSL_1_1_1q"
+  buildMakeProject srcdir="openssl" configcustom="./config --prefix=$SUBPROJECT_DIR/openssl/build/dist --openssldir=$SUBPROJECT_DIR/openssl/build/dist/ssl -static"
+  if [ $FAILED -eq 1 ]; then exit 1; fi
+else
+  echo "openssl already found."
+fi
+
+ZLIB_PKG=$SUBPROJECT_DIR/zlib-1.2.13/build/dist/lib/pkgconfig
+PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$ZLIB_PKG \
+pkg-config --exists --print-errors "zlib >= 1.2.11"
+ret=$?
+if [ $ret != 0 ]; then 
+  downloadAndExtract file="zlib-1.2.13.tar.gz" path="https://www.zlib.net/zlib-1.2.13.tar.gz"
+  buildMakeProject srcdir="zlib-1.2.13" prefix="$SUBPROJECT_DIR/zlib-1.2.13/build/dist"
+  if [ $FAILED -eq 1 ]; then exit 1; fi
+else
+  echo "zlib already found."
+fi
+
+################################################################
+# 
 #    Build gSoap
 #       
 ################################################################
@@ -633,12 +714,35 @@ if [ $ret != 0 ]; then
   echo "-- Building gsoap libgsoap-dev --"
   downloadAndExtract file="gsoap.zip" path="https://sourceforge.net/projects/gsoap2/files/gsoap_2.8.123.zip/download"
   if [ $FAILED -eq 1 ]; then exit 1; fi
-  LIBRARY_PATH="$(pkg-config --variable=libdir openssl):$LIBRARY_PATH" \
-  LD_LIBRARY_PATH="$(pkg-config --variable=libdir openssl):$LD_LIBRARY_PATH" \
+  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG:$ZLIB_PKG \
+  C_INCLUDE_PATH="$(pkg-config --variable=includedir openssl):$(pkg-config --variable=includedir zlib):$C_INCLUDE_PATH" \
+  CPLUS_INCLUDE_PATH="$(pkg-config --variable=includedir openssl):$(pkg-config --variable=includedir zlib):$CPLUS_INCLUDE_PATH" \
+  LIBRARY_PATH="$(pkg-config --variable=libdir openssl):$(pkg-config --variable=libdir zlib):$LIBRARY_PATH" \
+  LD_LIBRARY_PATH="$(pkg-config --variable=libdir openssl):$(pkg-config --variable=libdir zlib):$LD_LIBRARY_PATH" \
   buildMakeProject srcdir="gsoap-2.8" prefix="$SUBPROJECT_DIR/gsoap-2.8/build/dist" autogen="skip" configure="--with-openssl=/usr/lib/ssl"
   if [ $FAILED -eq 1 ]; then exit 1; fi
 else
   echo "gsoap already found."
+fi
+
+################################################################
+# 
+#     Build glib dependency
+#   sudo apt-get install libglib2.0-dev (gstreamer minimum 2.64.0)
+# 
+################################################################
+PKG_GLIB=$SUBPROJECT_DIR/glib-2.74.1/dist/lib/pkgconfig
+PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_GLIB \
+pkg-config --exists --print-errors "glib-2.0 >= 2.64.0"
+ret=$?
+if [ $ret != 0 ]; then 
+  echo "not found glib-2.0"
+  downloadAndExtract file="glib-2.74.1.tar.xz" path="https://download.gnome.org/sources/glib/2.74/glib-2.74.1.tar.xz"
+  if [ $FAILED -eq 1 ]; then exit 1; fi
+  buildMesonProject srcdir="glib-2.74.1" prefix="$SUBPROJECT_DIR/glib-2.74.1/dist" mesonargs="-Dpcre2:test=false -Dpcre2:grep=false -Dxattr=false -Db_lundef=false -Dtests=false -Dglib_debug=disabled -Dglib_assert=false -Dglib_checks=false"
+  if [ $FAILED -eq 1 ]; then exit 1; fi
+else
+  echo "glib already found."
 fi
 
 ################################################################
@@ -655,6 +759,8 @@ if [ $ret != 0 ]; then
   pullOrClone path=https://github.com/Quedale/OnvifDiscoveryLib.git
   PATH=$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin:$PATH \
   GSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8 \
+  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG \
+  C_INCLUDE_PATH="$(pkg-config --variable=includedir openssl):$(pkg-config --variable=includedir zlib):$C_INCLUDE_PATH" \
   buildMakeProject srcdir="OnvifDiscoveryLib" prefix="$SUBPROJECT_DIR/OnvifDiscoveryLib/build/dist" bootstrap="--skip-gsoap"
   if [ $FAILED -eq 1 ]; then exit 1; fi
 else
@@ -675,6 +781,8 @@ if [ $ret != 0 ]; then
   pullOrClone path=https://github.com/Quedale/OnvifSoapLib.git
   PATH=$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin:$PATH \
   GSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8 \
+  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG \
+  C_INCLUDE_PATH="$(pkg-config --variable=includedir openssl):$(pkg-config --variable=includedir zlib):$C_INCLUDE_PATH" \
   buildMakeProject srcdir="OnvifSoapLib" prefix="$SUBPROJECT_DIR/OnvifSoapLib/build/dist" bootstrap="--skip-gsoap"
   if [ $FAILED -eq 1 ]; then exit 1; fi
 else
@@ -707,7 +815,6 @@ fi
 #       sudo apt install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 ################################################################
 FFMPEG_PKG=$SUBPROJECT_DIR/FFmpeg/dist/lib/pkgconfig
-PKG_GLIB=$SUBPROJECT_DIR/glib-2.74.1/dist/lib/pkgconfig
 GST_OMX_PKG_PATH=$SUBPROJECT_DIR/gstreamer/build_omx/dist/lib/gstreamer-1.0/pkgconfig
 GST_PKG_PATH=:$SUBPROJECT_DIR/gstreamer/build/dist/lib/pkgconfig:$SUBPROJECT_DIR/gstreamer/build/dist/lib/gstreamer-1.0/pkgconfig
 gst_ret=0
@@ -762,25 +869,6 @@ if [ $gst_ret != 0 ] || [ $gst_plg_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $E
 
     ################################################################
     # 
-    #     Build glib dependency
-    #   sudo apt-get install libglib2.0-dev (gstreamer minimum 2.64.0)
-    # 
-    ################################################################
-    PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_GLIB \
-    pkg-config --exists --print-errors "glib-2.0 >= 2.64.0"
-    ret=$?
-    if [ $ret != 0 ]; then 
-      echo "not found glib-2.0"
-      downloadAndExtract file="glib-2.74.1.tar.xz" path="https://download.gnome.org/sources/glib/2.74/glib-2.74.1.tar.xz"
-      if [ $FAILED -eq 1 ]; then exit 1; fi
-      buildMesonProject srcdir="glib-2.74.1" prefix="$SUBPROJECT_DIR/glib-2.74.1/dist" mesonargs="-Dpcre2:test=false -Dpcre2:grep=false -Dxattr=false -Db_lundef=false -Dtests=false -Dglib_debug=disabled -Dglib_assert=false -Dglib_checks=false"
-      if [ $FAILED -eq 1 ]; then exit 1; fi
-    else
-      echo "glib already found."
-    fi
-
-    ################################################################
-    # 
     #    Build gudev-1.0 dependency
     #   sudo apt install libgudev-1.0-dev (tested 232)
     # 
@@ -826,6 +914,17 @@ if [ $gst_ret != 0 ] || [ $gst_plg_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $E
         if [ $FAILED -eq 1 ]; then exit 1; fi
       else
         echo "mount already found."
+      fi
+
+      python3 -c 'import jinja2'
+      ret=$?
+      if [ $ret != 0 ]; then
+        git -C jinja pull 2> /dev/null || git clone -b 3.1.2 https://github.com/pallets/jinja.git
+        cd jinja
+        python3 setup.py install --user
+        cd ..
+      else
+        echo "python3 jinja2 already found."
       fi
 
       PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_UDEV \
@@ -976,20 +1075,16 @@ if [ $gst_ret != 0 ] || [ $gst_plg_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $E
     if [ $ret != 0 ]; then 
       echo "not found libpulse"
 
-      PKG_LIBSNDFILE=$SUBPROJECT_DIR/libsndfile/dist/lib/pkgconfig
-      PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_LIBSNDFILE \
+      CMAKE_BIN=$SUBPROJECT_DIR/cmake-3.25.2/build/dist/bin
+      PATH=$PATH:$CMAKE_BIN \
       cmake --version
       ret=$?
       if [ $ret != 0 ]; then
-        echo "not found cmake"
-        python3 -m pip install cmake
-        status=$?
-        if [ $status -ne 0 ]; then
-            printf "${RED}*****************************\n${NC}"
-            printf "${RED}*** Failed to install cmake from pip ${srcdir} ***\n${NC}"
-            printf "${RED}*****************************\n${NC}"
-            exit 1
-        fi
+        
+        downloadAndExtract file="cmake-3.25.2.tar.gz" path="https://github.com/Kitware/CMake/releases/download/v3.25.2/cmake-3.25.2.tar.gz"
+        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG \
+        buildMakeProject srcdir="cmake-3.25.2" prefix="$SUBPROJECT_DIR/cmake-3.25.2/build/dist"
+        if [ $FAILED -eq 1 ]; then exit 1; fi
       else
         echo "cmake already found."
       fi
@@ -1007,6 +1102,7 @@ if [ $gst_ret != 0 ] || [ $gst_plg_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $E
         LIBSNDFILE_CMAKEARGS="$LIBSNDFILE_CMAKEARGS -DINSTALL_MANPAGES=off"
         pullOrClone path="https://github.com/libsndfile/libsndfile.git" tag=1.2.0
         mkdir "libsndfile/build"
+        PATH=$PATH:$CMAKE_BIN \
         buildMakeProject srcdir="libsndfile/build" prefix="$SUBPROJECT_DIR/libsndfile/dist" cmakedir=".." cmakeargs="$LIBSNDFILE_CMAKEARGS"
         if [ $FAILED -eq 1 ]; then exit 1; fi
       else
