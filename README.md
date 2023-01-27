@@ -53,10 +53,10 @@ sudo apt install libgtk-3-dev
 **[Optional]** The following package are optional, but will reduce the runtime of autogen.sh if installed.
 ```
 sudo apt install openssl
-sudo apt install zlib
-sudo apt install alsa-lib
+sudo apt install zlib1g-dev
+sudo apt install libasound2-dev
 sudo apt install libgudev-1.0-dev
-sudo apt install gettext libgettext-dev
+sudo apt install gettext
 sudo apt install libpulse-dev
 sudo apt install nasm
 ```
