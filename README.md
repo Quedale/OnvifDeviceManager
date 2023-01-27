@@ -9,12 +9,12 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 # Working
 - Onvif WS-Discovery (gsoap)
 - Soap Client for Onvif Device and Media service
-- Vew RTSP Stream with backchannel
+- Vew RTSP Stream with backchannel (Push-to-talk)
 - Prototype Soundlevel indicator
 - WS-Security
+- Support system and static libraries. (static recommended)
 
 # TODO
-- WIP : Use static libraries over shared to avoid version conflicts
 - Credential Storage 
 - EventQueue : Interupt pending events when needed
 - Display Onvif device information
@@ -23,7 +23,6 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Testing with a variety of camera
 - Record video
 - JPEG Snapshot
-- Push-to-Talk button
 - Check for better backchannel audio support. (PCMU@8000 might be Onvif's spec limit)
 
 # Use-case
@@ -39,39 +38,32 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 git clone https://github.com/Quedale/OnvifDeviceManager.git
 cd OnvifDeviceManager
 ```
-### Bootstrap using system's Gstreamer libraries
+### Autogen, Configure, Download and build dependencies
+autogen.sh will attempt download and build missing dependencies.   
+**[Mandatory]** The following package dependencies are mandatory and are not yet automatically built:
 ```
-./bootstrap.sh
+sudo apt install meson 
+sudo apt install ninja-build
+sudo apt install bison 
+sudo apt install flex 
+sudo apt install libtool 
+sudo apt install pkg-config
+sudo apt install libgtk-3-dev
 ```
- 
-### [Optional] Bootstrap and build Gstreamer from source
+**[Optional]** The following package are optional, but will reduce the runtime of autogen.sh if installed.
 ```
-./bootstrap.sh --with-gstreamer
+sudo apt install openssl
+sudo apt install zlib
+sudo apt install alsa-lib
+sudo apt install libgudev-1.0-dev
+sudo apt install gettext libgettext-dev
+sudo apt install libpulse-dev
+sudo apt install nasm
 ```
-### [Optional] Build GTK from source
-This is usefull when compiling using a older distribution
+If your system already has gstreamer pre-installed, I strongly recommend using `--enable-latest` to download the latest gstreamer release supported.   
+Note that autogen will automatically call "./configure".
 ```
-./build_gui_deps.sh
-```
-### Conifigure project
-This project supports out-of-tree build to keep the source directory clean.
-```
-mkdir build && cd build
-../configure --prefix=$(pwd)/dist
-```
-
-### Compile WS-Discovery Library
-This is usefull when compiling using a older distribution
-```
-make discolib
-make install-discolib
-```
-
-
-### Compile Onvif Soap Library
-```
-make onvifsoaplib
-make install-onvifsoaplib
+./autogen.sh --prefix=$(pwd)/dist --enable-latest
 ```
 
 ### Compile and install GUI App
