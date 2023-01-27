@@ -21,7 +21,7 @@ m4
 .dirstamp
 configure~
 libtool
-subprojects
+subprojects*
 py-compile
 test-driver
 onvifmgr

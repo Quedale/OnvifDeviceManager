@@ -711,14 +711,27 @@ PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GSOAP_PKG \
 pkg-config --exists --print-errors "gsoap >= 2.8.123"
 ret=$?
 if [ $ret != 0 ]; then 
+
+  SSL_PREFIX=$(pkg-config --variable=prefix openssl)
+  if [ $SSL_PREFIX -ne "/usr" ]; then
+    SSL_INCLUDE=$(pkg-config --variable=includedir openssl)
+    SSL_LIBS=$(pkg-config --variable=libdir openssl)
+  fi
+
+  ZLIB_PREFIX==$(pkg-config --variable=prefix zlib)
+  if [ $SSL_PREFIX -ne "/usr" ]; then
+    ZLIB_INCLUDE=$(pkg-config --variable=includedir zlib)
+    ZLIB_LIBS=$(pkg-config --variable=libdir zlib)
+  fi
+
   echo "-- Building gsoap libgsoap-dev --"
   downloadAndExtract file="gsoap.zip" path="https://sourceforge.net/projects/gsoap2/files/gsoap_2.8.123.zip/download"
   if [ $FAILED -eq 1 ]; then exit 1; fi
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG:$ZLIB_PKG \
-  C_INCLUDE_PATH="$(pkg-config --variable=includedir openssl):$(pkg-config --variable=includedir zlib):$C_INCLUDE_PATH" \
-  CPLUS_INCLUDE_PATH="$(pkg-config --variable=includedir openssl):$(pkg-config --variable=includedir zlib):$CPLUS_INCLUDE_PATH" \
-  LIBRARY_PATH="$(pkg-config --variable=libdir openssl):$(pkg-config --variable=libdir zlib):$LIBRARY_PATH" \
-  LD_LIBRARY_PATH="$(pkg-config --variable=libdir openssl):$(pkg-config --variable=libdir zlib):$LD_LIBRARY_PATH" \
+  C_INCLUDE_PATH="$SSL_INCLUDE:$ZLIB_INCLUDE:$C_INCLUDE_PATH" \
+  CPLUS_INCLUDE_PATH="$SSL_INCLUDE:$ZLIB_INCLUDE:$CPLUS_INCLUDE_PATH" \
+  LIBRARY_PATH="$SSL_LIBS:$ZLIB_LIBS:$LIBRARY_PATH" \
+  LD_LIBRARY_PATH="$SSL_LIBS:$ZLIB_LIBS:$LD_LIBRARY_PATH" \
   buildMakeProject srcdir="gsoap-2.8" prefix="$SUBPROJECT_DIR/gsoap-2.8/build/dist" autogen="skip" configure="--with-openssl=/usr/lib/ssl"
   if [ $FAILED -eq 1 ]; then exit 1; fi
 else
