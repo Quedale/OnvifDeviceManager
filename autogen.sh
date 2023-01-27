@@ -653,9 +653,10 @@ ret=$?
 if [ $ret != 0 ]; then
   echo "-- Bootrap OnvifDiscoveryLib  --"
   pullOrClone path=https://github.com/Quedale/OnvifDiscoveryLib.git
+  PATH=$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin:$PATH \
   GSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8 \
   buildMakeProject srcdir="OnvifDiscoveryLib" prefix="$SUBPROJECT_DIR/OnvifDiscoveryLib/build/dist" bootstrap="--skip-gsoap"
-
+  if [ $FAILED -eq 1 ]; then exit 1; fi
 else
   echo "onvifdisco already found."
 fi
@@ -672,10 +673,32 @@ ret=$?
 if [ $ret != 0 ]; then
   echo "-- Bootstrap OnvifSoapLib  --"
   pullOrClone path=https://github.com/Quedale/OnvifSoapLib.git
+  PATH=$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin:$PATH \
   GSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8 \
   buildMakeProject srcdir="OnvifSoapLib" prefix="$SUBPROJECT_DIR/OnvifSoapLib/build/dist" bootstrap="--skip-gsoap"
+  if [ $FAILED -eq 1 ]; then exit 1; fi
 else
   echo "onvifsoaplib already found."
+fi
+
+################################################################
+# 
+#    Build alsa-lib dependency
+#   sudo apt install llibasound2-dev (tested 1.2.7.2)
+# 
+################################################################
+ALSA_PKG=$SUBPROJECT_DIR/alsa-lib/build/dist/lib/pkgconfig
+PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$ALSA_PKG \
+pkg-config --exists --print-errors "alsa >= 1.2.7.2"
+ret=$?
+if [ $ret != 0 ]; then
+  echo "not found alsa"
+  pullOrClone path=git://git.alsa-project.org/alsa-lib.git tag=v1.2.8
+  # buildMakeProject srcdir="alsa-lib" prefix="$SUBPROJECT_DIR/alsa-lib/build/dist" configure="--enable-pic --enable-static=yes --enable-shared=no" autoreconf="-vif"
+  buildMakeProject srcdir="alsa-lib" prefix="$SUBPROJECT_DIR/alsa-lib/build/dist" configure="--enable-static=no --enable-shared=yes" autoreconf="-vif"
+  if [ $FAILED -eq 1 ]; then exit 1; fi
+else
+  echo "alsa-lib already found."
 fi
 
 ################################################################
@@ -1082,9 +1105,7 @@ if [ $gst_ret != 0 ] || [ $gst_plg_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $E
             MESON_PARAMS="$MESON_PARAMS -Dlibav=enabled"
         fi
 
-        echo "pullorclone"
-        exit 1
-        pullOrClone path="https://gitlab.freedesktop.org/gstreamer/gstreamer.git" tag=1.21.90
+        pullOrClone path="https://gitlab.freedesktop.org/gstreamer/gstreamer.git" tag=1.22.0
 
         # Force disable subproject features
         MESON_PARAMS="$MESON_PARAMS -Dglib:tests=false"
@@ -1103,7 +1124,7 @@ if [ $gst_ret != 0 ] || [ $gst_plg_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $E
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:videotestsrc=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:playback=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:x11=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:xvideo=enabled"
+        # MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:xvideo=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:alsa=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:videoconvertscale=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:videorate=enabled"
@@ -1153,7 +1174,7 @@ if [ $gst_ret != 0 ] || [ $gst_plg_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $E
 
         LIBRARY_PATH=$LD_LIBRARY_PATH:$SUBPROJECT_DIR/systemd-252/dist/usr/lib \
         PATH=$PATH:$SUBPROJECT_DIR/glib-2.74.1/dist/bin:$NASM_BIN \
-        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_GUDEV:$PKG_ALSA:$PKG_PULSE:$PKG_UDEV:$PKG_GLIB:$FFMPEG_PKG  \
+        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_GUDEV:$PKG_ALSA:$PKG_PULSE:$PKG_UDEV:$PKG_GLIB:$FFMPEG_PKG:$ALSA_PKG  \
         buildMesonProject srcdir="gstreamer" prefix="$SUBPROJECT_DIR/gstreamer/build/dist" mesonargs="$MESON_PARAMS" builddir="build"
         if [ $FAILED -eq 1 ]; then exit 1; fi
     else

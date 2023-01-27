@@ -37,7 +37,7 @@ GST_PLUGIN_STATIC_DECLARE(alsa);
 // GST_PLUGIN_STATIC_DECLARE(opus); gstopus
 // GST_PLUGIN_STATIC_DECLARE(vorbis); gstvorbis
 GST_PLUGIN_STATIC_DECLARE(ximagesink);
-GST_PLUGIN_STATIC_DECLARE(xvimagesink);
+// GST_PLUGIN_STATIC_DECLARE(xvimagesink);
 // GST_PLUGIN_STATIC_DECLARE(alpha); gstalpha
 // GST_PLUGIN_STATIC_DECLARE(alphacolor); gstalphacolor
 // GST_PLUGIN_STATIC_DECLARE(apetag); gstapetag
@@ -250,7 +250,7 @@ onvif_init_static_plugins (void)
     // GST_PLUGIN_STATIC_REGISTER(opus); gstopus
     // GST_PLUGIN_STATIC_REGISTER(vorbis); gstvorbis
     GST_PLUGIN_STATIC_REGISTER(ximagesink);
-    GST_PLUGIN_STATIC_REGISTER(xvimagesink);
+    // GST_PLUGIN_STATIC_REGISTER(xvimagesink);
     // GST_PLUGIN_STATIC_REGISTER(alpha); gstalpha
     // GST_PLUGIN_STATIC_REGISTER(alphacolor); gstalphacolor
     // GST_PLUGIN_STATIC_REGISTER(apetag); gstapetag
