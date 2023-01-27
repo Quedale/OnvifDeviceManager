@@ -12,6 +12,7 @@
 #include <gtk/gtk.h>
 #include <gst/gst.h>
 #include <gst/video/videooverlay.h>
+#include <gst/pbutils/gstpluginsbaseversion.h>
 
 #include <gdk/gdk.h>
 #if defined (GDK_WINDOWING_X11)
@@ -427,6 +428,8 @@ int main(int argc, char *argv[]) {
   gst_init (&argc, &argv);
   onvif_init_static_plugins();
 
+  printf("Using Gstreamer Version : %i.%i.%i.%i\n",GST_PLUGINS_BASE_VERSION_MAJOR,GST_PLUGINS_BASE_VERSION_MINOR,GST_PLUGINS_BASE_VERSION_MICRO,GST_PLUGINS_BASE_VERSION_NANO);
+  
   /* Initialize our data structure */
   data = OnvifPlayer__create();
   
