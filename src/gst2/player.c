@@ -2,6 +2,7 @@
 #include "overlay.h"
 #include <unistd.h>
 #include "gtk/gstgtkbasesink.h"
+#include <math.h>
 
 /* This function is called when an error message is posted on the bus */
 static void error_cb (GstBus *bus, GstMessage *msg, OnvifPlayer *data) {
@@ -34,39 +35,46 @@ static void eos_cb (GstBus *bus, GstMessage *msg, OnvifPlayer *data) {
   gst_element_set_state (data->pipeline, GST_STATE_NULL);
 }
 
-gboolean level_handler(GstBus * bus, GstMessage * message, OnvifPlayer *player, const GstStructure *s){
+void level_handler(GstBus * bus, GstMessage * message, OnvifPlayer *player, const GstStructure *s){
 
   gint channels;
   GstClockTime endtime;
-  gdouble rms_dB;
-  gdouble output = 0;
-  const GValue *array_val;
+  gdouble peak_dB;
+  gdouble peak;
+  const gdouble max_variance = 15;
+  const GValue *list;
   const GValue *value;
-  GValueArray *rms_arr;
+  GValueArray *peak_arr;
+  gdouble output = 0;
   gint i;
 
   if (!gst_structure_get_clock_time (s, "endtime", &endtime))
     g_warning ("Could not parse endtime");
 
-  /* the values are packed into GValueArrays with the value per channel */
-  array_val = gst_structure_get_value (s, "rms");
-  rms_arr = (GValueArray *) g_value_get_boxed (array_val);
+  list = gst_structure_get_value (s, "peak");
+  peak_arr = (GValueArray *) g_value_get_boxed (list);
+  channels = peak_arr->n_values;
 
-//No control over the use of GValueArray over GArray since its constructed by gstreamer libs
-//Depracation can't be fixed until Gstreamer update this library
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-  /* we can get the number of channels as the length of any of the value
-    * arrays */
-  channels = rms_arr->n_values;
   for (i = 0; i < channels; ++i) {
-    value = g_value_array_get_nth (rms_arr, i);
-    rms_dB = g_value_get_double (value);
+    // FIXME 'g_value_array_get_nth' is deprecated: Use 'GArray' instead
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    value = g_value_array_get_nth (peak_arr, i);
+    peak_dB = g_value_get_double (value);
+    #pragma GCC diagnostic pop
 
-    output = output + 100 + rms_dB / 7; 
+    /* converting from dB to normal gives us a value between 0.0 and 1.0 */
+    peak = pow (10, peak_dB / 20);
+
+    //Add up all channels peaks
+    output = output + peak * 100; 
   }
-#pragma GCC diagnostic pop
+
+  //Optionally only get the highest peak instead of calculating average.
+  //Average output of all channels
   output = output / channels;
+
+  //Set Output value on player
   if(output == player->level){
     //Ignore
   } else if( output > player->level){
@@ -75,16 +83,14 @@ gboolean level_handler(GstBus * bus, GstMessage * message, OnvifPlayer *player, 
   } else {
     //Lower to a maximum drop of 15 for a graphical decay
     gdouble variance = player->level-output;
-    if(variance > 7.5){
-      player->level=player->level-7.5; //The decay value has to match the interval set. We are dealing with 2x faster interval therefor 15/2=7.5
+    if(variance > max_variance){
+      player->level=player->level-max_variance; //The decay value has to match the interval set. We are dealing with 2x faster interval therefor 15/2=7.5
     } else {
       player->level = output;
     }
   }
-  return TRUE;
 
 }
-
 
 /* This function is called when the pipeline changes states. We use it to
  * keep track of the current state. */
