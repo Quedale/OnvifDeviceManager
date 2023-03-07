@@ -15,6 +15,7 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Support system and static libraries. (static recommended)
 
 # TODO
+- Support Multiple Onvif Profiles
 - Credential Storage 
 - EventQueue : Interupt pending events when needed
 - Display Onvif device information

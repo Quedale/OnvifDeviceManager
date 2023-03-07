@@ -60,7 +60,8 @@ void _display_onvif_thumbnail(void * user_data){
   char * imgdata;
   int freeimgdata = 0;
   if(input->device->authorized){
-    struct chunk * imgchunk = OnvifDevice__media_getSnapshot(input->device);
+    //TODO handle profiles
+    struct chunk * imgchunk = OnvifDevice__media_getSnapshot(input->device,0);
     if(!imgchunk){
       //TODO Set error image
       printf("Error retrieve snapshot.");
@@ -182,7 +183,8 @@ void _play_onvif_stream(void * user_data){
   }
 
     /* Set the URI to play */
-  char * uri = OnvifDevice__media_getStreamUri(input->player->device);
+    //TODO handle profiles
+  char * uri = OnvifDevice__media_getStreamUri(input->player->device,0);
   OnvifPlayer__set_playback_url(input->player,uri);
   OnvifPlayer__play(input->player);
 
