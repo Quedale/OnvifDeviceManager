@@ -34,6 +34,12 @@ void EventQueue__reset(EventQueue* self) {
 void EventQueue__destroy(EventQueue* EventQueue) {
     if (EventQueue) {
         EventQueue__reset(EventQueue);
+        pthread_mutex_destroy(EventQueue->sleep_lock);
+        pthread_mutex_destroy(EventQueue->pop_lock);
+        pthread_cond_destroy(EventQueue->sleep_cond);
+        free(EventQueue->sleep_lock);
+        free(EventQueue->pop_lock);
+        free(EventQueue->sleep_cond);
         free(EventQueue);
     }
 }

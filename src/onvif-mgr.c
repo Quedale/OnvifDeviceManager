@@ -72,11 +72,12 @@ create_row (ProbMatch * m, OnvifPlayer *player)
   //   printf("\t\tScope : %s\n",m->scopes[i]);
   // }
   
-  OnvifDevice * dev = OnvifDevice__create(g_strdup(m->addr));
-  OnvifDeviceList__insert_element(player->onvifDeviceList,dev,player->onvifDeviceList->device_count);
+  OnvifDevice * onvif_dev = OnvifDevice__create(g_strdup(m->addr));
+  Device * device = Device_create(onvif_dev);
+  DeviceList__insert_element(player->device_list,device,player->device_list->device_count);
   int b;
-  for (b=0;b<player->onvifDeviceList->device_count;b++){
-    printf("DEBUG List Record :[%i] %s:%s\n",b,player->onvifDeviceList->devices[b]->ip,player->onvifDeviceList->devices[b]->port);
+  for (b=0;b<player->device_list->device_count;b++){
+    printf("DEBUG List Record :[%i] %s:%s\n",b,player->device_list->devices[b]->onvif_device->ip,player->device_list->devices[b]->onvif_device->port);
   }
 
   row = gtk_list_box_row_new ();
@@ -88,7 +89,7 @@ create_row (ProbMatch * m, OnvifPlayer *player)
   gtk_spinner_start (GTK_SPINNER (image));
 
   GtkWidget * thumbnail_handle = gtk_event_box_new ();
-  dev->image_handle = thumbnail_handle;
+  device->image_handle = thumbnail_handle;
   gtk_container_add (GTK_CONTAINER (thumbnail_handle), image);
   g_object_set (thumbnail_handle, "margin-end", 10, NULL);
   gtk_grid_attach (GTK_GRID (grid), thumbnail_handle, 0, 1, 1, 3);
@@ -104,7 +105,7 @@ create_row (ProbMatch * m, OnvifPlayer *player)
   gtk_widget_set_hexpand (label, TRUE);
   gtk_grid_attach (GTK_GRID (grid), label, 0, 0, 2, 1);
 
-  label = gtk_label_new (dev->ip);
+  label = gtk_label_new (onvif_dev->ip);
   g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
   gtk_widget_set_hexpand (label, TRUE);
   gtk_grid_attach (GTK_GRID (grid), label, 1, 1, 1, 1);
@@ -120,6 +121,24 @@ create_row (ProbMatch * m, OnvifPlayer *player)
   gtk_widget_set_hexpand (label, TRUE);
   gtk_grid_attach (GTK_GRID (grid), label, 1, 3, 1, 1);
 
+//WIP - ONVIF profile selection
+/* 
+  GtkListStore *liststore = gtk_list_store_new(2, G_TYPE_STRING, G_TYPE_STRING);
+  device->profile_dropdown = gtk_combo_box_new_with_model(GTK_TREE_MODEL(liststore));
+  // liststore is now owned by combo, so the initial reference can be dropped 
+  g_object_unref(liststore);
+
+  GtkCellRenderer  * column = gtk_cell_renderer_text_new();
+  gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(device->profile_dropdown), column, TRUE);
+
+  gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(device->profile_dropdown), column,
+                                  "cell-background", 0,
+                                  "text", 1,
+                                  NULL);
+                                  
+  gtk_widget_set_sensitive (device->profile_dropdown, FALSE);
+  gtk_grid_attach (GTK_GRID (grid), device->profile_dropdown, 0, 4, 2, 1);
+*/
 
   gtk_container_add (GTK_CONTAINER (row), grid);
   
@@ -128,7 +147,7 @@ create_row (ProbMatch * m, OnvifPlayer *player)
   g_object_ref(image);
 
   //Dispatch Thread event to update GtkListRow
-  display_onvif_device_row(dev,EVENT_QUEUE);
+  display_onvif_device_row(device,EVENT_QUEUE);
 
   return row;
 }
@@ -186,7 +205,7 @@ onvif_scan (GtkWidget *widget,
   gtk_container_foreach (GTK_CONTAINER (player->listbox), (GtkCallback)gtk_widget_destroy, NULL);
   
   //Clearing old list data
-  OnvifDeviceList__clear(player->onvifDeviceList);
+  DeviceList__clear(player->device_list);
 
   struct DiscoveryInput * disco_in = malloc(sizeof(struct DiscoveryInput));
   disco_in->player = player;
@@ -247,7 +266,7 @@ void update_details_page(gint index, OnvifPlayer * player){
       printf("No device selected...\n");
       //TODO Clear
     } else {
-      printf("dev : %s\n",player->device->ip);
+      printf("dev : %s\n",player->device->onvif_device->ip);
     }
     // OnvifDeviceInformation * dev_info = OnvifDevice__device_getDeviceInformation(dev);
     // printf("manufacturer : %s\n",dev_info->manufacturer);
@@ -397,7 +416,18 @@ void create_ui (OnvifPlayer* player) {
 
   char * TITLE_STR = "NVT";
   label = gtk_label_new (TITLE_STR);
-  gtk_notebook_append_page (GTK_NOTEBOOK (notebook), widget, label);
+
+  //Hidden spinner used to display stream start loading
+  player->loading_handle = gtk_spinner_new ();
+  gtk_spinner_start (GTK_SPINNER (player->loading_handle));
+
+  //Only show label and keep loading hidden
+  GtkWidget * hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL,  6);
+  gtk_box_pack_start (GTK_BOX(hbox),label,TRUE,TRUE,0);
+  gtk_box_pack_start(GTK_BOX(hbox),player->loading_handle,FALSE,FALSE,0);
+  gtk_widget_show(label);
+
+  gtk_notebook_append_page (GTK_NOTEBOOK (notebook), widget, hbox);
 
   widget = create_details_ui(player);
   label = gtk_label_new ("Details");

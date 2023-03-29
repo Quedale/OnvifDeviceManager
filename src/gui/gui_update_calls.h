@@ -7,7 +7,7 @@
 #include <gtk/gtk.h>
 #include "credentials_input.h"
 
-void display_onvif_device_row(OnvifDevice * device, EventQueue * queue);
+void display_onvif_device_row(Device * device, EventQueue * queue);
 void select_onvif_device_row(OnvifPlayer * player, GtkListBoxRow * row, EventQueue * queue);
 void dialog_cancel_cb(CredentialsDialog * dialog);
 void dialog_login_cb(LoginEvent * input);

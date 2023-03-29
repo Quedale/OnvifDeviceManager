@@ -21,10 +21,10 @@ onvifserver_SOURCES = $(top_srcdir)/src/onvif-server.c $(top_srcdir)/src/gst2/on
 onvifserver_CFLAGS = -Wall $(GST_STATIC_FLAG) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS)` $(EXT_CFLAGS)
 onvifserver_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS)` $(EXT_STC_LIBS) -Wl,-Bdynamic $(EXT_DYN_LIBS) -lstdc++
 
-onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c $(top_srcdir)/src/gst2/player.c $(top_srcdir)/src/gst2/overlay.c $(top_srcdir)/src/queue/event_queue.c $(top_srcdir)/src/gui/gui_update_calls.c $(top_srcdir)/src/gui/credentials_input.c $(top_srcdir)/src/gst2/onvifinitstaticplugins.c $(top_srcdir)/src/gst2/gtk/gstgtkbasesink.c $(top_srcdir)/src/gst2/gtk/gstgtksink.c $(top_srcdir)/src/gst2/gtk/gstgtkutils.c $(top_srcdir)/src/gst2/gtk/gtkgstbasewidget.c $(top_srcdir)/src/gst2/gtk/gtkgstwidget.c $(top_srcdir)/src/gst2/gtk/gstplugin.c
+onvifmgr_SOURCES = $(top_srcdir)/src/device_list.c $(top_srcdir)/src/onvif-mgr.c $(top_srcdir)/src/gst2/player.c $(top_srcdir)/src/gst2/overlay.c $(top_srcdir)/src/queue/event_queue.c $(top_srcdir)/src/gui/gui_update_calls.c $(top_srcdir)/src/gui/credentials_input.c $(top_srcdir)/src/gst2/onvifinitstaticplugins.c $(top_srcdir)/src/gst2/gtk/gstgtkbasesink.c $(top_srcdir)/src/gst2/gtk/gstgtksink.c $(top_srcdir)/src/gst2/gtk/gstgtkutils.c $(top_srcdir)/src/gst2/gtk/gtkgstbasewidget.c $(top_srcdir)/src/gst2/gtk/gtkgstwidget.c $(top_srcdir)/src/gst2/gtk/gstplugin.c
 onvifmgr_CFLAGS = -DHAVE_CONFIG_H -Wall $(GST_STATIC_FLAG) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0 onvifsoap onvifdisco` $(EXT_CFLAGS) -I$(top_srcdir)/build/dist/include
 onvifmgr_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0 onvifsoap onvifdisco` $(EXT_STC_LIBS) -Wl,-Bdynamic $(EXT_DYN_LIBS) -lm -lstdc++ -z noexecstack
-onvifmgr_LDADD = locked-icon.o microphone.o
+onvifmgr_LDADD = locked-icon.o microphone.o warning.o
 
 queuetest_SOURCES = $(top_srcdir)/src/demo/queue_test.c $(top_srcdir)/src/queue/event_queue.c
 queuetest_CFLAGS = -Wall -lpthread -Wall 
@@ -64,6 +64,10 @@ microphone.o$(EXEEXT):
 locked-icon.o$(EXEEXT):
 	@echo "  CCLD     locked-icon.o"
 	@cd $(abs_top_srcdir)/images && ld -r -b binary -o $(abs_builddir)/locked-icon.o locked-icon.png && cd ..
+
+warning.o$(EXEEXT):
+	@echo "  CCLD     warning.o"
+	@cd $(abs_top_srcdir)/images && ld -r -b binary -o $(abs_builddir)/warning.o warning.png && cd ..
 
 uninstall-onvifsoaplib$(EXEEXT):
 	cd subprojects/OnvifSoapLib && $(MAKE) $(JOB_FLAG) uninstall GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd ..

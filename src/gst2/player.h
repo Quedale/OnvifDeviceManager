@@ -7,6 +7,7 @@
 #include <gdk/gdk.h>
 #include "overlay.h"
 #include "../gui/credentials_input.h"
+#include "../device_list.h"
 
 #if defined (GDK_WINDOWING_X11)
 #include <gdk/gdkx.h>
@@ -33,12 +34,13 @@ typedef struct _OnvifPlayer {
   OverlayState *overlay_state;
 
   GstState state;                 /* Current state of the pipeline */
-  OnvifDevice* device; /* Currently selected device */
-  OnvifDeviceList* onvifDeviceList;
+  Device* device; /* Currently selected device */
+  DeviceList *device_list;
   GtkWidget *listbox;
   GtkWidget *details_notebook;
   GtkWidget *canvas_handle;
   GtkWidget *canvas;
+  GtkWidget *loading_handle;
   gdouble level; //Used to calculate level decay
   guint back_stream_id;
   CredentialsDialog * dialog;

@@ -50,6 +50,7 @@ sudo apt install flex
 sudo apt install libtool 
 sudo apt install pkg-config
 sudo apt install libgtk-3-dev
+sudo apt install g++
 ```
 **[Optional]** The following package are optional, but will reduce the runtime of autogen.sh if installed.
 ```

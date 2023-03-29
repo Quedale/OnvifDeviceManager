@@ -9,6 +9,9 @@ static void error_cb (GstBus *bus, GstMessage *msg, OnvifPlayer *data) {
   GError *err;
   gchar *debug_info;
 
+  //Hide loading on error
+  gtk_widget_hide(data->loading_handle);
+
   /* Print error details on the screen */
   gst_message_parse_error (msg, &err, &debug_info);
   GST_ERROR ("Error received from element %s: %s\n", GST_OBJECT_NAME (msg->src), err->message);
@@ -106,6 +109,8 @@ state_changed_cb (GstBus * bus, GstMessage * msg, OnvifPlayer * data)
     data->state = new_state;
     if(data->state == GST_STATE_PLAYING){
       gtk_widget_set_visible(data->canvas, TRUE);
+      //Hide loading after stream successfully started
+      gtk_widget_hide(data->loading_handle);
     } else {
       gtk_widget_set_visible(data->canvas, FALSE);
     }
@@ -344,7 +349,7 @@ find_backchannel (GstElement * rtspsrc, guint idx, GstCaps * caps,
   GstStructure *s;
   gchar *caps_str = gst_caps_to_string (caps);
   g_free (caps_str);
-  printf("OnvifDevice__find_backchannel\n");
+  printf("OnvifPlayer__find_backchannel\n");
   s = gst_caps_get_structure (caps, 0);
   if (gst_structure_has_field (s, "a-sendonly")) {
     player->back_stream_id = idx;
@@ -645,7 +650,7 @@ void create_pipeline(OnvifPlayer *self){
 void OnvifPlayer__init(OnvifPlayer* self) {
 
     self->level = 0;
-    self->onvifDeviceList = OnvifDeviceList__create();
+    self->device_list = DeviceList__create();
     self->device = NULL;
     self->mic_volume_element = NULL;
     self->state = GST_STATE_NULL;
@@ -676,7 +681,7 @@ OnvifPlayer * OnvifPlayer__create() {
 void OnvifPlayer__reset(OnvifPlayer* self) {
     free(self->overlay_state);
     free(self->player_lock);
-    OnvifDeviceList__destroy(self->onvifDeviceList);
+    DeviceList__destroy(self->device_list);
 }
 
 void OnvifPlayer__destroy(OnvifPlayer* self) {
@@ -687,14 +692,15 @@ void OnvifPlayer__destroy(OnvifPlayer* self) {
 }
 
 void OnvifPlayer__set_playback_url(OnvifPlayer* self, char *url) {
+    pthread_mutex_lock(self->player_lock);
     printf("set location : %s\n",url);
     g_object_set (G_OBJECT (self->src), "location", url, NULL);
+    pthread_mutex_unlock(self->player_lock);
 }
 
 void OnvifPlayer__stop(OnvifPlayer* self){
-    printf("OnvifPlayer__stop \n");
-
     pthread_mutex_lock(self->player_lock);
+    printf("OnvifPlayer__stop \n");
     GstStateChangeReturn ret;
 
     //Backchannel clean up
@@ -732,6 +738,10 @@ stop_out:
 void OnvifPlayer__play(OnvifPlayer* self){
   pthread_mutex_lock(self->player_lock);
   printf("OnvifPlayer__play \n");
+
+  //Display loading
+  gtk_widget_show(self->loading_handle);
+
   GstStateChangeReturn ret;
   ret = gst_element_set_state (self->pipeline, GST_STATE_PLAYING);
   if (ret == GST_STATE_CHANGE_FAILURE) {

@@ -641,6 +641,11 @@ if [ -z "$(checkProg name='pkg-config' args='--version' path=$PATH)" ]; then
   echo "pkg-config build utility not found! Aborting..."
 fi
 
+if [ -z "$(checkProg name='g++' args='--version' path=$PATH)" ]; then
+  MISSING_DEP=1
+  echo "g++ build utility not found! Aborting..."
+fi
+
 pkg-config --exists "gtk+-3.0"
 ret=$?
 if [ $ret != 0 ]; then
@@ -916,6 +921,7 @@ if [ $gst_ret != 0 ] || [ $gst_plg_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $E
         echo "libcap already found."
       fi
 
+      #TODO build autopoint... (Mint linux)
       PKG_UTIL_LINUX=$SUBPROJECT_DIR/util-linux/dist/lib/pkgconfig
       PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_UTIL_LINUX \
       pkg-config --exists --print-errors "mount >= 2.38.0"
