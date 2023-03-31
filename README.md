@@ -54,7 +54,7 @@ sudo apt install g++
 ```
 **[Optional]** The following package are optional, but will reduce the runtime of autogen.sh if installed.
 ```
-sudo apt install openssl
+sudo apt install libssl-dev
 sudo apt install zlib1g-dev
 sudo apt install libasound2-dev
 sudo apt install libgudev-1.0-dev
