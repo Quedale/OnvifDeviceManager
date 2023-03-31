@@ -61,18 +61,23 @@ create_row (ProbMatch * m, OnvifPlayer *player)
   GtkWidget *label;
   GtkWidget *image;
 
-  // int i;
-  // printf("--- Prob -------\n");
-  // printf("\tProbe %s\n",m->prob_uuid);
-  // printf("\tAddr %s\n",m->addr);
-  // printf("\tTypes %s\n",m->types);
-  // printf("\tVersion : %s\n", m->version);
-  // printf("\tcount : %i\n", m->scope_count);
-  // for (i = 0 ; i < m->scope_count ; ++i) {
-  //   printf("\t\tScope : %s\n",m->scopes[i]);
-  // }
-  
-  OnvifDevice * onvif_dev = OnvifDevice__create(g_strdup(m->addr));
+  int i;
+  printf("--- Prob Match ---\n");
+  printf("\tProbe %s\n",m->prob_uuid);
+  printf("\tTypes %s\n",m->types);
+  printf("\tVersion : %i\n", m->version);
+  printf("\tscope count : %i\n", m->scope_count);
+  for (i = 0 ; i < m->scope_count ; ++i) {
+    printf("\t\tScope : %s\n",m->scopes[i]);
+  }
+  printf("\tAddr count : %i\n", m->addrs_count);
+  for (i = 0 ; i < m->addrs_count ; ++i) {
+    printf("\t\tAddr : %s\n",m->addrs[i]);
+  }
+  printf("------------------\n");
+
+  //TODO Support IPv6 alternate IP
+  OnvifDevice * onvif_dev = OnvifDevice__create(g_strdup(m->addrs[0]));
   Device * device = Device_create(onvif_dev);
   DeviceList__insert_element(player->device_list,device,player->device_list->device_count);
   int b;
@@ -184,7 +189,6 @@ found_server (void * e)
     m = server->matches->matches[i];
 
     // Create GtkListBoxRow and add it
-    printf("Prob Match #%i ----------------\n",i);
     row = create_row (m,disco_in->player);
     gtk_list_box_insert (GTK_LIST_BOX (disco_in->player->listbox), row, -1);  
   }

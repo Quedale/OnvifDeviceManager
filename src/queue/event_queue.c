@@ -122,7 +122,6 @@ void * queue_thread_cb(void * data){
 
         QueueEvent event = EventQueue__pop(queue);
         if(!event.callback){ //Happens if pop happens simultaniously at 0. Continue to wait on condition call
-            printf("-------------------------------------------------------------------------\n");
             continue;
         }
 
