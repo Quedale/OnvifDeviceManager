@@ -121,7 +121,7 @@ downloadAndExtract (){
 #
 ############################################
 pullOrClone (){
-  local path tag depth recurse # reset first
+  local path tag depth recurse ignorecache # reset first
   local "${@}"
 
   if [ $SKIP -eq 1 ]
@@ -160,7 +160,7 @@ pullOrClone (){
   name=${ADDR[0]}
 
   dest_val=""
-  if [ ! -z "$SRC_CACHE_DIR" ]; then
+  if [ ! -z "$SRC_CACHE_DIR" ] && [ -z "${ignorecache}" ]; then
     dest_val="$SRC_CACHE_DIR/$name"
   else
     dest_val=$name
@@ -169,7 +169,7 @@ pullOrClone (){
     dest_val+="-${tag}"
   fi
 
-  if [ -z "$SRC_CACHE_DIR" ]; then 
+  if [ -z "$SRC_CACHE_DIR" ] || [ -z "${ignorecache}" ]; then 
     #TODO Check if it's the right tag
     git -C $dest_val pull $tgstr 2> /dev/null || git clone -j$(nproc) $recursestr $depthstr $tgstr2 ${path} $dest_val
   elif [ -d "$dest_val" ] && [ ! -z "${tag}" ]; then #Folder exist, switch to tag
@@ -193,7 +193,7 @@ pullOrClone (){
     echo "2 ${tag} : $(test -z \"${tag}\")"
   fi
 
-  if [ ! -z "$SRC_CACHE_DIR" ]; then
+  if [ ! -z "$SRC_CACHE_DIR" ] && [ -z "${ignorecache}" ]; then
     printf "${ORANGE}*****************************\n${NC}"
     printf "${ORANGE}*** Copy repo from cache ***\n${NC}"
     printf "${ORANGE}*** $dest_val ***\n${NC}"
@@ -768,18 +768,43 @@ fi
 #    Build OnvifDiscoveryLib
 #       
 ################################################################
-DISCOLIB_PKG=$SUBPROJECT_DIR/OnvifDiscoveryLib/build/dist/lib/pkgconfig
-PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$DISCOLIB_PKG \
-pkg-config --exists --print-errors "onvifdisco"
-ret=$?
+#Check if new changes needs to be pulled
+git -C OnvifDiscoveryLib remote update 2> /dev/null
+LOCAL=$(git -C OnvifDiscoveryLib rev-parse @)
+REMOTE=$(git -C OnvifDiscoveryLib rev-parse @{u})
+BASE=$(git -C OnvifDiscoveryLib merge-base @ @{u})
+force_rebuild=0
+if [ $LOCAL = $REMOTE ]; then
+    echo "OnvifDiscoveryLib is already up-to-date. Do nothing..."
+elif [ $LOCAL = $BASE ]; then
+    echo "OnvifDiscoveryLib has new changes. Force rebuild..."
+    force_rebuild=1
+    skipwsdl="--skip-wsdl"
+elif [ $REMOTE = $BASE ]; then
+    echo "OnvifDiscoveryLib has local changes. Doing nothing..."
+    skipwsdl="--skip-wsdl"
+else
+    echo "Error OnvifDiscoveryLib is diverged."
+    exit 1
+fi
+
+if [ $force_rebuild -eq 0 ]; then
+  DISCOLIB_PKG=$SUBPROJECT_DIR/OnvifDiscoveryLib/build/dist/lib/pkgconfig
+  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$DISCOLIB_PKG \
+  pkg-config --exists --print-errors "onvifdisco"
+  ret=$?
+else
+  ret=1
+fi
+
 if [ $ret != 0 ]; then
   echo "-- Bootrap OnvifDiscoveryLib  --"
-  pullOrClone path=https://github.com/Quedale/OnvifDiscoveryLib.git
+  pullOrClone path=https://github.com/Quedale/OnvifDiscoveryLib.git ignorecache="true"
   PATH=$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin:$PATH \
   GSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8 \
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG \
   C_INCLUDE_PATH="$(pkg-config --variable=includedir openssl):$(pkg-config --variable=includedir zlib):$C_INCLUDE_PATH" \
-  buildMakeProject srcdir="OnvifDiscoveryLib" prefix="$SUBPROJECT_DIR/OnvifDiscoveryLib/build/dist" bootstrap="--skip-gsoap"
+  buildMakeProject srcdir="OnvifDiscoveryLib" prefix="$SUBPROJECT_DIR/OnvifDiscoveryLib/build/dist" bootstrap="--skip-gsoap $skipwsdl"
   if [ $FAILED -eq 1 ]; then exit 1; fi
 else
   echo "onvifdisco already found."
@@ -790,18 +815,44 @@ fi
 #    Build OnvifSoapLib
 #       
 ################################################################
-ONVIFSOAP_PKG=$SUBPROJECT_DIR/OnvifSoapLib/build/dist/lib/pkgconfig
-PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$ONVIFSOAP_PKG \
-pkg-config --exists --print-errors "onvifsoap"
-ret=$?
+#Check if new changes needs to be pulled
+git -C OnvifSoapLib remote update 2> /dev/null
+LOCAL=$(git -C OnvifSoapLib rev-parse @)
+REMOTE=$(git -C OnvifSoapLib rev-parse @{u})
+BASE=$(git -C OnvifSoapLib merge-base @ @{u})
+force_rebuild=0
+if [ $LOCAL = $REMOTE ]; then
+    echo "OnvifSoapLib is already up-to-date. Do nothing..."
+elif [ $LOCAL = $BASE ]; then
+    echo "OnvifSoapLib has new changes. Force rebuild..."
+    force_rebuild=1
+    skipwsdl="--skip-wsdl"
+elif [ $REMOTE = $BASE ]; then
+    echo "OnvifSoapLib has local changes. Doing nothing..."
+    skipwsdl="--skip-wsdl"
+else
+    echo "Error OnvifSoapLib is diverged."
+    exit 1
+fi
+
+#Git is up to date, now check if built
+if [ $force_rebuild -eq 0 ]; then
+  ONVIFSOAP_PKG=$SUBPROJECT_DIR/OnvifSoapLib/build/dist/lib/pkgconfig
+  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$ONVIFSOAP_PKG \
+  pkg-config --exists --print-errors "onvifsoap"
+  ret=$?
+else
+  ret=1
+fi
+
 if [ $ret != 0 ]; then
   echo "-- Bootstrap OnvifSoapLib  --"
-  pullOrClone path=https://github.com/Quedale/OnvifSoapLib.git
+  pullOrClone path=https://github.com/Quedale/OnvifSoapLib.git ignorecache="true"
   PATH=$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin:$PATH \
   GSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8 \
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG \
   C_INCLUDE_PATH="$(pkg-config --variable=includedir openssl):$(pkg-config --variable=includedir zlib):$C_INCLUDE_PATH" \
-  buildMakeProject srcdir="OnvifSoapLib" prefix="$SUBPROJECT_DIR/OnvifSoapLib/build/dist" bootstrap="--skip-gsoap"
+  buildMakeProject srcdir="OnvifSoapLib" prefix="$SUBPROJECT_DIR/OnvifSoapLib/build/dist" bootstrap="--skip-gsoap $skipwsdl"
   if [ $FAILED -eq 1 ]; then exit 1; fi
 else
   echo "onvifsoaplib already found."
