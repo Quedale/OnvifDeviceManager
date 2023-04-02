@@ -3,7 +3,6 @@
 #include <unistd.h>
 #include "gtk/gstgtkbasesink.h"
 #include <math.h>
-#include <unistd.h>
 
 /* This function is called when an error message is posted on the bus */
 static void error_cb (GstBus *bus, GstMessage *msg, OnvifPlayer *data) {
@@ -25,15 +24,14 @@ static void error_cb (GstBus *bus, GstMessage *msg, OnvifPlayer *data) {
     gst_element_set_state (data->pipeline, GST_STATE_NULL);
   }
 
-  if(data->retry < 3){
+  if(data->retry < 3 && data->playing == 1 && data->retry_callback){
     data->retry++;
     printf("****************************************************\n");
     printf("****************************************************\n");
     printf("Retry attempt #%i\n",data->retry);
     printf("****************************************************\n");
     printf("****************************************************\n");
-    sleep(1);
-    OnvifPlayer__play(data);
+    (*(data->retry_callback))(data, data->retry_user_data);
   } else {
     //Hide loading on error
     gtk_widget_hide(data->loading_handle);
@@ -661,29 +659,31 @@ void create_pipeline(OnvifPlayer *self){
 
 void OnvifPlayer__init(OnvifPlayer* self) {
 
-    self->level = 0;
-    self->retry = 0;
-    self->device_list = DeviceList__create();
-    self->device = NULL;
-    self->mic_volume_element = NULL;
-    self->state = GST_STATE_NULL;
-    self->player_lock =malloc(sizeof(pthread_mutex_t));
+  self->retry_user_data = NULL;
+  self->retry_callback = NULL;
+  self->level = 0;
+  self->retry = 0;
+  self->playing = 0;
+  self->device_list = DeviceList__create();
+  self->device = NULL;
+  self->mic_volume_element = NULL;
+  self->state = GST_STATE_NULL;
+  self->player_lock =malloc(sizeof(pthread_mutex_t));
 
-    self->overlay_state = malloc(sizeof(OverlayState));
-    self->overlay_state->valid = 0;
-    self->canvas_handle = NULL;
-    self->canvas = NULL;
-    self->video_bin = NULL;
-    self->audio_bin = NULL;
+  self->overlay_state = malloc(sizeof(OverlayState));
+  self->overlay_state->valid = 0;
+  self->canvas_handle = NULL;
+  self->canvas = NULL;
+  self->video_bin = NULL;
+  self->audio_bin = NULL;
 
-    pthread_mutex_init(self->player_lock, NULL);
-    create_pipeline(self);
-    if (!self->pipeline){
-      g_error ("Failed to parse pipeline");
-      return;
-    }
-
- }
+  pthread_mutex_init(self->player_lock, NULL);
+  create_pipeline(self);
+  if (!self->pipeline){
+    g_error ("Failed to parse pipeline");
+    return;
+  }
+}
 
 OnvifPlayer * OnvifPlayer__create() {
     OnvifPlayer *result  =  (OnvifPlayer *) malloc(sizeof(OnvifPlayer));
@@ -704,17 +704,23 @@ void OnvifPlayer__destroy(OnvifPlayer* self) {
   }
 }
 
+void OnvifPlayer__set_retry_callback(OnvifPlayer* self, void (*retry_callback)(OnvifPlayer *, void *), void * user_data){
+  self->retry_user_data = user_data;
+  self->retry_callback = retry_callback;
+}
+
 void OnvifPlayer__set_playback_url(OnvifPlayer* self, char *url) {
-    pthread_mutex_lock(self->player_lock);
-    printf("set location : %s\n",url);
-    g_object_set (G_OBJECT (self->src), "location", url, NULL);
-    pthread_mutex_unlock(self->player_lock);
+  pthread_mutex_lock(self->player_lock);
+  printf("set location : %s\n",url);
+  g_object_set (G_OBJECT (self->src), "location", url, NULL);
+  pthread_mutex_unlock(self->player_lock);
 }
 
 void OnvifPlayer__stop(OnvifPlayer* self){
     pthread_mutex_lock(self->player_lock);
     printf("OnvifPlayer__stop \n");
     self->retry = 0;
+    self->playing = 0;
     GstStateChangeReturn ret;
 
     //Backchannel clean up
@@ -752,7 +758,7 @@ stop_out:
 void OnvifPlayer__play(OnvifPlayer* self){
   pthread_mutex_lock(self->player_lock);
   printf("OnvifPlayer__play \n");
-
+  self->playing = 1;
   //Display loading
   gtk_widget_show(self->loading_handle);
 

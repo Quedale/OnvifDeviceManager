@@ -466,6 +466,7 @@ int main(int argc, char *argv[]) {
   
   /* Initialize our data structure */
   data = OnvifPlayer__create();
+  OnvifPlayer__set_retry_callback(data, retry_play_stream, EVENT_QUEUE);
   
   /* Create the GUI */
   create_ui (data);

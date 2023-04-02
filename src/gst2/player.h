@@ -22,6 +22,8 @@
 #define ONVIF_PLAYER_H_
 
 /* Structure to contain all our information, so we can pass it around */
+typedef struct _OnvifPlayer OnvifPlayer;
+
 typedef struct _OnvifPlayer {
   GstElement *pipeline; /* Our one and only pipeline */
   GstElement *backpipe;
@@ -35,6 +37,10 @@ typedef struct _OnvifPlayer {
 
   GstState state;                 /* Current state of the pipeline */
   int retry;
+  int playing;
+  void (*retry_callback)(OnvifPlayer *, void * user_data);
+  void * retry_user_data;
+
   Device* device; /* Currently selected device */
   DeviceList *device_list;
   GtkWidget *listbox;
@@ -51,6 +57,7 @@ typedef struct _OnvifPlayer {
 
 OnvifPlayer * OnvifPlayer__create();  // equivalent to "new Point(x, y)"
 void OnvifPlayer__destroy(OnvifPlayer* self);  // equivalent to "delete point"
+void OnvifPlayer__set_retry_callback(OnvifPlayer* self, void (*retry_callback)(OnvifPlayer *, void *), void * user_data);
 void OnvifPlayer__set_playback_url(OnvifPlayer* self, char *url);
 void OnvifPlayer__stop(OnvifPlayer* self);
 void OnvifPlayer__play(OnvifPlayer* self);

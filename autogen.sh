@@ -23,7 +23,7 @@ do
     if [ "$arg" == "--enable-libav" ]; then
         ENABLE_LIBAV=1
         set -- "$@" "$arg"
-    elif [ "$arg" == "----enable-latest" ]; then
+    elif [ "$arg" == "--enable-latest" ]; then
         ENABLE_LATEST=1
         set -- "$@" "$arg"
     else
@@ -889,12 +889,13 @@ GST_PKG_PATH=:$SUBPROJECT_DIR/gstreamer/build/dist/lib/pkgconfig:$SUBPROJECT_DIR
 gst_ret=0
 gst_plg_ret=0
 gst_libav_ret=0
+GSTREAMER_LATEST=1.22.1
 
 PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB \
-pkg-config --exists --print-errors "gstreamer-1.0 >= 1.21.90"
+pkg-config --exists --print-errors "gstreamer-1.0 >= 1.14.4"
 gst_ret=$?
 PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB \
-pkg-config --exists --print-errors "gstreamer-rtsp-server-1.0 >= 1.21.90"
+pkg-config --exists --print-errors "gstreamer-rtsp-server-1.0 >= 1.14.4"
 gst_plg_ret=$?
 if [ $ENABLE_LIBAV -eq 1 ]; then
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB:$FFMPEG_PKG \
@@ -906,14 +907,14 @@ fi
 if [ $gst_ret != 0 ] || [ $gst_plg_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
 
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB \
-  pkg-config --exists --print-errors "gstreamer-1.0 >= 1.21.90"
+  pkg-config --exists --print-errors "gstreamer-1.0 >= $GSTREAMER_LATEST"
   gst_ret=$?
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB \
-  pkg-config --exists --print-errors "gstreamer-rtsp-server-1.0 >= 1.21.90"
+  pkg-config --exists --print-errors "gstreamer-rtsp-server-1.0 >= $GSTREAMER_LATEST"
   gst_plg_ret=$?
   if [ $ENABLE_LIBAV -eq 1 ]; then
     PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB:$FFMPEG_PKG \
-    pkg-config --exists --print-errors "gstlibav >= 1.21.90"
+    pkg-config --exists --print-errors "gstlibav >= $GSTREAMER_LATEST"
     gst_libav_ret=$?
   fi
 
@@ -1271,7 +1272,7 @@ if [ $gst_ret != 0 ] || [ $gst_plg_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $E
             MESON_PARAMS="$MESON_PARAMS -Dlibav=enabled"
         fi
 
-        pullOrClone path="https://gitlab.freedesktop.org/gstreamer/gstreamer.git" tag=1.22.0
+        pullOrClone path="https://gitlab.freedesktop.org/gstreamer/gstreamer.git" tag=$GSTREAMER_LATEST
 
         # Force disable subproject features
         MESON_PARAMS="$MESON_PARAMS -Dglib:tests=false"

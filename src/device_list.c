@@ -49,7 +49,7 @@ void DeviceList__insert_element(DeviceList* self, Device * record, int index)
 void DeviceList__clear(DeviceList* self){
     int i;
     for(i=0; i < self->device_count; i++){
-        Device__unref(self->devices[i]);
+        Device__destroy(self->devices[i]);
     }
     self->device_count = 0;
     self->devices = realloc(self->devices,0);
@@ -70,6 +70,7 @@ void DeviceList__remove_element(DeviceList* self, int index){
 void Device__init(Device* self, OnvifDevice * onvif_device) {
     self->onvif_device = onvif_device;
     self->refcount = 1;
+    self->destroyed = 0;
 }
 
 Device * Device_create(OnvifDevice * onvif_device){
@@ -79,9 +80,12 @@ Device * Device_create(OnvifDevice * onvif_device){
 }
 
 void Device__destroy(Device* self) {
-  if (self) {
+  if (self && self->refcount == 0) {
      OnvifDevice__destroy(self->onvif_device);
      free(self);
+  } else if(self){
+    self->destroyed=1;
+    Device__unref(self);
   }
 }
 
@@ -99,7 +103,7 @@ void Device__unref(Device *self){
 }
 
 int Device__is_valid(Device* device){
-    if(device && device->refcount > 0){
+    if(device && device->refcount > 0 && !device->destroyed){
         return 1;
     }
 

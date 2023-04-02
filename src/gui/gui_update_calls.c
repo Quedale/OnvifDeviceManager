@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "credentials_input.h"
+#include <unistd.h>
 
 extern char _binary_prohibited_icon_png_size[];
 extern char _binary_prohibited_icon_png_start[];
@@ -35,6 +36,7 @@ struct DeviceInput {
 
 struct PlayInput {
   OnvifPlayer * player;
+  Device * device;
   GtkListBoxRow * row;
   EventQueue * queue;
 };
@@ -51,6 +53,7 @@ struct PlayInput * PlayInput_copy(struct PlayInput * input){
   newinput->player = input->player;//OnvifDevice__copy(input->device);  
   newinput->row = input->row;
   newinput->queue = input->queue;
+  newinput->device = input->device;
   return newinput;
 }
 
@@ -88,8 +91,8 @@ void _display_onvif_thumbnail(void * user_data, int profile_index){
     size = _binary_locked_icon_png_end - _binary_locked_icon_png_start;
   }
 
-  //If the gtk handle is destoyed by the time its ready
-  if(!GTK_IS_CONTAINER(input->device->image_handle)){
+  //Check is device is still valid. (User performed scan before snapshot finished)
+  if(!Device__is_valid(input->device)){
     goto exit;
   }
 
@@ -118,7 +121,12 @@ void _display_onvif_thumbnail(void * user_data, int profile_index){
       }
     }
   }
-  
+
+  //Check is device is still valid. (User performed scan before spinner showed)
+  if(!Device__is_valid(input->device)){
+    goto exit;
+  }
+
   //Remove previous image
   gtk_container_foreach (GTK_CONTAINER (input->device->image_handle), (void*) gtk_widget_destroy, NULL);
 
@@ -129,6 +137,12 @@ void _display_onvif_thumbnail(void * user_data, int profile_index){
     double newpw = 40 / ph * pw;
     scaled_pixbuf = gdk_pixbuf_scale_simple (pixbuf,newpw,40,GDK_INTERP_NEAREST);
     image = gtk_image_new_from_pixbuf (scaled_pixbuf);
+
+    //Check is device is still valid. (User performed scan before scale finished)
+    if(!Device__is_valid(input->device)){
+      goto exit;
+    }
+
     gtk_container_add (GTK_CONTAINER (input->device->image_handle), image);
     gtk_widget_show (image);
   } else {
@@ -254,45 +268,73 @@ void _stop_onvif_stream(void * user_data){
   OnvifPlayer__stop(player);
 }
 
+void _retry_play_stream(void * user_data){
+  OnvifPlayer * player = (OnvifPlayer *) user_data;
+  sleep(1);
+  OnvifPlayer__play(player);
+}
+
+void retry_play_stream(OnvifPlayer * player, void * user_data){
+  EventQueue * queue = (EventQueue *) user_data;
+  EventQueue__insert(queue,_retry_play_stream,player);
+}
+
 void _play_onvif_stream(void * user_data){
   struct PlayInput * input = (struct PlayInput *) user_data;
 
-  //If the gtk handle is destoyed by the time its ready
-  if(!Device__is_valid(input->player->device)){
+  //Check if device is still valid. (User performed scan before thread started)
+  if(!Device__is_valid(input->device)){
     goto exit;
   }
 
-  Device__addref(input->player->device);
+  Device__addref(input->device);
     /* Set the URI to play */
     //TODO handle profiles
-  char * uri = OnvifDevice__media_getStreamUri(input->player->device->onvif_device,0);
+  char * uri = OnvifDevice__media_getStreamUri(input->device->onvif_device,0);
   OnvifPlayer__set_playback_url(input->player,uri);
+
+  //User performed scan before StreamURI was retrieved
+  if(!Device__is_valid(input->device)){
+    goto exit;
+  }
+
   OnvifPlayer__play(input->player);
 
 exit:
-  Device__unref(input->player->device);
+  Device__unref(input->device);
   free(input);
 }
 
 void _onvif_authentication(void * user_data){
   LoginEvent * event = (LoginEvent *) user_data;
   struct PlayInput * input = (struct PlayInput *) event->user_data;
-  OnvifDevice_set_credentials(input->player->device->onvif_device,event->user,event->pass);
-  OnvifDevice_authenticate(input->player->device->onvif_device);
-  if(!input->player->device->onvif_device->authorized){
-    return;
+  //Check device is still valid before adding ref (User performed scan before thread started)
+  if(!Device__is_valid(input->device)){
+    goto exit;
+  }
+  Device__addref(input->device);
+
+  OnvifDevice_set_credentials(input->device->onvif_device,event->user,event->pass);
+  OnvifDevice_authenticate(input->device->onvif_device);
+
+  //Check if device is valid and authorized (User performed scan before auth finished)
+  if(!Device__is_valid(input->device) || !input->device->onvif_device->authorized){
+    goto exit;
   }
 
   //Replace locked image with spinner
   GtkWidget * image = gtk_spinner_new ();
   gtk_spinner_start (GTK_SPINNER (image));
-  gtk_container_foreach (GTK_CONTAINER (input->player->device->image_handle), (void*) gtk_widget_destroy, NULL);
-  gtk_container_add (GTK_CONTAINER (input->player->device->image_handle), image);
+  gtk_container_foreach (GTK_CONTAINER (input->device->image_handle), (void*) gtk_widget_destroy, NULL);
+  gtk_container_add (GTK_CONTAINER (input->device->image_handle), image);
   gtk_widget_show (image);
 
   CredentialsDialog__hide(input->player->dialog);
-  display_onvif_device_row(input->player->device,input->queue);
+  display_onvif_device_row(input->device,input->queue);
   EventQueue__insert(input->queue,_play_onvif_stream,PlayInput_copy(input));
+
+exit:
+  Device__unref(input->device);
   free(input);
   free(event);
 }
@@ -320,6 +362,7 @@ void select_onvif_device_row(OnvifPlayer * player,  GtkListBoxRow * row, EventQu
   EventQueue__insert(queue,_stop_onvif_stream,player);
 
   if(input->row == NULL){
+    input->player->device = NULL;
     free(input);
     return;
   }
@@ -328,9 +371,10 @@ void select_onvif_device_row(OnvifPlayer * player,  GtkListBoxRow * row, EventQu
   int pos;
   pos = gtk_list_box_row_get_index (GTK_LIST_BOX_ROW (input->row));
   input->player->device = input->player->device_list->devices[pos];
+  input->device = input->player->device;
 
   //Prompt for authentication
-  if(!input->player->device->onvif_device->authorized){
+  if(!input->device->onvif_device->authorized){
     gdk_threads_add_idle((void *)main_thread_dispatch,input);
     return;
   }

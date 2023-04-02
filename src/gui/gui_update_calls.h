@@ -11,6 +11,7 @@ void display_onvif_device_row(Device * device, EventQueue * queue);
 void select_onvif_device_row(OnvifPlayer * player, GtkListBoxRow * row, EventQueue * queue);
 void dialog_cancel_cb(CredentialsDialog * dialog);
 void dialog_login_cb(LoginEvent * input);
+void retry_play_stream(OnvifPlayer * player, void * user_data);
 
 GtkWidget * create_controls_overlay(OnvifPlayer *player);
 
