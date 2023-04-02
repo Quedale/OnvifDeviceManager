@@ -34,6 +34,7 @@ typedef struct _OnvifPlayer {
   OverlayState *overlay_state;
 
   GstState state;                 /* Current state of the pipeline */
+  int retry;
   Device* device; /* Currently selected device */
   DeviceList *device_list;
   GtkWidget *listbox;

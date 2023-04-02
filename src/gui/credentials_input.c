@@ -69,6 +69,7 @@ void CredentialsDialog__show (CredentialsDialog * dialog, void * user_data){
     if(dialog->visible == 1){
         return;
     }
+    printf("CredentialsDialog__show\n");
     dialog->visible = 1;
 
     //Set input userdata for current dialog session
@@ -101,6 +102,7 @@ void CredentialsDialog__hide (CredentialsDialog * dialog){
     if(dialog->visible == 0){
         return;
     }
+    printf("CredentialsDialog__hide\n");
     dialog->visible = 0;
 
     //Disconnect keyboard handler.

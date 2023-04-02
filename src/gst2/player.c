@@ -3,14 +3,12 @@
 #include <unistd.h>
 #include "gtk/gstgtkbasesink.h"
 #include <math.h>
+#include <unistd.h>
 
 /* This function is called when an error message is posted on the bus */
 static void error_cb (GstBus *bus, GstMessage *msg, OnvifPlayer *data) {
   GError *err;
   gchar *debug_info;
-
-  //Hide loading on error
-  gtk_widget_hide(data->loading_handle);
 
   /* Print error details on the screen */
   gst_message_parse_error (msg, &err, &debug_info);
@@ -25,6 +23,20 @@ static void error_cb (GstBus *bus, GstMessage *msg, OnvifPlayer *data) {
       gst_element_set_state (data->backpipe, GST_STATE_NULL);
     }
     gst_element_set_state (data->pipeline, GST_STATE_NULL);
+  }
+
+  if(data->retry < 3){
+    data->retry++;
+    printf("****************************************************\n");
+    printf("****************************************************\n");
+    printf("Retry attempt #%i\n",data->retry);
+    printf("****************************************************\n");
+    printf("****************************************************\n");
+    sleep(1);
+    OnvifPlayer__play(data);
+  } else {
+    //Hide loading on error
+    gtk_widget_hide(data->loading_handle);
   }
 }
 
@@ -650,6 +662,7 @@ void create_pipeline(OnvifPlayer *self){
 void OnvifPlayer__init(OnvifPlayer* self) {
 
     self->level = 0;
+    self->retry = 0;
     self->device_list = DeviceList__create();
     self->device = NULL;
     self->mic_volume_element = NULL;
@@ -701,6 +714,7 @@ void OnvifPlayer__set_playback_url(OnvifPlayer* self, char *url) {
 void OnvifPlayer__stop(OnvifPlayer* self){
     pthread_mutex_lock(self->player_lock);
     printf("OnvifPlayer__stop \n");
+    self->retry = 0;
     GstStateChangeReturn ret;
 
     //Backchannel clean up

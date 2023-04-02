@@ -9,6 +9,7 @@ typedef struct {
   OnvifDevice * onvif_device;
   GtkWidget * image_handle;
   GtkWidget * profile_dropdown;
+  int refcount;
 } Device;
 
 typedef struct {
@@ -24,6 +25,8 @@ void DeviceList__remove_element(DeviceList* self, int index);
 void DeviceList__clear(DeviceList* self);
 
 Device * Device_create(OnvifDevice * onvif_device);
-void Device__destroy(Device* self);
+void Device__addref(Device* device); 
+void Device__unref(Device* device); 
+int Device__is_valid(Device* device); 
 
 #endif

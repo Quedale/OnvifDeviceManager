@@ -2,6 +2,7 @@
 #include "onvif_device.h"
 #include "../queue/event_queue.h"
 #include "../gst2/player.h"
+#include "../device_list.h"
 #include <gtk/gtk.h>
 #include <netdb.h>
 #include <arpa/inet.h>
@@ -58,18 +59,25 @@ void _display_onvif_thumbnail(void * user_data, int profile_index){
   GdkPixbufLoader *loader = NULL;
   GdkPixbuf *pixbuf = NULL;
   GdkPixbuf *scaled_pixbuf = NULL;
-
-  struct DeviceInput * input = (struct DeviceInput *) user_data;
   double size;
   char * imgdata;
   int freeimgdata = 0;
+
+  struct DeviceInput * input = (struct DeviceInput *) user_data;
+
+  if(!Device__is_valid(input->device)){
+    goto exit;
+  }
+
+  Device__addref(input->device);
+
   if(input->device->onvif_device->authorized){
     //TODO handle profiles
     struct chunk * imgchunk = OnvifDevice__media_getSnapshot(input->device->onvif_device,profile_index);
     if(!imgchunk){
       //TODO Set error image
       printf("Error retrieve snapshot.");
-      return;
+      goto exit;
     }
     imgdata = imgchunk->buffer;
     size = imgchunk->size;
@@ -138,12 +146,18 @@ exit:
   if(freeimgdata){
     free(imgdata);
   }
+  Device__unref(input->device);
 }
 
 void _display_nslookup_hostname(void * user_data){
   struct DeviceInput * input = (struct DeviceInput *) user_data;
   char * hostname;
 
+  if(!Device__is_valid(input->device)){
+    goto exit;
+  }
+
+  Device__addref(input->device);
   printf("NSLookup ... %s\n",input->device->onvif_device->ip);
   //Lookup hostname
   struct in_addr in_a;
@@ -162,6 +176,8 @@ void _display_nslookup_hostname(void * user_data){
 
   printf("Retrieved hostname : %s\n",hostname);
 
+exit:
+  Device__unref(input->device);
   free(input);
 }
 
@@ -241,12 +257,20 @@ void _stop_onvif_stream(void * user_data){
 void _play_onvif_stream(void * user_data){
   struct PlayInput * input = (struct PlayInput *) user_data;
 
+  //If the gtk handle is destoyed by the time its ready
+  if(!Device__is_valid(input->player->device)){
+    goto exit;
+  }
+
+  Device__addref(input->player->device);
     /* Set the URI to play */
     //TODO handle profiles
   char * uri = OnvifDevice__media_getStreamUri(input->player->device->onvif_device,0);
   OnvifPlayer__set_playback_url(input->player,uri);
   OnvifPlayer__play(input->player);
 
+exit:
+  Device__unref(input->player->device);
   free(input);
 }
 
@@ -267,19 +291,21 @@ void _onvif_authentication(void * user_data){
   gtk_widget_show (image);
 
   CredentialsDialog__hide(input->player->dialog);
-  EventQueue__insert(input->queue,_play_onvif_stream,PlayInput_copy(input));
   display_onvif_device_row(input->player->device,input->queue);
+  EventQueue__insert(input->queue,_play_onvif_stream,PlayInput_copy(input));
   free(input);
   free(event);
 }
 
 
 void dialog_cancel_cb(CredentialsDialog * dialog){
+  printf("OnvifAuthentication cancelled...\n");
   CredentialsDialog__hide(dialog);
   free(dialog->user_data);
 }
 
 void dialog_login_cb(LoginEvent * event){
+  printf("OnvifAuthentication attempt...\n");
   struct PlayInput * input = (struct PlayInput *) event->user_data;
   EventQueue__insert(input->queue,_onvif_authentication,LoginEvent_copy(event));
 }
