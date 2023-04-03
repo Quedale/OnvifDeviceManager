@@ -800,6 +800,8 @@ stop_out:
   //Force hide the previous stream
   if(GTK_IS_WIDGET (self->canvas))
     gtk_widget_set_visible(self->canvas, FALSE);
+  if(GTK_IS_WIDGET (self->loading_handle))
+    gtk_widget_hide(self->loading_handle);
 
   pthread_mutex_unlock(self->player_lock);
 }
