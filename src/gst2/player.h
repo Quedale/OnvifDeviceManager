@@ -30,12 +30,16 @@ typedef struct _OnvifPlayer {
   GstElement *src;  /* RtspSrc to support backchannel */
   GstElement *sink;  /* Video Sink */
   GstElement *mic_volume_element;
+  int pad_found;
   GstElement * video_bin;
+  int no_video;
+  int video_done;
   GstElement * audio_bin;
+  int no_audio;
+  int audio_done;
   GstVideoOverlay *overlay; //Overlay rendered on the canvas widget
   OverlayState *overlay_state;
 
-  GstState state;                 /* Current state of the pipeline */
   int retry;
   int playing;
   void (*retry_callback)(OnvifPlayer *, void * user_data);
@@ -61,6 +65,12 @@ void OnvifPlayer__set_retry_callback(OnvifPlayer* self, void (*retry_callback)(O
 void OnvifPlayer__set_playback_url(OnvifPlayer* self, char *url);
 void OnvifPlayer__stop(OnvifPlayer* self);
 void OnvifPlayer__play(OnvifPlayer* self);
+
+/*
+Compared to play, retry is design to work after a stream failure.
+Stopping will essentially break the retry method and stop the loop.
+*/
+void OnvifPlayer__retry(OnvifPlayer* self);
 GtkWidget * OnvifDevice__createCanvas(OnvifPlayer *self);
 gboolean OnvifPlayer__is_mic_mute(OnvifPlayer* self);
 void OnvifPlayer__mic_mute(OnvifPlayer* self, gboolean mute);

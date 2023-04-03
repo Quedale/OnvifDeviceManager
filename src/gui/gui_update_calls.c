@@ -271,7 +271,7 @@ void _stop_onvif_stream(void * user_data){
 void _retry_play_stream(void * user_data){
   OnvifPlayer * player = (OnvifPlayer *) user_data;
   sleep(1);
-  OnvifPlayer__play(player);
+  OnvifPlayer__retry(player);
 }
 
 void retry_play_stream(OnvifPlayer * player, void * user_data){

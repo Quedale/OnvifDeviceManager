@@ -113,17 +113,38 @@ state_changed_cb (GstBus * bus, GstMessage * msg, OnvifPlayer * data)
   GstState old_state, new_state, pending_state;
   gst_message_parse_state_changed (msg, &old_state, &new_state, &pending_state);
   /* Using video_bin for state change since the pipeline is PLAYING before the videosink */
-  if (data->video_bin != NULL 
+  
+  //Check if video exists and pad is linked
+  if((data->no_video ||
+        (data->video_bin != NULL
         && GST_IS_OBJECT(data->video_bin) 
-        &&  GST_MESSAGE_SRC (msg) == GST_OBJECT (data->video_bin)) {
-    data->state = new_state;
-    if(data->state == GST_STATE_PLAYING){
-      gtk_widget_set_visible(data->canvas, TRUE);
-      //Hide loading after stream successfully started
-      gtk_widget_hide(data->loading_handle);
-    } else {
-      gtk_widget_set_visible(data->canvas, FALSE);
-    }
+        &&  GST_MESSAGE_SRC (msg) == GST_OBJECT (data->video_bin)))){
+      if(new_state == GST_STATE_PLAYING) {
+        gtk_widget_set_visible(data->canvas, TRUE);
+        data->video_done=1;
+      } else {
+        gtk_widget_set_visible(data->canvas, FALSE);
+      }
+  }
+
+  //Check if audio exists and pad is linked
+  if((data->no_audio ||
+        (data->audio_bin != NULL 
+        && GST_IS_OBJECT(data->audio_bin) 
+        &&  GST_MESSAGE_SRC (msg) == GST_OBJECT (data->audio_bin))) &&
+      new_state == GST_STATE_PLAYING) {
+    data->audio_done=1;
+  }
+
+  //Check that all streams are ready before hiding loading
+  if(data->video_done && data->audio_done && data->pad_found == 1 &&
+      GST_MESSAGE_SRC(msg) == GST_OBJECT(data->pipeline)){
+    gtk_widget_hide(data->loading_handle);
+  }
+
+  if(GST_MESSAGE_SRC (msg) == GST_OBJECT (data->video_bin) ||
+      GST_MESSAGE_SRC (msg) == GST_OBJECT (data->audio_bin) ||
+      GST_MESSAGE_SRC (msg) == GST_OBJECT (data->pipeline)){
     printf ("State set to %s for %s\n", gst_element_state_get_name (new_state), GST_OBJECT_NAME (msg->src));
   }
 }
@@ -569,6 +590,8 @@ static void on_rtsp_pad_added (GstElement *element, GstPad *new_pad, OnvifPlayer
   // printf("caps_str : %s\n",caps_str);
 
   if (payload_v == 96) {
+    data->pad_found = 1;
+    data->no_video = 0;
     gst_event_new_flush_stop(0);
     GstElement * video_bin = create_video_bin(data);
 
@@ -579,11 +602,15 @@ static void on_rtsp_pad_added (GstElement *element, GstPad *new_pad, OnvifPlayer
     pad_ret = gst_pad_link (new_pad, sink_pad);
     if (GST_PAD_LINK_FAILED (pad_ret)) {
       g_printerr ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(video_bin));
+      //TODO Show error on canvas
+      data->no_video = 1;
       goto exit;
     }
 
     gst_element_sync_state_with_parent(video_bin);
   } else if (payload_v == 0) {
+    data->pad_found = 1;
+    data->no_audio = 0;
     const gchar * audio_format_v = gst_structure_get_string(new_pad_struct,"encoding-name");
     if(!strcmp(audio_format_v,"PCMU")){
       GstElement * audio_bin = create_audio_bin(data);
@@ -594,6 +621,7 @@ static void on_rtsp_pad_added (GstElement *element, GstPad *new_pad, OnvifPlayer
       pad_ret = gst_pad_link (new_pad, sink_pad);
       if (GST_PAD_LINK_FAILED (pad_ret)) {
         g_printerr ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(audio_bin));
+        data->no_audio = 1;
         goto exit;
       }
 
@@ -659,6 +687,9 @@ void create_pipeline(OnvifPlayer *self){
 
 void OnvifPlayer__init(OnvifPlayer* self) {
 
+  self->no_audio = 1;
+  self->no_video = 1;
+  self->pad_found = 0;
   self->retry_user_data = NULL;
   self->retry_callback = NULL;
   self->level = 0;
@@ -667,7 +698,6 @@ void OnvifPlayer__init(OnvifPlayer* self) {
   self->device_list = DeviceList__create();
   self->device = NULL;
   self->mic_volume_element = NULL;
-  self->state = GST_STATE_NULL;
   self->player_lock =malloc(sizeof(pthread_mutex_t));
 
   self->overlay_state = malloc(sizeof(OverlayState));
@@ -742,7 +772,7 @@ void OnvifPlayer__stop(OnvifPlayer* self){
       }
     }
 stop_out: 
-
+  gtk_widget_hide(self->loading_handle);
   //Destroy old pipeline
   gst_object_unref (self->pipeline);
   if(GST_IS_ELEMENT(self->backpipe)){
@@ -755,10 +785,18 @@ stop_out:
   pthread_mutex_unlock(self->player_lock);
 }
 
-void OnvifPlayer__play(OnvifPlayer* self){
+void _OnvifPlayer__play(OnvifPlayer* self, int retry){
   pthread_mutex_lock(self->player_lock);
   printf("OnvifPlayer__play \n");
-  self->playing = 1;
+  if(retry && self->playing == 0){//Retry signal after stop requested
+    goto exit;
+  } else {
+    self->playing = 1;
+  }
+
+  self->pad_found = 0;
+  self->video_done = 0;
+  self->audio_done = 0;
   //Display loading
   gtk_widget_show(self->loading_handle);
 
@@ -767,10 +805,23 @@ void OnvifPlayer__play(OnvifPlayer* self){
   if (ret == GST_STATE_CHANGE_FAILURE) {
       GST_ERROR ("Unable to set the pipeline to the playing state.\n");
       gst_object_unref (self->pipeline);
-      pthread_mutex_unlock(self->player_lock);
-      return;
+      goto exit;
   }
+
+exit:
   pthread_mutex_unlock(self->player_lock);
+}
+
+void OnvifPlayer__play(OnvifPlayer* self){
+  _OnvifPlayer__play(self,0);
+}
+
+/*
+Compared to play, retry is design to work after a stream failure.
+Stopping will essentially break the retry method and stop the loop.
+*/
+void OnvifPlayer__retry(OnvifPlayer* self){
+  _OnvifPlayer__play(self,1);
 }
 
 GtkWidget * OnvifDevice__createCanvas(OnvifPlayer *self){
