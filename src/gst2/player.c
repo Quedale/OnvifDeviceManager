@@ -16,13 +16,14 @@ static void error_cb (GstBus *bus, GstMessage *msg, OnvifPlayer *data) {
   g_clear_error (&err);
   g_free (debug_info);
 
-
+  pthread_mutex_lock(data->player_lock);
   if(GST_IS_ELEMENT(msg->src)){
     if(GST_IS_ELEMENT(data->backpipe)){
       gst_element_set_state (data->backpipe, GST_STATE_NULL);
     }
     gst_element_set_state (data->pipeline, GST_STATE_NULL);
   }
+  pthread_mutex_unlock(data->player_lock);
 
   if(data->retry < 3 && data->playing == 1 && data->retry_callback){
     data->retry++;
@@ -111,6 +112,9 @@ static void
 state_changed_cb (GstBus * bus, GstMessage * msg, OnvifPlayer * data)
 {
   GstState old_state, new_state, pending_state;
+
+  pthread_mutex_lock(data->player_lock);
+
   gst_message_parse_state_changed (msg, &old_state, &new_state, &pending_state);
   /* Using video_bin for state change since the pipeline is PLAYING before the videosink */
   
@@ -120,10 +124,12 @@ state_changed_cb (GstBus * bus, GstMessage * msg, OnvifPlayer * data)
         && GST_IS_OBJECT(data->video_bin) 
         &&  GST_MESSAGE_SRC (msg) == GST_OBJECT (data->video_bin)))){
       if(new_state == GST_STATE_PLAYING) {
-        gtk_widget_set_visible(data->canvas, TRUE);
+        if(GTK_IS_WIDGET (data->canvas))
+          gtk_widget_set_visible(data->canvas, TRUE);
         data->video_done=1;
       } else {
-        gtk_widget_set_visible(data->canvas, FALSE);
+        if(GTK_IS_WIDGET (data->canvas))
+          gtk_widget_set_visible(data->canvas, FALSE);
       }
   }
 
@@ -138,15 +144,17 @@ state_changed_cb (GstBus * bus, GstMessage * msg, OnvifPlayer * data)
 
   //Check that all streams are ready before hiding loading
   if(data->video_done && data->audio_done && data->pad_found == 1 &&
-      GST_MESSAGE_SRC(msg) == GST_OBJECT(data->pipeline)){
+      data->pipeline != NULL && GST_MESSAGE_SRC(msg) == GST_OBJECT(data->pipeline)){
     gtk_widget_hide(data->loading_handle);
   }
 
-  if(GST_MESSAGE_SRC (msg) == GST_OBJECT (data->video_bin) ||
-      GST_MESSAGE_SRC (msg) == GST_OBJECT (data->audio_bin) ||
-      GST_MESSAGE_SRC (msg) == GST_OBJECT (data->pipeline)){
+  if((data->video_bin != NULL && GST_IS_OBJECT(data->video_bin) && GST_MESSAGE_SRC (msg) == GST_OBJECT (data->video_bin)) ||
+      (data->audio_bin != NULL && GST_IS_OBJECT(data->audio_bin) && GST_MESSAGE_SRC (msg) == GST_OBJECT (data->audio_bin)) ||
+      (data->pipeline != NULL && GST_IS_OBJECT(data->pipeline) && GST_MESSAGE_SRC (msg) == GST_OBJECT (data->pipeline))){
     printf ("State set to %s for %s\n", gst_element_state_get_name (new_state), GST_OBJECT_NAME (msg->src));
   }
+
+  pthread_mutex_unlock(data->player_lock);
 }
 
 static void 
@@ -378,6 +386,9 @@ find_backchannel (GstElement * rtspsrc, guint idx, GstCaps * caps,
     OnvifPlayer *player G_GNUC_UNUSED)
 {
   GstStructure *s;
+  
+  pthread_mutex_lock(player->player_lock);
+
   gchar *caps_str = gst_caps_to_string (caps);
   g_free (caps_str);
   printf("OnvifPlayer__find_backchannel\n");
@@ -392,6 +403,8 @@ find_backchannel (GstElement * rtspsrc, guint idx, GstCaps * caps,
     setup_backchannel_shoveler (player, caps);
   }
 
+  
+  pthread_mutex_unlock(player->player_lock);
   return TRUE;
 }
 
@@ -643,6 +656,8 @@ exit:
 
 void create_pipeline(OnvifPlayer *self){
 
+  self->pad_found = 0;
+
   /* Create the empty pipeline */
   self->pipeline = gst_pipeline_new ("onvif-pipeline");
 
@@ -772,29 +787,32 @@ void OnvifPlayer__stop(OnvifPlayer* self){
       }
     }
 stop_out: 
-  gtk_widget_hide(self->loading_handle);
   //Destroy old pipeline
-  gst_object_unref (self->pipeline);
-  if(GST_IS_ELEMENT(self->backpipe)){
+  if(GST_IS_ELEMENT(self->pipeline))
+    gst_object_unref (self->pipeline);
+  if(GST_IS_ELEMENT(self->backpipe))
     gst_object_unref (self->backpipe);
-  }
 
   // Create new pipeline
   create_pipeline(self);
+
+  //New pipeline causes previous pipe to stop dispatching state change.
+  //Force hide the previous stream
+  if(GTK_IS_WIDGET (self->canvas))
+    gtk_widget_set_visible(self->canvas, FALSE);
 
   pthread_mutex_unlock(self->player_lock);
 }
 
 void _OnvifPlayer__play(OnvifPlayer* self, int retry){
   pthread_mutex_lock(self->player_lock);
-  printf("OnvifPlayer__play \n");
+  printf("OnvifPlayer__play %i\n",retry);
   if(retry && self->playing == 0){//Retry signal after stop requested
     goto exit;
   } else {
     self->playing = 1;
   }
 
-  self->pad_found = 0;
   self->video_done = 0;
   self->audio_done = 0;
   //Display loading
