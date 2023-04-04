@@ -46,7 +46,7 @@ GstVideoOverlayComposition *
 draw_overlay (GstElement * overlay, GstSample * sample, gpointer user_data)
 {
 
-  OnvifPlayer *player = (OnvifPlayer *)user_data;
+  RtspPlayer *player = (RtspPlayer *)user_data;
   GstVideoOverlayRectangle *rect;
   GstVideoOverlayComposition *comp;
   GstVideoMeta *vmeta;

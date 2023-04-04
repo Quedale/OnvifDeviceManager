@@ -2,15 +2,16 @@
 #define DEVICE_LIST_H_
 
 #include "onvif_device.h"
-#include <stdlib.h>
 #include <gtk/gtk.h>
 
 typedef struct {
   OnvifDevice * onvif_device;
   GtkWidget * image_handle;
   GtkWidget * profile_dropdown;
+  pthread_mutex_t * ref_lock;
   int destroyed;
   int refcount;
+  int selected;
 } Device;
 
 typedef struct {
@@ -27,7 +28,7 @@ void DeviceList__clear(DeviceList* self);
 
 void Device__destroy(Device* self);
 Device * Device_create(OnvifDevice * onvif_device);
-void Device__addref(Device* device); 
+int Device__addref(Device* device); 
 void Device__unref(Device* device); 
 int Device__is_valid(Device* device); 
 
