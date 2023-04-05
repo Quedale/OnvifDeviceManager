@@ -1,6 +1,4 @@
 #include "overlay.h"
-#include <cairo.h>
-#include <stdio.h>
 #include "player.h"
 
 void prepare_overlay (GstElement * overlay, GstCaps * caps, gint window_width,

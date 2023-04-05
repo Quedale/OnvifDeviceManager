@@ -1,7 +1,7 @@
-#include <gtk/gtk.h>
-
 #ifndef CRED_INPUT_H_ 
 #define CRED_INPUT_H_
+
+#include <gtk/gtk.h>
 
 typedef struct {
     int visible;

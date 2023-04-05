@@ -1,12 +1,8 @@
-#include <gtk/gtk.h>
-
-
-#include "overlay.h"
-
-
-
 #ifndef ONVIF_PLAYER_H_ 
 #define ONVIF_PLAYER_H_
+
+#include <gtk/gtk.h>
+#include "overlay.h"
 
 
 typedef struct _RtspPlayer RtspPlayer;

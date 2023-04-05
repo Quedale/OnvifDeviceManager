@@ -1,10 +1,7 @@
-
-#include <gst/gst.h>
-#include <gst/video/video.h>
-#include <gio/gio.h>
-
 #ifndef ONVIF_PLAYER_OVERLAY_H_ 
 #define ONVIF_PLAYER_OVERLAY_H_
+
+#include <gst/video/video.h>
 
 typedef struct
 {
