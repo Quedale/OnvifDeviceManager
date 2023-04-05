@@ -1,5 +1,5 @@
 #include <string.h>
-#include "gst2/onvifinitstaticplugins.h"
+#include "gst/onvifinitstaticplugins.h"
 #include "app/onvif_app.h"
 #include <gst/pbutils/gstpluginsbaseversion.h>
 #include <gtk/gtk.h>

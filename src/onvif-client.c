@@ -10,8 +10,8 @@
 
 #include <gst/gst.h>
 #include <gst/video/gstvideodecoder.h>
-#include "gst2/gtk/gstgtkbasesink.h"
-#include "gst2/onvifinitstaticplugins.h"
+#include "gst/gtk/gstgtkbasesink.h"
+#include "gst/onvifinitstaticplugins.h"
 #include <gtk/gtk.h>
 #include<unistd.h>
 

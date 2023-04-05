@@ -29,8 +29,8 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "gst2/onvifinitstaticplugins.h"
-#include "gst2/sink-retriever.h"
+#include "gst/onvifinitstaticplugins.h"
+#include "gst/sink-retriever.h"
 
 const char *argp_program_version = "0.0";
 const char *argp_program_bug_address = "<your@email.address>";

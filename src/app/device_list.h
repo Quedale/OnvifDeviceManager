@@ -3,12 +3,14 @@
 
 #include "onvif_device.h"
 #include <gtk/gtk.h>
+#include "../queue/event_queue.h"
 
 typedef struct {
   OnvifDevice * onvif_device;
   GtkWidget * image_handle;
   GtkWidget * profile_dropdown;
   pthread_mutex_t * ref_lock;
+  int profile_index;
   int destroyed;
   int refcount;
   int selected;
@@ -27,9 +29,13 @@ void DeviceList__remove_element(DeviceList* self, int index);
 void DeviceList__clear(DeviceList* self);
 
 void Device__destroy(Device* self);
-Device * Device_create(OnvifDevice * onvif_device);
+Device * Device__create(OnvifDevice * onvif_device);
 int Device__addref(Device* device); 
 void Device__unref(Device* device); 
 int Device__is_valid(Device* device); 
+void Device__lookup_hostname(Device* device, EventQueue * queue); 
+void Device__load_thumbnail(Device* device, EventQueue * queue);
+void Device__load_profiles(Device* device, EventQueue * queue);
+GtkWidget * Device__create_row (Device * device, char * uri, char* name, char * hardware, char * location);
 
 #endif

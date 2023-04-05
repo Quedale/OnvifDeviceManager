@@ -1,28 +1,11 @@
 #include "onvif_app.h"
-#include "../gui/credentials_input.h"
-#include "../device_list.h"
+#include "credentials_input.h"
+#include "onvif_details.h"
+#include "onvif_nvt.h"
+#include "device_list.h"
 #include "../queue/event_queue.h"
-#include "../gst2/player.h"
+#include "../gst/player.h"
 #include "discoverer.h"
-#include "onvif_info_details.h"
-#include <netdb.h>
-#include <arpa/inet.h>
-
-extern char _binary_prohibited_icon_png_size[];
-extern char _binary_prohibited_icon_png_start[];
-extern char _binary_prohibited_icon_png_end[];
-
-extern char _binary_locked_icon_png_size[];
-extern char _binary_locked_icon_png_start[];
-extern char _binary_locked_icon_png_end[];
-
-extern char _binary_warning_png_size[];
-extern char _binary_warning_png_start[];
-extern char _binary_warning_png_end[];
-
-extern char _binary_microphone_png_size[];
-extern char _binary_microphone_png_start[];
-extern char _binary_microphone_png_end[];
 
 typedef struct _OnvifApp {
     Device* device; /* Currently selected device */
@@ -30,14 +13,13 @@ typedef struct _OnvifApp {
 
     GtkWidget *listbox;
     GtkWidget *main_notebook;
-    GtkWidget *details_notebook;
     GtkWidget *player_loading_handle;
 
-    OnvifInfoDetails * onvif_info_details;
     CredentialsDialog * dialog;
 
     int current_page;
 
+    OnvifDetails * details;
     EventQueue * queue;
     RtspPlayer * player;
 } OnvifApp;
@@ -57,23 +39,6 @@ struct DiscoveryInput {
     OnvifApp * app;
     GtkWidget * widget;
 };
-
-
-struct DeviceInput * DeviceInput_copy(struct DeviceInput * input){
-    struct DeviceInput * newinput = malloc(sizeof(struct DeviceInput));
-    newinput->device = input->device;
-    newinput->app = input->app;
-    return newinput;
-}
-
-struct PlayInput * PlayInput_copy(struct PlayInput * input){
-    struct PlayInput * newinput = malloc(sizeof(struct PlayInput));
-    newinput->app = input->app;
-    newinput->row = input->row;
-    newinput->app = input->app;
-    newinput->device = input->device;
-    return newinput;
-}
 
 /*
  *
@@ -139,29 +104,19 @@ void onvif_scan (GtkWidget *widget, OnvifApp * app) {
 
 }
 
-gboolean toggle_mic_cb (GtkWidget *widget, gpointer * p, gpointer * p2){
-    RtspPlayer * player = (RtspPlayer *) p2;
-    if(RtspPlayer__is_mic_mute(player)){
-        RtspPlayer__mic_mute(player,FALSE);
-    } else {
-        RtspPlayer__mic_mute(player,TRUE);
-    }
-    return FALSE;
-}
-
 void error_onvif_stream(RtspPlayer * player, void * user_data){
     OnvifApp * app = (OnvifApp *) user_data;
-    gtk_widget_hide(app->player_loading_handle);
+    gtk_spinner_stop (GTK_SPINNER (app->player_loading_handle));
 }
 
 void stopped_onvif_stream(RtspPlayer * player, void * user_data){
     OnvifApp * app = (OnvifApp *) user_data;
-    gtk_widget_hide(app->player_loading_handle);
+    gtk_spinner_stop (GTK_SPINNER (app->player_loading_handle));
 }
 
 void start_onvif_stream(RtspPlayer * player, void * user_data){
     OnvifApp * app = (OnvifApp *) user_data;
-    gtk_widget_show(app->player_loading_handle);
+    gtk_spinner_start (GTK_SPINNER (app->player_loading_handle));
 }
 
 void _retry_onvif_stream(void * user_data){
@@ -180,183 +135,17 @@ void _stop_onvif_stream(void * user_data){
     RtspPlayer__stop(app->player);
 }
 
-void _display_onvif_thumbnail(void * user_data, int profile_index){
-    GtkWidget *image;
-    GdkPixbufLoader *loader = NULL;
-    GdkPixbuf *pixbuf = NULL;
-    GdkPixbuf *scaled_pixbuf = NULL;
-    double size;
-    char * imgdata;
-    int freeimgdata = 0;
-
-    struct DeviceInput * input = (struct DeviceInput *) user_data;
-
-    if(!Device__addref(input->device)){
-        goto exit;
-    }
-
-    if(input->device->onvif_device->authorized){
-        //TODO handle profiles
-        struct chunk * imgchunk = OnvifDevice__media_getSnapshot(input->device->onvif_device,profile_index);
-        if(!imgchunk){
-            //TODO Set error image
-            printf("Error retrieve snapshot.");
-            goto exit;
-        }
-        imgdata = imgchunk->buffer;
-        size = imgchunk->size;
-        freeimgdata = 1;
-        free(imgchunk);
-    } else {
-        imgdata = _binary_locked_icon_png_start;
-        size = _binary_locked_icon_png_end - _binary_locked_icon_png_start;
-    }
-
-    //Check is device is still valid. (User performed scan before snapshot finished)
-    if(!Device__is_valid(input->device)){
-        goto exit;
-    }
-
-    //Attempt to get downloaded pixbuf or locked icon
-    loader = gdk_pixbuf_loader_new ();
-    GError *error = NULL;
-    if(gdk_pixbuf_loader_write (loader, (unsigned char *)imgdata, size,&error)){
-        pixbuf = gdk_pixbuf_loader_get_pixbuf (loader);
-    } else {
-        if(error->message){
-            printf("Error writing png to GtkPixbufLoader : %s\n",error->message);
-        } else {
-            printf("Error writing png to GtkPixbufLoader : [null]\n");
-        }
-    }
-  
-    //Show warning icon in case of failure
-    if(!pixbuf){
-        if(gdk_pixbuf_loader_write (loader, (unsigned char *)_binary_warning_png_start, _binary_warning_png_end - _binary_warning_png_start,&error)){
-            pixbuf = gdk_pixbuf_loader_get_pixbuf (loader);
-        } else {
-            if(error->message){
-                printf("Error writing warning png to GtkPixbufLoader : %s\n",error->message);
-            } else {
-                printf("Error writing warning png to GtkPixbufLoader : [null]\n");
-            }
-        }
-    }
-
-    //Check is device is still valid. (User performed scan before spinner showed)
-    if(!Device__is_valid(input->device)){
-        goto exit;
-    }
-
-    //Remove previous image
-    gtk_container_foreach (GTK_CONTAINER (input->device->image_handle), (void*) gtk_widget_destroy, NULL);
-
-    //Display pixbuf
-    if(pixbuf){
-        double ph = gdk_pixbuf_get_height (pixbuf);
-        double pw = gdk_pixbuf_get_width (pixbuf);
-        double newpw = 40 / ph * pw;
-        scaled_pixbuf = gdk_pixbuf_scale_simple (pixbuf,newpw,40,GDK_INTERP_NEAREST);
-        image = gtk_image_new_from_pixbuf (scaled_pixbuf);
-
-        //Check is device is still valid. (User performed scan before scale finished)
-        if(!Device__is_valid(input->device)){
-            goto exit;
-        }
-
-        gtk_container_add (GTK_CONTAINER (input->device->image_handle), image);
-        gtk_widget_show (image);
-    } else {
-        printf("Failed all thumbnail creation.\n");
-    }
-
-exit:
-    if(loader){
-        gdk_pixbuf_loader_close(loader,NULL);
-        g_object_unref(loader);
-    }
-    if(scaled_pixbuf){
-        g_object_unref(scaled_pixbuf);
-    }
-    if(freeimgdata){
-        free(imgdata);
-    }
-    Device__unref(input->device);
-}
-
-//WIP Profile selection
-void _display_onvif_profiles(void * user_data){
-    struct DeviceInput * input = (struct DeviceInput *) user_data;
-
-    if(!input->device->onvif_device->authorized){
-        return;
-    }
-
-    GtkListStore *liststore = GTK_LIST_STORE(gtk_combo_box_get_model(GTK_COMBO_BOX(input->device->profile_dropdown)));
-    OnvifDevice_get_profiles(input->device->onvif_device);
-    for (int i = 0; i < input->device->onvif_device->sizeSrofiles; i++){
-        printf("Profile name: %s\n", input->device->onvif_device->profiles[i].name);
-        printf("Profile token: %s\n", input->device->onvif_device->profiles[i].token);
-
-        // if(i == 0){
-        //   gtk_entry_set_text (GTK_ENTRY (GTK_COMBO(input->device->profile_dropdown)->entry), input->device->onvif_device->profiles[i].name);
-        // }
-
-        // GtkListStore *liststore = gtk_list_store_new(2, G_TYPE_STRING, G_TYPE_STRING);
-        gtk_list_store_insert_with_values(liststore, NULL, -1,
-                                        // 0, "red",
-                                        1, input->device->onvif_device->profiles[i].name,
-                                        // 2, input->device->onvif_device->profiles[i].token,
-                                        -1);
-    }
-    gtk_combo_box_set_active(GTK_COMBO_BOX(input->device->profile_dropdown),0);
-    gtk_widget_set_sensitive (input->device->profile_dropdown, TRUE);
-    // gtk_combo_set_popdown_strings (GTK_COMBO(input->device->profile_dropdown), cbitems);
-
-}
-
 void _display_onvif_device(void * user_data){
     struct DeviceInput * input = (struct DeviceInput *) user_data;
     /* Start by authenticating the device then start retrieve thumbnail */
     OnvifDevice_authenticate(input->device->onvif_device);
 
     /* Display Profile dropdown */
-    // _display_onvif_profiles(input);
+    // Device__load_profiles(input->device,input->app->queue);
 
     /* Display row thumbnail. Default to profile index 0 */
-    _display_onvif_thumbnail(input, 0);
+    Device__load_thumbnail(input->device,input->app->queue);
 
-    free(input);
-}
-
-void _display_nslookup_hostname(void * user_data){
-    struct DeviceInput * input = (struct DeviceInput *) user_data;
-    char * hostname;
-
-    if(!Device__addref(input->device)){
-        goto exit;
-    }
-
-    printf("NSLookup ... %s\n",input->device->onvif_device->ip);
-    //Lookup hostname
-    struct in_addr in_a;
-    inet_pton(AF_INET, input->device->onvif_device->ip, &in_a);
-    struct hostent* host;
-    host = gethostbyaddr( (const void*)&in_a, 
-                        sizeof(struct in_addr), 
-                        AF_INET );
-    if(host){
-        printf("Found hostname : %s\n",host->h_name);
-        hostname = host->h_name;
-    } else {
-        printf("Failed to get hostname ...\n");
-        hostname = NULL;
-    }
-
-    printf("Retrieved hostname : %s\n",hostname);
-
-exit:
-    Device__unref(input->device);
     free(input);
 }
 
@@ -372,7 +161,7 @@ void onvif_display_device_row(OnvifApp * self, Device * device){
     input->app = self;
 
     /* nslookup doesn't require onvif authentication. Dispatch event now. */
-    EventQueue__insert(self->queue,_display_nslookup_hostname,DeviceInput_copy(input));
+    Device__lookup_hostname(self->device,self->queue);
 
     EventQueue__insert(self->queue,_display_onvif_device,input);
 }
@@ -411,7 +200,7 @@ void update_details(OnvifApp * self){
     if(!self->current_page){//NVT is displayed
         return;
     }
-    OnvifInfoDetails_update_details(self->onvif_info_details,self->device,self->queue);
+    OnvifDetails_update_details(self->details,self->device,self->queue);
 }
 
 void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
@@ -419,7 +208,7 @@ void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
     input->app = app;
     input->row = row;
 
-    OnvifInfoDetails_clear_details(input->app->onvif_info_details);
+    OnvifDetails_clear_details(input->app->details);
     EventQueue__insert(app->queue,_stop_onvif_stream,app);
     if(input->app->device){
         input->app->device->selected = 0;
@@ -455,7 +244,7 @@ void row_selected_cb (GtkWidget *widget,   GtkListBoxRow* row,
 }
 
 static void switch_page (GtkNotebook* self, GtkWidget* page, guint page_num, OnvifApp * app) {
-    OnvifInfoDetails_clear_details(app->onvif_info_details);
+    OnvifDetails_clear_details(app->details);
     app->current_page = page_num;
     update_details(app);
 }
@@ -465,74 +254,6 @@ static void switch_page (GtkNotebook* self, GtkWidget* page, guint page_num, Onv
  *  UI Creation
  *
  */
-
-GtkWidget * create_details_ui (OnvifApp * app){
-    GtkWidget * widget;
-    GtkWidget *label;
-    char * TITLE_STR = "Information";
-
-    app->details_notebook = gtk_notebook_new ();
-
-    gtk_notebook_set_tab_pos (GTK_NOTEBOOK (app->details_notebook), GTK_POS_LEFT);
-
-    widget = OnvifInfoDetails__create_ui(app->onvif_info_details);
-
-    label = gtk_label_new (TITLE_STR);
-    gtk_notebook_append_page (GTK_NOTEBOOK (app->details_notebook), widget, label);
-
-    return app->details_notebook;
-}
-
-GtkWidget * create_controls_overlay(RtspPlayer *player){
-
-    GdkPixbufLoader *loader = gdk_pixbuf_loader_new ();
-    gdk_pixbuf_loader_write (loader, (unsigned char *)_binary_microphone_png_start, _binary_microphone_png_end - _binary_microphone_png_start, NULL);
-
-    GdkPixbuf *pixbuf = gdk_pixbuf_loader_get_pixbuf (loader);
-    double ph = gdk_pixbuf_get_height (pixbuf);
-    double pw = gdk_pixbuf_get_width (pixbuf);
-    double newpw = 30 / ph * pw;
-    pixbuf = gdk_pixbuf_scale_simple (pixbuf,newpw,30,GDK_INTERP_NEAREST);
-    GtkWidget * image = gtk_image_new_from_pixbuf (pixbuf); 
-
-    GtkWidget * widget = gtk_button_new ();
-    g_signal_connect (widget, "button-press-event", G_CALLBACK (toggle_mic_cb), player);
-    g_signal_connect (widget, "button-release-event", G_CALLBACK (toggle_mic_cb), player);
-
-    gtk_button_set_image (GTK_BUTTON (widget), image);
-
-    GtkWidget * fixed = gtk_fixed_new();
-    gtk_fixed_put(GTK_FIXED(fixed),widget,10,10); 
-    return fixed;
-}
-
-GtkWidget * create_nvt_ui (RtspPlayer * player){
-    GtkWidget *grid;
-    GtkWidget *widget;
-
-    grid = gtk_grid_new ();
-    widget = OnvifDevice__createCanvas(player);
-    gtk_widget_set_vexpand (widget, TRUE);
-    gtk_widget_set_hexpand (widget, TRUE);
-
-    gtk_grid_attach (GTK_GRID (grid), widget, 0, 1, 1, 1);
-
-    GtkCssProvider * cssProvider = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(cssProvider, "* { background-image:none; background-color:black;}",-1,NULL); 
-    GtkStyleContext * context = gtk_widget_get_style_context(grid);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
-    g_object_unref (cssProvider);  
-
-    GtkWidget * overlay =gtk_overlay_new();
-    gtk_container_add (GTK_CONTAINER (overlay), grid);
-
-    widget = create_controls_overlay(player);
-
-    gtk_overlay_add_overlay(GTK_OVERLAY(overlay),widget);
-    return overlay;
-}
-
-
 void create_ui (OnvifApp * app) {
     GtkWidget *main_window;  /* The uppermost window, containing all other windows */
     GtkWidget *grid;
@@ -599,31 +320,29 @@ void create_ui (OnvifApp * app) {
 
     //Hidden spinner used to display stream start loading
     app->player_loading_handle = gtk_spinner_new ();
-    gtk_spinner_start (GTK_SPINNER (app->player_loading_handle));
 
     //Only show label and keep loading hidden
     hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL,  6);
     gtk_box_pack_start (GTK_BOX(hbox),label,TRUE,TRUE,0);
     gtk_box_pack_start(GTK_BOX(hbox),app->player_loading_handle,FALSE,FALSE,0);
-    gtk_widget_show(label);
+    gtk_widget_show_all(hbox);
 
-    widget = create_nvt_ui(app->player);
+    widget = OnvifNVT__create_ui(app->player);
     gtk_notebook_append_page (GTK_NOTEBOOK (app->main_notebook), widget, hbox);
 
     label = gtk_label_new ("Details");
 
     //Hidden spinner used to display stream start loading
     widget = gtk_spinner_new ();
-    gtk_spinner_start (GTK_SPINNER (widget));
-    OnvifInfoDetails_set_details_loading_handle(app->onvif_info_details,widget);
+    OnvifDetails_set_details_loading_handle(app->details,widget);
 
     //Only show label and keep loading hidden
     hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL,  6);
     gtk_box_pack_start (GTK_BOX(hbox),label,TRUE,TRUE,0);
     gtk_box_pack_start(GTK_BOX(hbox),widget,FALSE,FALSE,0);
-    gtk_widget_show(label);
+    gtk_widget_show_all(hbox);
 
-    widget = create_details_ui(app);
+    widget = OnvifDetails__get_widget(app->details);
 
     gtk_notebook_append_page (GTK_NOTEBOOK (app->main_notebook), widget, hbox);
 
@@ -631,82 +350,6 @@ void create_ui (OnvifApp * app) {
     gtk_widget_show_all (main_window);
     g_signal_connect (G_OBJECT (app->main_notebook), "switch-page", G_CALLBACK (switch_page), app);
 
-}
-
-static GtkWidget *
-create_device_row (OnvifApp * app, Device * device, char * uri, char* name, char * hardware, char * location)
-{
-    GtkWidget *row;
-    GtkWidget *grid;
-    GtkWidget *label;
-    GtkWidget *image;
-    
-    row = gtk_list_box_row_new ();
-
-    grid = gtk_grid_new ();
-    g_object_set (grid, "margin", 5, NULL);
-
-    image = gtk_spinner_new ();
-    gtk_spinner_start (GTK_SPINNER (image));
-
-    GtkWidget * thumbnail_handle = gtk_event_box_new ();
-    device->image_handle = thumbnail_handle;
-    gtk_container_add (GTK_CONTAINER (thumbnail_handle), image);
-    g_object_set (thumbnail_handle, "margin-end", 10, NULL);
-    gtk_grid_attach (GTK_GRID (grid), thumbnail_handle, 0, 1, 1, 3);
-
-    char* markup_name = malloc(strlen(name)+1+7);
-    strcpy(markup_name, "<b>");
-    strcat(markup_name, name);
-    strcat(markup_name, "</b>");
-    label = gtk_label_new (NULL);
-    gtk_label_set_markup(GTK_LABEL(label), markup_name);
-    g_object_set (label, "margin-end", 5, NULL);
-    gtk_widget_set_hexpand (label, TRUE);
-    gtk_grid_attach (GTK_GRID (grid), label, 0, 0, 2, 1);
-
-    label = gtk_label_new (device->onvif_device->ip);
-    g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
-    gtk_widget_set_hexpand (label, TRUE);
-    gtk_grid_attach (GTK_GRID (grid), label, 1, 1, 1, 1);
-
-    label = gtk_label_new (hardware);
-    g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
-    gtk_widget_set_hexpand (label, TRUE);
-    gtk_grid_attach (GTK_GRID (grid), label, 1, 2, 1, 1);
-
-    label = gtk_label_new (location);
-    gtk_label_set_ellipsize (GTK_LABEL(label),PANGO_ELLIPSIZE_END);
-    g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
-    gtk_widget_set_hexpand (label, TRUE);
-    gtk_grid_attach (GTK_GRID (grid), label, 1, 3, 1, 1);
-
-//WIP - ONVIF profile selection
-/* 
-  GtkListStore *liststore = gtk_list_store_new(2, G_TYPE_STRING, G_TYPE_STRING);
-  device->profile_dropdown = gtk_combo_box_new_with_model(GTK_TREE_MODEL(liststore));
-  // liststore is now owned by combo, so the initial reference can be dropped 
-  g_object_unref(liststore);
-
-  GtkCellRenderer  * column = gtk_cell_renderer_text_new();
-  gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(device->profile_dropdown), column, TRUE);
-
-  gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(device->profile_dropdown), column,
-                                  "cell-background", 0,
-                                  "text", 1,
-                                  NULL);
-                                  
-  gtk_widget_set_sensitive (device->profile_dropdown, FALSE);
-  gtk_grid_attach (GTK_GRID (grid), device->profile_dropdown, 0, 4, 2, 1);
-*/
-
-    gtk_container_add (GTK_CONTAINER (row), grid);
-  
-    //For some reason, spinner has a floating ref
-    //This is required to keep ability to remove the spinner later
-    g_object_ref(image);
-
-    return row;
 }
 
 void _onvif_authentication(void * user_data){
@@ -732,15 +375,14 @@ void _onvif_authentication(void * user_data){
     gtk_container_add (GTK_CONTAINER (input->device->image_handle), image);
     gtk_widget_show (image);
 
-    OnvifInfoDetails_clear_details(input->app->onvif_info_details);
+    OnvifDetails_clear_details(input->app->details);
     CredentialsDialog__hide(input->app->dialog);
     onvif_display_device_row(input->app, input->device);
-    EventQueue__insert(input->app->queue,_play_onvif_stream,PlayInput_copy(input));
+    EventQueue__insert(input->app->queue,_play_onvif_stream,input); //Input is cleaned up here
     update_details(input->app);
 
 exit:
     Device__unref(input->device);
-    free(input);
     free(event);
 }
 
@@ -763,7 +405,7 @@ OnvifApp * OnvifApp__create(){
     app->device = NULL;
     app->dialog = CredentialsDialog__create(dialog_login_cb, dialog_cancel_cb);
     app->queue = EventQueue__create();
-    app->onvif_info_details = OnvifInfoDetails__create();
+    app->details = OnvifDetails__create();
     app->current_page = 0;
 
     //Defaults 4 paralell event threads.
@@ -789,7 +431,7 @@ OnvifApp * OnvifApp__create(){
 
 void OnvifApp__destroy(OnvifApp* self){
     if (self) {
-        OnvifInfoDetails__destroy(self->onvif_info_details);
+        OnvifDetails__destroy(self->details);
         CredentialsDialog__destroy(self->dialog);
         RtspPlayer__destroy(self->player);
         EventQueue__destroy(self->queue);
@@ -800,14 +442,14 @@ void OnvifApp__destroy(OnvifApp* self){
 
 void add_device(OnvifApp * self, char * uri, char* name, char * hardware, char * location){
     OnvifDevice * onvif_dev = OnvifDevice__create(uri);
-    Device * device = Device_create(onvif_dev);
+    Device * device = Device__create(onvif_dev);
     DeviceList__insert_element(self->device_list,device,self->device_list->device_count);
     int b;
     for (b=0;b<self->device_list->device_count;b++){
         printf("DEBUG List Record :[%i] %s:%s\n",b,self->device_list->devices[b]->onvif_device->ip,self->device_list->devices[b]->onvif_device->port);
     }
 
-    GtkWidget * row = create_device_row(self, device, uri, name, hardware, location);
+    GtkWidget * row = Device__create_row(device, uri, name, hardware, location);
     
     gtk_list_box_insert (GTK_LIST_BOX (self->listbox), row, -1);
     gtk_widget_show_all (row);
