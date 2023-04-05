@@ -200,7 +200,7 @@ void update_details(OnvifApp * self){
     if(!self->current_page){//NVT is displayed
         return;
     }
-    OnvifDetails_update_details(self->details,self->device,self->queue);
+    OnvifDetails_update_details(self->details,self->device);
 }
 
 void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
@@ -287,12 +287,15 @@ void create_ui (OnvifApp * app) {
     g_signal_connect (widget, "clicked", G_CALLBACK (onvif_scan), app);
 
     /* --- Create a list item from the data element --- */
+    widget = gtk_scrolled_window_new (NULL, NULL);
     app->listbox = gtk_list_box_new ();
-    gtk_widget_set_size_request(app->listbox,100,-1);
+    gtk_widget_set_size_request(widget,200,-1);
+    gtk_widget_set_size_request(app->listbox,200,-1);
     gtk_widget_set_vexpand (app->listbox, TRUE);
     gtk_widget_set_hexpand (app->listbox, FALSE);
     gtk_list_box_set_selection_mode (GTK_LIST_BOX (app->listbox), GTK_SELECTION_SINGLE);
-    gtk_grid_attach (GTK_GRID (grid), app->listbox, 0, 1, 1, 1);
+    gtk_container_add(GTK_CONTAINER(widget),app->listbox);
+    gtk_grid_attach (GTK_GRID (grid), widget, 0, 1, 1, 1);
     g_signal_connect (app->listbox, "row-selected", G_CALLBACK (row_selected_cb), app);
 
     widget = gtk_button_new_with_label ("Quit");
@@ -346,7 +349,17 @@ void create_ui (OnvifApp * app) {
 
     gtk_notebook_append_page (GTK_NOTEBOOK (app->main_notebook), widget, hbox);
 
-    gtk_window_set_default_size(GTK_WINDOW(main_window),640,480);
+    GdkRectangle workarea = {0};
+    gdk_monitor_get_workarea(
+        gdk_display_get_primary_monitor(gdk_display_get_default()),
+        &workarea);
+
+    if(workarea.width > 775){//If resolution allows it, big enough to show no scrollbars
+        gtk_window_set_default_size(GTK_WINDOW(main_window),775,480);
+    } else {//Resolution is so low that we launch fullscreen
+        gtk_window_set_default_size(GTK_WINDOW(main_window),workarea.width,workarea.height);
+    }
+
     gtk_widget_show_all (main_window);
     g_signal_connect (G_OBJECT (app->main_notebook), "switch-page", G_CALLBACK (switch_page), app);
 
@@ -405,7 +418,7 @@ OnvifApp * OnvifApp__create(){
     app->device = NULL;
     app->dialog = CredentialsDialog__create(dialog_login_cb, dialog_cancel_cb);
     app->queue = EventQueue__create();
-    app->details = OnvifDetails__create();
+    app->details = OnvifDetails__create(app->queue);
     app->current_page = 0;
 
     //Defaults 4 paralell event threads.

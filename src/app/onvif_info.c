@@ -1,11 +1,6 @@
 #include "onvif_info.h"
 #include "gui_utils.h"
 
-typedef struct {
-    Device * device;
-    OnvifInfo * info;
-} OnvifInformationRequest;
-
 typedef struct _OnvifInfo {
     GtkWidget * info_page;
     GtkWidget * name_lbl;
@@ -21,45 +16,54 @@ typedef struct _OnvifInfo {
     GtkWidget * version_lbl;
     GtkWidget * uri_lbl;
 
+    EventQueue * queue;
     GtkWidget * widget;
+    Device * device;
 
     void (*done_callback)(OnvifInfo *, void * user_data);
     void * done_user_data;
 } OnvifInfo;
 
 void OnvifInfo__create_ui(OnvifInfo * self){
-    printf("OnvifInfo__create_ui\n");
-    self->widget = gtk_grid_new ();
+    self->widget = gtk_scrolled_window_new (NULL, NULL);
+
+    GtkWidget * grid = gtk_grid_new();
 
     int i = 0;
-    self->name_lbl = add_label_entry(self->widget,i++,"Name : ");
+    self->name_lbl = add_label_entry(grid,i++,"Name : ");
 
-    self->hostname_lbl = add_label_entry(self->widget,i++,"Hostname : ");
+    self->hostname_lbl = add_label_entry(grid,i++,"Hostname : ");
 
-    self->location_lbl = add_label_entry(self->widget,i++,"Location : ");
+    self->location_lbl = add_label_entry(grid,i++,"Location : ");
 
-    self->manufacturer_lbl = add_label_entry(self->widget,i++,"Manufacturer : ");
+    self->manufacturer_lbl = add_label_entry(grid,i++,"Manufacturer : ");
 
-    self->model_lbl = add_label_entry(self->widget,i++,"Model : ");
+    self->model_lbl = add_label_entry(grid,i++,"Model : ");
 
-    self->hardware_lbl = add_label_entry(self->widget,i++,"Hardware : ");
+    self->hardware_lbl = add_label_entry(grid,i++,"Hardware : ");
 
-    self->firmware_lbl = add_label_entry(self->widget,i++,"Firmware : ");
+    self->firmware_lbl = add_label_entry(grid,i++,"Firmware : ");
 
-    self->serial_lbl = add_label_entry(self->widget,i++,"Device ID : ");
+    self->serial_lbl = add_label_entry(grid,i++,"Device ID : ");
 
-    self->ip_lbl = add_label_entry(self->widget,i++,"IP Address : ");
+    self->ip_lbl = add_label_entry(grid,i++,"IP Address : ");
 
     self->mac_lbl =  gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
-    gtk_grid_attach (GTK_GRID (self->widget), self->mac_lbl, 0, i++, 2, 1);
+    gtk_grid_attach (GTK_GRID (grid), self->mac_lbl, 0, i++, 2, 1);
 
-    self->version_lbl = add_label_entry(self->widget,i++,"ONVIF Version : ");
+    self->version_lbl = add_label_entry(grid,i++,"ONVIF Version : ");
 
-    self->uri_lbl = add_label_entry(self->widget,i++,"URI : ");
+    self->uri_lbl = add_label_entry(grid,i++,"URI : ");
+
+    gtk_container_add(GTK_CONTAINER(self->widget),grid);
 }
 
-OnvifInfo * OnvifInfo__create(){
+OnvifInfo * OnvifInfo__create(EventQueue * queue){
     OnvifInfo *info  =  malloc(sizeof(OnvifInfo));
+    info->queue = queue;
+    info->device = NULL;
+    info->done_callback = NULL;
+    info->done_user_data = NULL;
     OnvifInfo__create_ui(info);
     return info;
 }
@@ -76,50 +80,50 @@ void _update_details_page(void * user_data){
     OnvifInterfaces * interfaces = NULL;
     OnvifScopes * scopes = NULL;
 
-    OnvifInformationRequest * req = (OnvifInformationRequest *) user_data;
-    if(!Device__addref(req->device) || !req->device->selected){
+    OnvifInfo * self = (OnvifInfo *) user_data;
+    if(!Device__addref(self->device) || !self->device->selected){
         goto exit;
     }
 
-    hostname = OnvifDevice__device_getHostname(req->device->onvif_device);
-    if(!Device__is_valid(req->device) || !req->device->selected)
+    hostname = OnvifDevice__device_getHostname(self->device->onvif_device);
+    if(!Device__is_valid(self->device) || !self->device->selected)
         goto exit;
-    dev_info = OnvifDevice__device_getDeviceInformation(req->device->onvif_device);
-    if(!Device__is_valid(req->device) || !req->device->selected)
+    dev_info = OnvifDevice__device_getDeviceInformation(self->device->onvif_device);
+    if(!Device__is_valid(self->device) || !self->device->selected)
         goto exit;
-    interfaces = OnvifDevice__device_getNetworkInterfaces(req->device->onvif_device);
-    if(!Device__is_valid(req->device) || !req->device->selected)
+    interfaces = OnvifDevice__device_getNetworkInterfaces(self->device->onvif_device);
+    if(!Device__is_valid(self->device) || !self->device->selected)
         goto exit;
-    scopes = OnvifDevice__device_getScopes(req->device->onvif_device);
-    if(!Device__is_valid(req->device) || !req->device->selected)
+    scopes = OnvifDevice__device_getScopes(self->device->onvif_device);
+    if(!Device__is_valid(self->device) || !self->device->selected)
         goto exit;
 
-    gtk_entry_set_text(GTK_ENTRY(req->info->name_lbl),OnvifScopes__extract_scope(scopes,"name"));
-    gtk_editable_set_editable  ((GtkEditable*)req->info->name_lbl, FALSE);
+    gtk_entry_set_text(GTK_ENTRY(self->name_lbl),OnvifScopes__extract_scope(scopes,"name"));
+    gtk_editable_set_editable  ((GtkEditable*)self->name_lbl, FALSE);
 
-    gtk_entry_set_text(GTK_ENTRY(req->info->hostname_lbl),hostname);
-    gtk_editable_set_editable  ((GtkEditable*)req->info->hostname_lbl, FALSE);
+    gtk_entry_set_text(GTK_ENTRY(self->hostname_lbl),hostname);
+    gtk_editable_set_editable  ((GtkEditable*)self->hostname_lbl, FALSE);
 
-    gtk_entry_set_text(GTK_ENTRY(req->info->location_lbl),OnvifScopes__extract_scope(scopes,"location"));
-    gtk_editable_set_editable  ((GtkEditable*)req->info->location_lbl, FALSE);
+    gtk_entry_set_text(GTK_ENTRY(self->location_lbl),OnvifScopes__extract_scope(scopes,"location"));
+    gtk_editable_set_editable  ((GtkEditable*)self->location_lbl, FALSE);
 
-    gtk_entry_set_text(GTK_ENTRY(req->info->manufacturer_lbl),dev_info->manufacturer);
-    gtk_editable_set_editable  ((GtkEditable*)req->info->manufacturer_lbl, FALSE);
+    gtk_entry_set_text(GTK_ENTRY(self->manufacturer_lbl),dev_info->manufacturer);
+    gtk_editable_set_editable  ((GtkEditable*)self->manufacturer_lbl, FALSE);
 
-    gtk_entry_set_text(GTK_ENTRY(req->info->model_lbl),dev_info->model);
-    gtk_editable_set_editable  ((GtkEditable*)req->info->model_lbl, FALSE);
+    gtk_entry_set_text(GTK_ENTRY(self->model_lbl),dev_info->model);
+    gtk_editable_set_editable  ((GtkEditable*)self->model_lbl, FALSE);
     
-    gtk_entry_set_text(GTK_ENTRY(req->info->hardware_lbl),dev_info->hardwareId);
-    gtk_editable_set_editable  ((GtkEditable*)req->info->hardware_lbl, FALSE);
+    gtk_entry_set_text(GTK_ENTRY(self->hardware_lbl),dev_info->hardwareId);
+    gtk_editable_set_editable  ((GtkEditable*)self->hardware_lbl, FALSE);
     
-    gtk_entry_set_text(GTK_ENTRY(req->info->firmware_lbl),dev_info->firmwareVersion);
-    gtk_editable_set_editable  ((GtkEditable*)req->info->firmware_lbl, FALSE);
+    gtk_entry_set_text(GTK_ENTRY(self->firmware_lbl),dev_info->firmwareVersion);
+    gtk_editable_set_editable  ((GtkEditable*)self->firmware_lbl, FALSE);
 
-    gtk_entry_set_text(GTK_ENTRY(req->info->serial_lbl),dev_info->serialNumber);
-    gtk_editable_set_editable  ((GtkEditable*)req->info->serial_lbl, FALSE);
+    gtk_entry_set_text(GTK_ENTRY(self->serial_lbl),dev_info->serialNumber);
+    gtk_editable_set_editable  ((GtkEditable*)self->serial_lbl, FALSE);
 
-    gtk_entry_set_text(GTK_ENTRY(req->info->ip_lbl),req->device->onvif_device->ip);
-    gtk_editable_set_editable  ((GtkEditable*)req->info->ip_lbl, FALSE);
+    gtk_entry_set_text(GTK_ENTRY(self->ip_lbl),self->device->onvif_device->ip);
+    gtk_editable_set_editable  ((GtkEditable*)self->ip_lbl, FALSE);
 
     int mac_count=0;
     for(int i=0;i<interfaces->count;i++){
@@ -127,7 +131,7 @@ void _update_details_page(void * user_data){
         if(interface->ipv4_enabled){
             for(int a=0;a<interface->ipv4_manual_count;a++){
                 char * ip = interface->ipv4_manual[a];
-                if(!strcmp(ip,req->device->onvif_device->ip)){
+                if(!strcmp(ip,self->device->onvif_device->ip)){
                     mac_count++;
                     char * format = "MAC Address #%i : ";
                     char buff[27];
@@ -143,18 +147,18 @@ void _update_details_page(void * user_data){
                     gtk_editable_set_editable  ((GtkEditable*)widget, FALSE);
                     gtk_grid_attach (GTK_GRID (grid), widget, 1, mac_count, 1, 1);
                     
-                    gtk_box_pack_start (GTK_BOX(req->info->mac_lbl),grid,FALSE,FALSE,0);
+                    gtk_box_pack_start (GTK_BOX(self->mac_lbl),grid,FALSE,FALSE,0);
                     gtk_widget_show_all(grid);
                 }
             }
         }
     }
   
-    gtk_entry_set_text(GTK_ENTRY(req->info->version_lbl),"SomeName");
-    gtk_editable_set_editable  ((GtkEditable*)req->info->version_lbl, FALSE);
+    gtk_entry_set_text(GTK_ENTRY(self->version_lbl),"SomeName");
+    gtk_editable_set_editable  ((GtkEditable*)self->version_lbl, FALSE);
 
-    gtk_entry_set_text(GTK_ENTRY(req->info->uri_lbl),req->device->onvif_device->device_soap->endpoint);
-    gtk_editable_set_editable  ((GtkEditable*)req->info->uri_lbl, FALSE);
+    gtk_entry_set_text(GTK_ENTRY(self->uri_lbl),self->device->onvif_device->device_soap->endpoint);
+    gtk_editable_set_editable  ((GtkEditable*)self->uri_lbl, FALSE);
 
 exit:
     if(hostname)
@@ -162,17 +166,14 @@ exit:
     OnvifDeviceInformation__destroy(dev_info);
     OnvifInterfaces__destroy(interfaces);
     OnvifScopes__destroy(scopes);
-    Device__unref(req->device);
-    if(req->info->done_callback)
-        (*(req->info->done_callback))(req->info, req->info->done_user_data);
-    free(req);
+    Device__unref(self->device);
+    if(self->done_callback)
+        (*(self->done_callback))(self, self->done_user_data);
 }
 
-void OnvifInfo_update_details(OnvifInfo * self, Device * device, EventQueue * queue){
-    OnvifInformationRequest * req = malloc(sizeof(OnvifInformationRequest));
-    req->info = self;
-    req->device = device;
-    EventQueue__insert(queue,_update_details_page,req);
+void OnvifInfo_update_details(OnvifInfo * self, Device * device){
+    self->device = device;
+    EventQueue__insert(self->queue,_update_details_page,self);
 }
 
 void OnvifInfo_clear_details(OnvifInfo * self){
