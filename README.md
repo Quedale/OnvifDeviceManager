@@ -1,7 +1,7 @@
 # OnvifDeviceManager
 Onvif Device Manager for Linux
 
-![Application Capture](AppCapture.png?raw=true "OnvifDeviceMgr Linux")
+![Application Capture](images/AppCapture.png?raw=true "OnvifDeviceMgr Linux")
 
 # Description
 The goal of this project is to implement a Onvif Device Manager similar to the windows client, compatible for linux. I'm also working on adding some Profile T capabilities, such as bidirectional audio.
