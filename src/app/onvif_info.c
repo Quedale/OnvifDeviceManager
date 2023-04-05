@@ -71,24 +71,29 @@ void OnvifInfo__destroy(OnvifInfo* self){
 }
 
 void _update_details_page(void * user_data){
+    char * hostname = NULL;
+    OnvifDeviceInformation * dev_info = NULL;
+    OnvifInterfaces * interfaces = NULL;
+    OnvifScopes * scopes = NULL;
+
     OnvifInformationRequest * req = (OnvifInformationRequest *) user_data;
     if(!Device__addref(req->device) || !req->device->selected){
         goto exit;
     }
 
-    char * hostname = OnvifDevice__device_getHostname(req->device->onvif_device);
+    hostname = OnvifDevice__device_getHostname(req->device->onvif_device);
     if(!Device__is_valid(req->device) || !req->device->selected)
         goto exit;
-    OnvifDeviceInformation * dev_info = OnvifDevice__device_getDeviceInformation(req->device->onvif_device);
+    dev_info = OnvifDevice__device_getDeviceInformation(req->device->onvif_device);
     if(!Device__is_valid(req->device) || !req->device->selected)
         goto exit;
-    OnvifInterfaces * interfaces = OnvifDevice__device_getNetworkInterfaces(req->device->onvif_device);
+    interfaces = OnvifDevice__device_getNetworkInterfaces(req->device->onvif_device);
     if(!Device__is_valid(req->device) || !req->device->selected)
         goto exit;
-    OnvifScopes * scopes = OnvifDevice__device_getScopes(req->device->onvif_device);
+    scopes = OnvifDevice__device_getScopes(req->device->onvif_device);
     if(!Device__is_valid(req->device) || !req->device->selected)
         goto exit;
-    
+
     gtk_entry_set_text(GTK_ENTRY(req->info->name_lbl),OnvifScopes__extract_scope(scopes,"name"));
     gtk_editable_set_editable  ((GtkEditable*)req->info->name_lbl, FALSE);
 
@@ -152,6 +157,11 @@ void _update_details_page(void * user_data){
     gtk_editable_set_editable  ((GtkEditable*)req->info->uri_lbl, FALSE);
 
 exit:
+    if(hostname)
+        free(hostname);
+    OnvifDeviceInformation__destroy(dev_info);
+    OnvifInterfaces__destroy(interfaces);
+    OnvifScopes__destroy(scopes);
     Device__unref(req->device);
     if(req->info->done_callback)
         (*(req->info->done_callback))(req->info, req->info->done_user_data);

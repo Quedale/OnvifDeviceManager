@@ -17,8 +17,10 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 # TODO
 - Support Multiple Onvif Profiles
 - Credential Storage 
+- Add option to scale up stream.
 - EventQueue : Interupt pending events when needed
-- Display Onvif device information
+- Edit Onvif device identification
+- Display Onvif network information
 - Display Media information
 - Better Look&Feel
 - Testing with a variety of camera
