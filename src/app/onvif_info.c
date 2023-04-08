@@ -24,6 +24,25 @@ typedef struct _OnvifInfo {
     void * done_user_data;
 } OnvifInfo;
 
+
+typedef struct {
+    OnvifInfo * info;
+    char * name;
+    char * hostname;
+    char * location;
+    char * manufacturer;
+    char * model;
+    char * hardware;
+    char * firmware;
+    char * serial;
+    char * ip;
+    int mac_count;
+    char ** macs;
+    char * version;
+    char * uri;
+
+} InfoGUIUpdate;
+
 void OnvifInfo__create_ui(OnvifInfo * self){
     self->widget = gtk_scrolled_window_new (NULL, NULL);
 
@@ -74,6 +93,68 @@ void OnvifInfo__destroy(OnvifInfo* self){
     }
 }
 
+gboolean * onvif_info_gui_update (void * user_data){
+    InfoGUIUpdate * update = (InfoGUIUpdate *) user_data;
+
+    gtk_entry_set_text(GTK_ENTRY(update->info->name_lbl),update->name);
+    gtk_editable_set_editable  ((GtkEditable*)update->info->name_lbl, FALSE);
+
+    gtk_entry_set_text(GTK_ENTRY(update->info->hostname_lbl),update->hostname);
+    gtk_editable_set_editable  ((GtkEditable*)update->info->hostname_lbl, FALSE);
+
+    gtk_entry_set_text(GTK_ENTRY(update->info->location_lbl),update->location);
+    gtk_editable_set_editable  ((GtkEditable*)update->info->location_lbl, FALSE);
+
+    gtk_entry_set_text(GTK_ENTRY(update->info->manufacturer_lbl),update->manufacturer);
+    gtk_editable_set_editable  ((GtkEditable*)update->info->manufacturer_lbl, FALSE);
+
+    gtk_entry_set_text(GTK_ENTRY(update->info->model_lbl),update->model);
+    gtk_editable_set_editable  ((GtkEditable*)update->info->model_lbl, FALSE);
+    
+    gtk_entry_set_text(GTK_ENTRY(update->info->hardware_lbl),update->hardware);
+    gtk_editable_set_editable  ((GtkEditable*)update->info->hardware_lbl, FALSE);
+    
+    gtk_entry_set_text(GTK_ENTRY(update->info->firmware_lbl),update->firmware);
+    gtk_editable_set_editable  ((GtkEditable*)update->info->firmware_lbl, FALSE);
+
+    gtk_entry_set_text(GTK_ENTRY(update->info->serial_lbl),update->serial);
+    gtk_editable_set_editable  ((GtkEditable*)update->info->serial_lbl, FALSE);
+
+    gtk_entry_set_text(GTK_ENTRY(update->info->ip_lbl),update->ip);
+    gtk_editable_set_editable  ((GtkEditable*)update->info->ip_lbl, FALSE);
+
+    for(int i=0;i<update->mac_count;i++){
+        //TODO
+    }
+
+    gtk_entry_set_text(GTK_ENTRY(update->info->version_lbl),update->version);
+    gtk_editable_set_editable  ((GtkEditable*)update->info->version_lbl, FALSE);
+
+    gtk_entry_set_text(GTK_ENTRY(update->info->uri_lbl),update->uri);
+    gtk_editable_set_editable  ((GtkEditable*)update->info->uri_lbl, FALSE);
+
+    if(update->info->done_callback)
+        (*(update->info->done_callback))(update->info, update->info->done_user_data);
+
+    free(update->name);
+    free(update->hostname);
+    free(update->location);
+    free(update->manufacturer);
+    free(update->model);
+    free(update->hardware);
+    free(update->firmware);
+    free(update->serial);
+    free(update->ip);
+    for(int i=0;i<update->mac_count;i++){
+        free(update->macs[i]);
+    }
+    free(update->macs);
+    free(update->version);
+    free(update->uri);
+    free(update);
+    return FALSE;
+}
+
 void _update_details_page(void * user_data){
     char * hostname = NULL;
     OnvifDeviceInformation * dev_info = NULL;
@@ -98,77 +179,60 @@ void _update_details_page(void * user_data){
     if(!Device__is_valid(self->device) || !self->device->selected)
         goto exit;
 
-    gtk_entry_set_text(GTK_ENTRY(self->name_lbl),OnvifScopes__extract_scope(scopes,"name"));
-    gtk_editable_set_editable  ((GtkEditable*)self->name_lbl, FALSE);
+    InfoGUIUpdate * gui_update = malloc(sizeof(InfoGUIUpdate));
+    gui_update->info = self;
+    gui_update->mac_count = 0;
+    gui_update->macs= malloc(0);
 
-    gtk_entry_set_text(GTK_ENTRY(self->hostname_lbl),hostname);
-    gtk_editable_set_editable  ((GtkEditable*)self->hostname_lbl, FALSE);
+    gui_update->name = OnvifScopes__extract_scope(scopes,"name"); //No need to copy since extract_scope returns a malloc pointer
+    gui_update->hostname = hostname; //No need to copy since OnvifDevice__device_getHostname returns malloc pointer
+    gui_update->location = OnvifScopes__extract_scope(scopes,"location");
 
-    gtk_entry_set_text(GTK_ENTRY(self->location_lbl),OnvifScopes__extract_scope(scopes,"location"));
-    gtk_editable_set_editable  ((GtkEditable*)self->location_lbl, FALSE);
+    gui_update->manufacturer = malloc(strlen(dev_info->manufacturer)+1);
+    strcpy(gui_update->manufacturer,dev_info->manufacturer);
 
-    gtk_entry_set_text(GTK_ENTRY(self->manufacturer_lbl),dev_info->manufacturer);
-    gtk_editable_set_editable  ((GtkEditable*)self->manufacturer_lbl, FALSE);
+    gui_update->model = malloc(strlen(dev_info->model)+1);
+    strcpy(gui_update->model,dev_info->model);
 
-    gtk_entry_set_text(GTK_ENTRY(self->model_lbl),dev_info->model);
-    gtk_editable_set_editable  ((GtkEditable*)self->model_lbl, FALSE);
-    
-    gtk_entry_set_text(GTK_ENTRY(self->hardware_lbl),dev_info->hardwareId);
-    gtk_editable_set_editable  ((GtkEditable*)self->hardware_lbl, FALSE);
-    
-    gtk_entry_set_text(GTK_ENTRY(self->firmware_lbl),dev_info->firmwareVersion);
-    gtk_editable_set_editable  ((GtkEditable*)self->firmware_lbl, FALSE);
+    gui_update->hardware = malloc(strlen(dev_info->hardwareId)+1);
+    strcpy(gui_update->hardware,dev_info->hardwareId);
 
-    gtk_entry_set_text(GTK_ENTRY(self->serial_lbl),dev_info->serialNumber);
-    gtk_editable_set_editable  ((GtkEditable*)self->serial_lbl, FALSE);
+    gui_update->firmware = malloc(strlen(dev_info->firmwareVersion)+1);
+    strcpy(gui_update->firmware,dev_info->firmwareVersion);
 
-    gtk_entry_set_text(GTK_ENTRY(self->ip_lbl),self->device->onvif_device->ip);
-    gtk_editable_set_editable  ((GtkEditable*)self->ip_lbl, FALSE);
+    gui_update->serial = malloc(strlen(dev_info->serialNumber)+1);
+    strcpy(gui_update->serial,dev_info->serialNumber);
 
-    int mac_count=0;
+    gui_update->ip = malloc(strlen(self->device->onvif_device->ip)+1);
+    strcpy(gui_update->ip,self->device->onvif_device->ip);
+
     for(int i=0;i<interfaces->count;i++){
         OnvifInterface * interface = interfaces->interfaces[i];
         if(interface->ipv4_enabled){
             for(int a=0;a<interface->ipv4_manual_count;a++){
                 char * ip = interface->ipv4_manual[a];
                 if(!strcmp(ip,self->device->onvif_device->ip)){
-                    mac_count++;
-                    char * format = "MAC Address #%i : ";
-                    char buff[27];
-                    snprintf(buff,sizeof(buff),format,mac_count);
-                    GtkWidget * grid = gtk_grid_new();
-                    GtkWidget * widget = gtk_label_new (buff);
-                    gtk_widget_set_size_request(widget,130,-1);
-                    gtk_label_set_xalign (GTK_LABEL(widget), 1.0);
-                    gtk_grid_attach (GTK_GRID (grid), widget, 0, mac_count, 1, 1);
-                    widget = gtk_entry_new();
-                    gtk_widget_set_size_request(widget,300,-1);
-                    gtk_entry_set_text(GTK_ENTRY(widget),interface->mac);
-                    gtk_editable_set_editable  ((GtkEditable*)widget, FALSE);
-                    gtk_grid_attach (GTK_GRID (grid), widget, 1, mac_count, 1, 1);
-                    
-                    gtk_box_pack_start (GTK_BOX(self->mac_lbl),grid,FALSE,FALSE,0);
-                    gtk_widget_show_all(grid);
+                    gui_update->mac_count++;
+                    gui_update->macs = realloc(gui_update->macs,sizeof(char *) * gui_update->mac_count);
+                    gui_update->macs[gui_update->mac_count-1] = malloc(strlen(interface->mac)+1);
+                    strcpy(gui_update->macs[gui_update->mac_count-1],interface->mac);
                 }
             }
         }
     }
-  
-    gtk_entry_set_text(GTK_ENTRY(self->version_lbl),"SomeName");
-    gtk_editable_set_editable  ((GtkEditable*)self->version_lbl, FALSE);
 
-    gtk_entry_set_text(GTK_ENTRY(self->uri_lbl),self->device->onvif_device->device_soap->endpoint);
-    gtk_editable_set_editable  ((GtkEditable*)self->uri_lbl, FALSE);
+    gui_update->version = malloc(strlen("SomeName")+1);
+    strcpy(gui_update->version,"SomeName");
 
+    gui_update->uri = malloc(strlen(self->device->onvif_device->device_soap->endpoint)+1);
+    strcpy(gui_update->uri,self->device->onvif_device->device_soap->endpoint);
+
+    gdk_threads_add_idle((void *)onvif_info_gui_update,gui_update);
 exit:
-    if(hostname)
-        free(hostname);
     OnvifDeviceInformation__destroy(dev_info);
     OnvifInterfaces__destroy(interfaces);
     OnvifScopes__destroy(scopes);
     Device__unref(self->device);
-    if(self->done_callback)
-        (*(self->done_callback))(self, self->done_user_data);
 }
 
 void OnvifInfo_update_details(OnvifInfo * self, Device * device){

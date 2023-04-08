@@ -676,10 +676,13 @@ void create_pipeline(RtspPlayer *self){
   /* Create the elements */
   self->src = gst_element_factory_make ("rtspsrc", "rtspsrc");
 
-  if (!self->pipeline
-    || !self->src){
-      GST_ERROR ("One of the elements wasn't created... Exiting\n");
-      return;
+  if (!self->pipeline){
+    printf("Failed to created pipeline. Check your gstreamer installation...\n");
+    return;
+  }
+  if (!self->src){
+    printf ("Failed to created rtspsrc. Check your gstreamer installation...\n");
+    return;
   }
 
   // Add Elements to the Bin

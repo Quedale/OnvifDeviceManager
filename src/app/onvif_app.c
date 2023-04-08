@@ -3,6 +3,7 @@
 #include "onvif_details.h"
 #include "onvif_nvt.h"
 #include "device_list.h"
+#include "settings/app_settings.h"
 #include "../queue/event_queue.h"
 #include "../gst/player.h"
 #include "discoverer.h"
@@ -20,6 +21,8 @@ typedef struct _OnvifApp {
     int current_page;
 
     OnvifDetails * details;
+    AppSettings * settings;
+
     EventQueue * queue;
     RtspPlayer * player;
 } OnvifApp;
@@ -196,11 +199,16 @@ exit:
     free(input);
 }
 
-void update_details(OnvifApp * self){
-    if(!self->current_page){//NVT is displayed
-        return;
+
+void update_pages(OnvifApp * self){
+    if(self->current_page == 1){
+        OnvifDetails__clear_details(self->details);
+        OnvifDetails__update_details(self->details,self->device);
+    } else if(self->current_page == 2){
+        AppSettings__clear_details(self->settings);
+        AppSettings__update_details(self->settings);
     }
-    OnvifDetails_update_details(self->details,self->device);
+    
 }
 
 void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
@@ -208,7 +216,6 @@ void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
     input->app = app;
     input->row = row;
 
-    OnvifDetails_clear_details(input->app->details);
     EventQueue__insert(app->queue,_stop_onvif_stream,app);
     if(input->app->device){
         input->app->device->selected = 0;
@@ -234,7 +241,7 @@ void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
     }
 
     EventQueue__insert(app->queue,_play_onvif_stream,input);
-    update_details(input->app);
+    update_pages(input->app);
 }
 
 void row_selected_cb (GtkWidget *widget,   GtkListBoxRow* row,
@@ -244,9 +251,8 @@ void row_selected_cb (GtkWidget *widget,   GtkListBoxRow* row,
 }
 
 static void switch_page (GtkNotebook* self, GtkWidget* page, guint page_num, OnvifApp * app) {
-    OnvifDetails_clear_details(app->details);
     app->current_page = page_num;
-    update_details(app);
+    update_pages(app);
 }
 
 /*
@@ -334,10 +340,9 @@ void create_ui (OnvifApp * app) {
     gtk_notebook_append_page (GTK_NOTEBOOK (app->main_notebook), widget, hbox);
 
     label = gtk_label_new ("Details");
-
     //Hidden spinner used to display stream start loading
     widget = gtk_spinner_new ();
-    OnvifDetails_set_details_loading_handle(app->details,widget);
+    OnvifDetails__set_details_loading_handle(app->details,widget);
 
     //Only show label and keep loading hidden
     hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL,  6);
@@ -346,6 +351,22 @@ void create_ui (OnvifApp * app) {
     gtk_widget_show_all(hbox);
 
     widget = OnvifDetails__get_widget(app->details);
+
+    gtk_notebook_append_page (GTK_NOTEBOOK (app->main_notebook), widget, hbox);
+
+
+    label = gtk_label_new ("Settings");
+    //Hidden spinner used to display stream start loading
+    widget = gtk_spinner_new ();
+    AppSettings__set_details_loading_handle(app->settings,widget);
+
+    //Only show label and keep loading hidden
+    hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL,  6);
+    gtk_box_pack_start (GTK_BOX(hbox),label,TRUE,TRUE,0);
+    gtk_box_pack_start(GTK_BOX(hbox),widget,FALSE,FALSE,0);
+    gtk_widget_show_all(hbox);
+
+    widget = AppSettings__get_widget(app->settings);
 
     gtk_notebook_append_page (GTK_NOTEBOOK (app->main_notebook), widget, hbox);
 
@@ -388,11 +409,10 @@ void _onvif_authentication(void * user_data){
     gtk_container_add (GTK_CONTAINER (input->device->image_handle), image);
     gtk_widget_show (image);
 
-    OnvifDetails_clear_details(input->app->details);
     CredentialsDialog__hide(input->app->dialog);
     onvif_display_device_row(input->app, input->device);
     EventQueue__insert(input->app->queue,_play_onvif_stream,input); //Input is cleaned up here
-    update_details(input->app);
+    update_pages(input->app);
 
 exit:
     Device__unref(input->device);
@@ -419,6 +439,7 @@ OnvifApp * OnvifApp__create(){
     app->dialog = CredentialsDialog__create(dialog_login_cb, dialog_cancel_cb);
     app->queue = EventQueue__create();
     app->details = OnvifDetails__create(app->queue);
+    app->settings = AppSettings__create(app->queue);
     app->current_page = 0;
 
     //Defaults 4 paralell event threads.
@@ -445,6 +466,7 @@ OnvifApp * OnvifApp__create(){
 void OnvifApp__destroy(OnvifApp* self){
     if (self) {
         OnvifDetails__destroy(self->details);
+        AppSettings__destroy(self->settings);
         CredentialsDialog__destroy(self->dialog);
         RtspPlayer__destroy(self->player);
         EventQueue__destroy(self->queue);

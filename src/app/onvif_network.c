@@ -15,27 +15,46 @@ typedef struct _OnvifNetwork {
     GtkWidget * widget;
 } OnvifNetwork;
 
+typedef struct {
+    OnvifNetwork * network;
+} NetworkGUIUpdate;
+
+gboolean * onvif_network_gui_update (void * user_data){
+    NetworkGUIUpdate * update = (NetworkGUIUpdate *) user_data;
+
+    gtk_entry_set_text(GTK_ENTRY(update->network->dhcp_dd),"test");
+    gtk_editable_set_editable  ((GtkEditable*)update->network->dhcp_dd, FALSE);
+
+    gtk_entry_set_text(GTK_ENTRY(update->network->ip_lbl),"test");
+    gtk_editable_set_editable  ((GtkEditable*)update->network->ip_lbl, FALSE);
+
+    gtk_entry_set_text(GTK_ENTRY(update->network->mask_lbl),"test");
+    gtk_editable_set_editable  ((GtkEditable*)update->network->mask_lbl, FALSE);
+
+    gtk_entry_set_text(GTK_ENTRY(update->network->gateway_lbl),"test");
+    gtk_editable_set_editable  ((GtkEditable*)update->network->gateway_lbl, FALSE);
+
+    if(update->network->done_callback)
+        (*(update->network->done_callback))(update->network, update->network->done_user_data);
+
+    free(update);
+
+    return FALSE;
+}
+
 void _update_network_page(void * user_data){
     OnvifNetwork * self = (OnvifNetwork *) user_data;
     if(!Device__addref(self->device) || !self->device->selected){
         goto exit;
     }
 
-    gtk_entry_set_text(GTK_ENTRY(self->dhcp_dd),"test");
-    gtk_editable_set_editable  ((GtkEditable*)self->dhcp_dd, FALSE);
+    NetworkGUIUpdate * gui_update = malloc(sizeof(NetworkGUIUpdate));
+    gui_update->network = self;
+    //TODO Fetch networking details
 
-    gtk_entry_set_text(GTK_ENTRY(self->ip_lbl),"test");
-    gtk_editable_set_editable  ((GtkEditable*)self->ip_lbl, FALSE);
-
-    gtk_entry_set_text(GTK_ENTRY(self->mask_lbl),"test");
-    gtk_editable_set_editable  ((GtkEditable*)self->mask_lbl, FALSE);
-
-    gtk_entry_set_text(GTK_ENTRY(self->gateway_lbl),"test");
-    gtk_editable_set_editable  ((GtkEditable*)self->gateway_lbl, FALSE);
+    gdk_threads_add_idle((void *)onvif_network_gui_update,gui_update);
 
 exit:
-    if(self->done_callback)
-        (*(self->done_callback))(self, self->done_user_data);
     Device__unref(self->device);
 }
 

@@ -39,14 +39,14 @@ void update_details_priv(OnvifDetails * self){
     }
 }
 
-void OnvifDetails_update_details(OnvifDetails * self, Device * device){
+void OnvifDetails__update_details(OnvifDetails * self, Device * device){
     self->device = device;
     update_details_priv(self);
 }
 
 
 static void details_switch_page (GtkNotebook* self, GtkWidget* page, guint page_num, OnvifDetails * details) {
-    OnvifDetails_clear_details(details);
+    OnvifDetails__clear_details(details);
 
     details->current_page = page_num;
     update_details_priv(details);
@@ -94,11 +94,11 @@ void OnvifDetails__destroy(OnvifDetails* self){
     }
 }
 
-void OnvifDetails_set_details_loading_handle(OnvifDetails * self, GtkWidget * widget){
+void OnvifDetails__set_details_loading_handle(OnvifDetails * self, GtkWidget * widget){
     self->details_loading_handle = widget;
 }
 
-void OnvifDetails_clear_details(OnvifDetails * self){
+void OnvifDetails__clear_details(OnvifDetails * self){
     if(self->current_page == 0){
         OnvifInfo_clear_details(self->info);
     } else if(self->current_page == 1){
