@@ -124,7 +124,22 @@ gboolean * onvif_info_gui_update (void * user_data){
     gtk_editable_set_editable  ((GtkEditable*)update->info->ip_lbl, FALSE);
 
     for(int i=0;i<update->mac_count;i++){
-        //TODO
+        char * format = "MAC Address #%i : ";
+        char buff[27];
+        snprintf(buff,sizeof(buff),format,i+1);
+        GtkWidget * grid = gtk_grid_new();
+        GtkWidget * widget = gtk_label_new (buff);
+        gtk_widget_set_size_request(widget,130,-1);
+        gtk_label_set_xalign (GTK_LABEL(widget), 1.0);
+        gtk_grid_attach (GTK_GRID (grid), widget, 0, i+1, 1, 1);
+        widget = gtk_entry_new();
+        gtk_widget_set_size_request(widget,300,-1);
+        gtk_entry_set_text(GTK_ENTRY(widget),update->macs[i]);
+        gtk_editable_set_editable  ((GtkEditable*)widget, FALSE);
+        gtk_grid_attach (GTK_GRID (grid), widget, 1, i+1, 1, 1);
+
+        gtk_box_pack_start (GTK_BOX(update->info->mac_lbl),grid,FALSE,FALSE,0);
+        gtk_widget_show_all(grid);
     }
 
     gtk_entry_set_text(GTK_ENTRY(update->info->version_lbl),update->version);
