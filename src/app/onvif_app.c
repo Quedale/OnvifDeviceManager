@@ -389,6 +389,7 @@ void create_ui (OnvifApp * app) {
 
 gboolean * gui_update_pages(void * user_data){
     OnvifApp * app = (OnvifApp *) user_data;
+    CredentialsDialog__hide(app->dialog);
     update_pages(app);
     return FALSE;
 }
@@ -414,7 +415,6 @@ void _onvif_authentication(void * user_data){
     gtk_spinner_start (GTK_SPINNER (image));
     gui_update_widget_image(image,input->device->image_handle);
 
-    CredentialsDialog__hide(input->app->dialog);
     onvif_display_device_row(input->app, input->device);
     EventQueue__insert(input->app->queue,_play_onvif_stream,input); //Input is cleaned up here
     gdk_threads_add_idle((void *)gui_update_pages,input->app);
