@@ -3,6 +3,7 @@
 #include "onvif_details.h"
 #include "onvif_nvt.h"
 #include "device_list.h"
+#include "gui_utils.h"
 #include "settings/app_settings.h"
 #include "../queue/event_queue.h"
 #include "../gst/player.h"
@@ -201,14 +202,14 @@ exit:
 
 
 void update_pages(OnvifApp * self){
+    //#0 NVT page already loaded
+    //#2 Settings page already loaded
+
+    //Details page is dynamically loaded
     if(self->current_page == 1){
         OnvifDetails__clear_details(self->details);
         OnvifDetails__update_details(self->details,self->device);
-    } else if(self->current_page == 2){
-        AppSettings__clear_details(self->settings);
-        AppSettings__update_details(self->settings);
     }
-    
 }
 
 void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
@@ -386,6 +387,12 @@ void create_ui (OnvifApp * app) {
 
 }
 
+gboolean * gui_update_pages(void * user_data){
+    OnvifApp * app = (OnvifApp *) user_data;
+    update_pages(app);
+    return FALSE;
+}
+
 void _onvif_authentication(void * user_data){
     LoginEvent * event = (LoginEvent *) user_data;
     struct PlayInput * input = (struct PlayInput *) event->user_data;
@@ -405,14 +412,12 @@ void _onvif_authentication(void * user_data){
     //Replace locked image with spinner
     GtkWidget * image = gtk_spinner_new ();
     gtk_spinner_start (GTK_SPINNER (image));
-    gtk_container_foreach (GTK_CONTAINER (input->device->image_handle), (void*) gtk_widget_destroy, NULL);
-    gtk_container_add (GTK_CONTAINER (input->device->image_handle), image);
-    gtk_widget_show (image);
+    gui_update_widget_image(image,input->device->image_handle);
 
     CredentialsDialog__hide(input->app->dialog);
     onvif_display_device_row(input->app, input->device);
     EventQueue__insert(input->app->queue,_play_onvif_stream,input); //Input is cleaned up here
-    update_pages(input->app);
+    gdk_threads_add_idle((void *)gui_update_pages,input->app);
 
 exit:
     Device__unref(input->device);
@@ -431,16 +436,23 @@ void dialog_login_cb(LoginEvent * event){
     EventQueue__insert(input->app->queue,_onvif_authentication,LoginEvent_copy(event));
 }
 
+void _overscale_cb(AppSettings * settings, int allow_overscale, void * user_data){
+    OnvifApp * app = (OnvifApp *) user_data;
+    RtspPlayer__allow_overscale(app->player,allow_overscale);
+}
+
 OnvifApp * OnvifApp__create(){
     OnvifApp *app  =  malloc(sizeof(OnvifApp));
-    app->player = RtspPlayer__create();
     app->device_list = DeviceList__create();
     app->device = NULL;
     app->dialog = CredentialsDialog__create(dialog_login_cb, dialog_cancel_cb);
     app->queue = EventQueue__create();
     app->details = OnvifDetails__create(app->queue);
     app->settings = AppSettings__create(app->queue);
+    AppSettings__set_overscale_callback(app->settings,_overscale_cb,app);
     app->current_page = 0;
+    app->player = RtspPlayer__create();
+    RtspPlayer__allow_overscale(app->player,AppSettings__get_allow_overscale(app->settings));
 
     //Defaults 4 paralell event threads.
     //TODO support configuration to modify this

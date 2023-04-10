@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "client.h"
 #include "device_list.h"
+#include "gui_utils.h"
 #include <netdb.h>
 #include <arpa/inet.h>
 
@@ -240,9 +241,6 @@ void _load_thumbnail(void * user_data){
         goto exit;
     }
 
-    //Remove previous image
-    gtk_container_foreach (GTK_CONTAINER (device->image_handle), (void*) gtk_widget_destroy, NULL);
-
     //Display pixbuf
     if(pixbuf){
         double ph = gdk_pixbuf_get_height (pixbuf);
@@ -256,8 +254,7 @@ void _load_thumbnail(void * user_data){
             goto exit;
         }
 
-        gtk_container_add (GTK_CONTAINER (device->image_handle), image);
-        gtk_widget_show (image);
+        gui_update_widget_image(image,device->image_handle);
     } else {
         printf("Failed all thumbnail creation.\n");
     }

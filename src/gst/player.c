@@ -510,6 +510,7 @@ static GstElement * create_video_bin(RtspPlayer * self){
   videoconvert = gst_element_factory_make ("videoconvert", NULL);
   overlay_comp = gst_element_factory_make ("overlaycomposition", NULL);
   self->sink = gst_element_factory_make ("gtkcustomsink", NULL);
+  gst_gtk_base_custom_sink_set_expand(GST_GTK_BASE_CUSTOM_SINK(self->sink),self->allow_overscale);
 
   if (!self->video_bin ||
       // !capsfilter ||
@@ -699,7 +700,7 @@ void create_pipeline(RtspPlayer *self){
       GST_WARNING ("Fail to connect select-stream signal...");
   }
 
-  g_object_set (G_OBJECT (self->src), "buffer-mode", 1, NULL);
+  g_object_set (G_OBJECT (self->src), "buffer-mode", 3, NULL);
   g_object_set (G_OBJECT (self->src), "latency", 0, NULL);
   g_object_set (G_OBJECT (self->src), "teardown-timeout", 0, NULL); 
   g_object_set (G_OBJECT (self->src), "backchannel", 1, NULL);
@@ -728,6 +729,7 @@ void RtspPlayer__init(RtspPlayer* self) {
   self->level = 0;
   self->retry = 0;
   self->playing = 0;
+  self->allow_overscale = 0;
   self->mic_volume_element = NULL;
   self->player_lock =malloc(sizeof(pthread_mutex_t));
   self->overlay_state = malloc(sizeof(OverlayState));
@@ -736,6 +738,7 @@ void RtspPlayer__init(RtspPlayer* self) {
   self->canvas = NULL;
   self->video_bin = NULL;
   self->audio_bin = NULL;
+  self->sink = NULL;
 
   pthread_mutex_init(self->player_lock, NULL);
   create_pipeline(self);
@@ -864,6 +867,13 @@ exit:
 
 void RtspPlayer__play(RtspPlayer* self){
   _RtspPlayer__play(self,0);
+}
+
+void RtspPlayer__allow_overscale(RtspPlayer * self, int allow_overscale){
+  self->allow_overscale = allow_overscale;
+  if(GST_IS_GTK_BASE_CUSTOM_SINK(self->sink)){
+    gst_gtk_base_custom_sink_set_expand(GST_GTK_BASE_CUSTOM_SINK(self->sink),allow_overscale);
+  }
 }
 
 /*

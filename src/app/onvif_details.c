@@ -53,7 +53,6 @@ static void details_switch_page (GtkNotebook* self, GtkWidget* page, guint page_
 }
 
 void OnvifDetails__create_ui(OnvifDetails *self){
-    printf("OnvifDetails__create_ui\n");
     GtkWidget * widget;
     GtkWidget *label;
 

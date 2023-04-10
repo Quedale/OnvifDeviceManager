@@ -42,7 +42,8 @@ typedef struct _RtspPlayer {
   GtkWidget *canvas;
   gdouble level; //Used to calculate level decay
   guint back_stream_id;
-
+  int allow_overscale;
+  
   pthread_mutex_t * player_lock;
 } RtspPlayer;
 
@@ -52,7 +53,7 @@ void RtspPlayer__set_retry_callback(RtspPlayer* self, void (*retry_callback)(Rts
 void RtspPlayer__set_error_callback(RtspPlayer* self, void (*error_callback)(RtspPlayer *, void *), void * user_data);
 void RtspPlayer__set_stopped_callback(RtspPlayer* self, void (*stopped_callback)(RtspPlayer *, void *), void * user_data);
 void RtspPlayer__set_start_callback(RtspPlayer* self, void (*start_callback)(RtspPlayer *, void *), void * user_data);
-
+void RtspPlayer__allow_overscale(RtspPlayer * self, int allow_overscale);
 void RtspPlayer__set_playback_url(RtspPlayer* self, char *url);
 void RtspPlayer__stop(RtspPlayer* self);
 void RtspPlayer__play(RtspPlayer* self);

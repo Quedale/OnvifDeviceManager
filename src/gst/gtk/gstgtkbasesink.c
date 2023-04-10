@@ -65,6 +65,8 @@ static GstFlowReturn gst_gtk_base_custom_sink_show_frame (GstVideoSink * bsink,
 static void
 gst_gtk_base_custom_sink_navigation_interface_init (GstNavigationInterface * iface);
 
+static void gst_gtk_base_custom_sink_set_element_expand(GstGtkBaseCustomSink * bsink);
+
 enum
 {
   PROP_0,
@@ -163,6 +165,7 @@ gst_gtk_base_custom_sink_init (GstGtkBaseCustomSink * gtk_sink)
   gtk_sink->video_par_n = DEFAULT_VIDEO_PAR_N;
   gtk_sink->video_par_d = DEFAULT_VIDEO_PAR_D;
   gtk_sink->ignore_alpha = DEFAULT_IGNORE_ALPHA;
+  gtk_sink->expand = FALSE;
 }
 
 static void
@@ -408,6 +411,7 @@ gst_gtk_base_custom_sink_start_on_main (GstBaseSink * bsink)
   toplevel = gtk_widget_get_toplevel (GTK_WIDGET (gst_sink->widget));
   if (!gtk_widget_is_toplevel (toplevel)) {
     // gtk_grid_attach (GTK_GRID (gst_sink->widget_parent), GTK_WIDGET(gst_sink->widget), 0, 1, 1, 1);
+    gst_gtk_base_custom_sink_set_element_expand(gst_sink);
     gtk_container_add (GTK_CONTAINER (gst_sink->widget_parent), GTK_WIDGET(gst_sink->widget));
     gtk_widget_show(GTK_WIDGET(gst_sink->widget));
   //   /* sanity check */
@@ -424,6 +428,18 @@ gst_gtk_base_custom_sink_start_on_main (GstBaseSink * bsink)
   }
 
   return TRUE;
+}
+
+static void gst_gtk_base_custom_sink_set_element_expand(GstGtkBaseCustomSink * bsink){
+  if(bsink->widget){
+    gtk_widget_set_vexpand(GTK_WIDGET(bsink->widget),bsink->expand);
+    gtk_widget_set_hexpand(GTK_WIDGET(bsink->widget),bsink->expand);
+  }
+}
+
+void gst_gtk_base_custom_sink_set_expand(GstGtkBaseCustomSink * bsink, gboolean val){
+  bsink->expand = val;
+  gst_gtk_base_custom_sink_set_element_expand(bsink);
 }
 
 static gboolean

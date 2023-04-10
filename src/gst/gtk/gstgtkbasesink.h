@@ -59,6 +59,7 @@ struct _GstGtkBaseCustomSink
   GtkWidget            *widget_parent;
 
   /* properties */
+  gboolean             expand;
   gboolean             force_aspect_ratio;
   GBinding             *bind_aspect_ratio;
 
@@ -106,6 +107,9 @@ gst_gtk_base_custom_sink_set_widget (GstGtkBaseCustomSink * gtk_sink,GtkGstBaseC
 
 void
 gst_gtk_base_custom_sink_set_parent (GstGtkBaseCustomSink * gtk_sink, GtkWidget * parent);
+
+void 
+gst_gtk_base_custom_sink_set_expand(GstGtkBaseCustomSink * bsink, gboolean val);
 G_END_DECLS
 
 #endif /* __GST_GTK_BASE_CUSTOM_SINK_H__ */
