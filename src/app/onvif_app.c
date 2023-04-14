@@ -401,15 +401,18 @@ void create_ui (OnvifApp * app) {
 
     gtk_notebook_append_page (GTK_NOTEBOOK (app->main_notebook), widget, hbox);
 
-    GdkRectangle workarea = {0};
-    gdk_monitor_get_workarea(
-        gdk_display_get_primary_monitor(gdk_display_get_default()),
-        &workarea);
-
-    if(workarea.width > 775){//If resolution allows it, big enough to show no scrollbars
-        gtk_window_set_default_size(GTK_WINDOW(main_window),775,480);
-    } else {//Resolution is so low that we launch fullscreen
-        gtk_window_set_default_size(GTK_WINDOW(main_window),workarea.width,workarea.height);
+    GdkMonitor* monitor = gdk_display_get_primary_monitor(gdk_display_get_default());
+    if(monitor){
+        GdkRectangle workarea = {0};
+        gdk_monitor_get_workarea(monitor,&workarea);
+        
+        if(workarea.width > 775){//If resolution allows it, big enough to show no scrollbars
+            gtk_window_set_default_size(GTK_WINDOW(main_window),775,480);
+        } else {//Resolution is so low that we launch fullscreen
+            gtk_window_set_default_size(GTK_WINDOW(main_window),workarea.width,workarea.height);
+        }
+    } else {
+        gtk_window_set_default_size(GTK_WINDOW(main_window),540,380);
     }
 
     gtk_widget_show_all (main_window);
