@@ -209,36 +209,42 @@ void AppSettings__create_ui(AppSettings * self){
 #define MAX_LEN 256
 
 void AppSettings__load_settings(AppSettings * self){
-    FILE *fptr;
+    FILE *fptr = NULL;
     
-    fptr = fopen(CONFIG_FILE_PATH,"r");
-    if(fptr != NULL){
-        char buffer[MAX_LEN];
-        printf("Reading Settings file %s\n",CONFIG_FILE_PATH);
-        while (fgets(buffer, MAX_LEN, fptr)){
-            // Remove trailing newline
-            buffer[strcspn(buffer, "\n")] = 0;
+    printf("Reading Settings file %s\n",CONFIG_FILE_PATH);
+    if (access(CONFIG_FILE_PATH, F_OK) == 0) {
+        fptr = fopen(CONFIG_FILE_PATH,"r");
+        if(fptr != NULL){
+            char buffer[MAX_LEN];
+            while (fgets(buffer, MAX_LEN, fptr)){
+                // Remove trailing newline
+                buffer[strcspn(buffer, "\n")] = 0;
 
-            char * buff_ptr = (char*)buffer;
-            char * key = strtok_r (buff_ptr, "=", &buff_ptr);
-            char * val = strtok_r (buff_ptr, "\n", &buff_ptr); //Get reminder of line
-            printf("\t'%s' = '%s'\n",key,val);
+                char * buff_ptr = (char*)buffer;
+                char * key = strtok_r (buff_ptr, "=", &buff_ptr);
+                char * val = strtok_r (buff_ptr, "\n", &buff_ptr); //Get reminder of line
+                printf("\t'%s' = '%s'\n",key,val);
 
-            if(!strcmp(key,"allow_overscaling")){
-                if(!strcmp(val,"false")){
-                    self->allow_overscale = 0;
+                if(!strcmp(key,"allow_overscaling")){
+                    if(!strcmp(val,"false")){
+                        self->allow_overscale = 0;
+                    }
                 }
             }
+        } else {
+            printf("WARNING no config file found. Using default configs. 2\n");
         }
     } else {
-        printf("WARNING no config file found. Using default configs.");
+        printf("WARNING no config file found. Using default configs. 1\n");
     }
 
     //Force defaults
     if(self->allow_overscale == -1){
         self->allow_overscale = 1;
     }
-    fclose(fptr);
+
+    if(fptr)
+        fclose(fptr);
 }
 
 AppSettings * AppSettings__create(EventQueue * queue){
