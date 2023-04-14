@@ -175,12 +175,13 @@ void Device__lookup_hostname(Device* device, EventQueue * queue){
 
 void _load_thumbnail(void * user_data){
     GtkWidget *image;
-    GdkPixbufLoader *loader = NULL;
+    GError *error = NULL;
     GdkPixbuf *pixbuf = NULL;
     GdkPixbuf *scaled_pixbuf = NULL;
     double size;
-    char * imgdata;
+    char * imgdata = NULL;
     int freeimgdata = 0;
+    GdkPixbufLoader *loader = gdk_pixbuf_loader_new ();
 
     Device * device = (Device *) user_data;
 
@@ -194,7 +195,7 @@ void _load_thumbnail(void * user_data){
         if(!imgchunk){
             //TODO Set error image
             printf("Error retrieve snapshot.");
-            goto exit;
+            goto warning;
         }
         imgdata = imgchunk->buffer;
         size = imgchunk->size;
@@ -211,8 +212,6 @@ void _load_thumbnail(void * user_data){
     }
 
     //Attempt to get downloaded pixbuf or locked icon
-    loader = gdk_pixbuf_loader_new ();
-    GError *error = NULL;
     if(gdk_pixbuf_loader_write (loader, (unsigned char *)imgdata, size,&error)){
         pixbuf = gdk_pixbuf_loader_get_pixbuf (loader);
     } else {
@@ -223,6 +222,12 @@ void _load_thumbnail(void * user_data){
         }
     }
   
+warning:
+    //Check is device is still valid. (User performed scan before snapshot finished)
+    if(!Device__is_valid(device)){
+        goto exit;
+    }
+
     //Show warning icon in case of failure
     if(!pixbuf){
         if(gdk_pixbuf_loader_write (loader, (unsigned char *)_binary_warning_png_start, _binary_warning_png_end - _binary_warning_png_start,&error)){
@@ -277,12 +282,27 @@ void Device__load_thumbnail(Device* device, EventQueue * queue){
     EventQueue__insert(queue,_load_thumbnail,device);
 }
 
+void profile_changed(GtkComboBox* self, Device * device){
+    int new_index = gtk_combo_box_get_active(self);
+    if(new_index != device->profile_index){
+        device->profile_index = new_index;
+        if(device->profile_callback){
+            device->profile_callback(device,device->profile_userdata);
+        }
+    }
+}
+
+//Prevent profile dropdown scroll to avoid useless event dispatched. Rely on click selection
+gboolean override_scroll_event (GtkWidget* self,GdkEventScroll event,gpointer user_data){
+    return TRUE;
+}
+
 GtkWidget * Device__create_row (Device * device, char * uri, char* name, char * hardware, char * location){
     GtkWidget *row;
     GtkWidget *grid;
     GtkWidget *label;
     GtkWidget *image;
-    
+
     row = gtk_list_box_row_new ();
 
     grid = gtk_grid_new ();
@@ -323,24 +343,25 @@ GtkWidget * Device__create_row (Device * device, char * uri, char* name, char * 
     gtk_widget_set_hexpand (label, TRUE);
     gtk_grid_attach (GTK_GRID (grid), label, 1, 3, 1, 1);
 
-//WIP - ONVIF profile selection
-/*
-  GtkListStore *liststore = gtk_list_store_new(2, G_TYPE_STRING, G_TYPE_STRING);
-  device->profile_dropdown = gtk_combo_box_new_with_model(GTK_TREE_MODEL(liststore));
-  // liststore is now owned by combo, so the initial reference can be dropped 
-  g_object_unref(liststore);
+    //Create profile dropdown placeholder
+    GtkListStore *liststore = gtk_list_store_new(2, G_TYPE_STRING, G_TYPE_STRING);
+    device->profile_dropdown = gtk_combo_box_new_with_model(GTK_TREE_MODEL(liststore));
+    g_object_unref(liststore);
 
-  GtkCellRenderer  * column = gtk_cell_renderer_text_new();
-  gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(device->profile_dropdown), column, TRUE);
+    GtkCellRenderer  * column = gtk_cell_renderer_text_new();
+    gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(device->profile_dropdown), column, TRUE);
 
-  gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(device->profile_dropdown), column,
-                                  "cell-background", 0,
-                                  "text", 1,
-                                  NULL);
-                                  
-  gtk_widget_set_sensitive (device->profile_dropdown, FALSE);
-  gtk_grid_attach (GTK_GRID (grid), device->profile_dropdown, 0, 4, 2, 1);
-*/
+    gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(device->profile_dropdown), column,
+                                    "cell-background", 0,
+                                    "text", 1,
+                                    NULL);
+                                    
+    gtk_widget_set_sensitive (device->profile_dropdown, FALSE);
+    gtk_grid_attach (GTK_GRID (grid), device->profile_dropdown, 0, 4, 2, 1);
+
+    //Disable scrollable section change to prevent useless event dispatch
+    g_signal_connect (G_OBJECT (device->profile_dropdown), "scroll_event", G_CALLBACK(override_scroll_event), device);
+    g_signal_connect (G_OBJECT (device->profile_dropdown), "changed", G_CALLBACK (profile_changed), device);
 
     gtk_container_add (GTK_CONTAINER (row), grid);
   
@@ -351,35 +372,46 @@ GtkWidget * Device__create_row (Device * device, char * uri, char* name, char * 
     return row;
 }
 
-//WIP Profile selection
-void _load_profiles(void * user_data){
+void Device__set_profile_callback(Device * self, void (*profile_callback)(Device *, void *), void * profile_userdata){
+    self->profile_callback = profile_callback;
+    self->profile_userdata = profile_userdata;
+}
+
+gboolean * gui_display_profiles (void * user_data){
     Device * device = (Device *) user_data;
-
-    if(!device->onvif_device->authorized){
-        return;
+    if(!Device__addref(device) || !device->onvif_device->authorized){
+        return FALSE;
     }
-
+    
     GtkListStore *liststore = GTK_LIST_STORE(gtk_combo_box_get_model(GTK_COMBO_BOX(device->profile_dropdown)));
-    OnvifDevice_get_profiles(device->onvif_device);
     for (int i = 0; i < device->onvif_device->sizeSrofiles; i++){
         printf("Profile name: %s\n", device->onvif_device->profiles[i].name);
         printf("Profile token: %s\n", device->onvif_device->profiles[i].token);
 
-        // if(i == 0){
-        //   gtk_entry_set_text (GTK_ENTRY (GTK_COMBO(device->profile_dropdown)->entry), device->onvif_device->profiles[i].name);
-        // }
-
-        // GtkListStore *liststore = gtk_list_store_new(2, G_TYPE_STRING, G_TYPE_STRING);
         gtk_list_store_insert_with_values(liststore, NULL, -1,
                                         // 0, "red",
                                         1, device->onvif_device->profiles[i].name,
-                                        // 2, device->onvif_device->profiles[i].token,
                                         -1);
     }
     gtk_combo_box_set_active(GTK_COMBO_BOX(device->profile_dropdown),0);
     gtk_widget_set_sensitive (device->profile_dropdown, TRUE);
-    // gtk_combo_set_popdown_strings (GTK_COMBO(device->profile_dropdown), cbitems);
 
+    Device__unref(device);
+    return FALSE;
+}
+
+//WIP Profile selection
+void _load_profiles(void * user_data){
+    Device * device = (Device *) user_data;
+
+    if(!Device__addref(device) || !device->onvif_device->authorized){
+        return;
+    }
+
+    OnvifDevice_get_profiles(device->onvif_device);
+    gdk_threads_add_idle((void *)gui_display_profiles,device);
+
+    Device__unref(device);
 }
 
 void Device__load_profiles(Device* device, EventQueue * queue){

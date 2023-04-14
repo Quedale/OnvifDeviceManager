@@ -1,6 +1,7 @@
 #include "player.h"
 #include "gtk/gstgtkbasesink.h"
 #include <math.h>
+#include "src_retriever.h"
 
 /* This function is called when an error message is posted on the bus */
 static void error_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
@@ -250,7 +251,7 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
       printf("msg : GST_MESSAGE_ASYNC_START\n");
       break;
     case GST_MESSAGE_ASYNC_DONE:
-      printf("msg : GST_MESSAGE_ASYNC_DONE\n");
+      // printf("msg : GST_MESSAGE_ASYNC_DONE\n");
       break;
     case GST_MESSAGE_REQUEST_STATE:
       printf("msg : GST_MESSAGE_REQUEST_STATE\n");
@@ -347,26 +348,97 @@ out:
   return ret;
 }
 
-void
-setup_backchannel_shoveler (RtspPlayer * player, GstCaps * caps)
-{
-  GstElement *appsink;
+static void 
+back_message_handler (GstBus * bus, GstMessage * message, gpointer p)
+{ 
+  GError *err;
+  gchar *debug_info;
+  GstState old_state, new_state, pending_state;
   
-  player->backpipe = gst_parse_launch ("autoaudiosrc ! volume name=vol ! "
-      "mulawenc ! rtppcmupay ! appsink name=out", NULL);
-  if (!player->backpipe)
-    g_error ("Could not setup backchannel pipeline");
+  switch(GST_MESSAGE_TYPE(message)){
+    case GST_MESSAGE_UNKNOWN:
+      printf("backpipe msg : GST_MESSAGE_UNKNOWN\n");
+      break;
+    case GST_MESSAGE_EOS:
+      printf ("backpipe msg : End-Of-Stream reached.\n");
+      break;
+    case GST_MESSAGE_ERROR:
+      gst_message_parse_error (message, &err, &debug_info);
+      printf ("backpipe - Error received from element %s: %s\n", GST_OBJECT_NAME (message->src), err->message);
+      printf ("backpipe - Debugging information: %s\n", debug_info ? debug_info : "none");
+      g_clear_error (&err);
+      g_free (debug_info);
+      break;
+    case GST_MESSAGE_STATE_CHANGED:
+      gst_message_parse_state_changed (message, &old_state, &new_state, &pending_state);
+      printf ("backpipe - State set to %s for %s\n", gst_element_state_get_name (new_state), GST_OBJECT_NAME (message->src));
+      break;
+    case GST_MESSAGE_WARNING:
+    default:
+  }
+}
 
-  appsink = gst_bin_get_by_name (GST_BIN (player->backpipe), "out");
-  g_object_set (G_OBJECT (appsink), "caps", caps, "emit-signals", TRUE, NULL);
+void
+setup_backchannel (RtspPlayer * player)
+{
+  GstElement *src;
+  GstElement *enc;
+  GstElement *pay;
 
-  player->mic_volume_element = gst_bin_get_by_name (GST_BIN (player->backpipe), "vol");
+  //self->mic_element
+  player->backpipe = gst_pipeline_new ("backpipe");
+
+  /* Create the elements */
+  if(!player->mic_element){
+    printf("No microphone detected. Skipping backchannel setup!\n");
+    return;
+  }
+
+  printf("Creating backchannel using source element %s\n",player->mic_element);
+
+  src = gst_element_factory_make (player->mic_element, NULL);
+  player->mic_volume_element = gst_element_factory_make ("volume", NULL);
+  enc = gst_element_factory_make ("mulawenc", NULL);
+  pay = gst_element_factory_make ("rtppcmupay", NULL);
+  player->appsink = gst_element_factory_make ("appsink", NULL);
+
+  if(!src || !player->mic_volume_element || !enc || !pay || !player->appsink){
+    printf("Failed to created backchannel element(s). Check your gstreamer installation...\n");
+    return;
+  }
+
+  // Add Elements to the Bin
+  gst_bin_add_many (GST_BIN (player->backpipe), src, player->mic_volume_element, enc, pay, player->appsink, NULL);
+
+  // Link confirmation
+  if (!gst_element_link_many (src,
+    player->mic_volume_element,
+    enc, pay, player->appsink, NULL)){
+      g_warning ("Failed to link backpipe element...");
+      return;
+  }
+
+  if(player->mic_device 
+      && !strcmp(player->mic_element,"alsasrc") 
+      && strlen(player->mic_device) > 1){
+      printf("Setting alsa mic to '%s'\n",player->mic_device);
+      g_object_set(G_OBJECT(src), "device", player->mic_device,NULL);
+  }
+
+  // g_object_set (G_OBJECT (src), "sync", FALSE, NULL);
   g_object_set (G_OBJECT (player->mic_volume_element), "mute", TRUE, NULL);
+  g_object_set (G_OBJECT (player->appsink), "emit-signals", TRUE, NULL);
+  if(!g_signal_connect (player->appsink, "new-sample", G_CALLBACK (new_sample), player)){
+    printf("Failed to add new-sample signal to appsink. Check your gstreamer installation...\n");
+    return;
+  }
 
-  g_signal_connect (appsink, "new-sample", G_CALLBACK (new_sample), player);
+  /* set up backpipe bus */
+  GstBus *bus = gst_element_get_bus (player->backpipe);
+  gst_bus_add_signal_watch (bus);
+  g_signal_connect (bus, "message", G_CALLBACK (back_message_handler), player);
+  gst_object_unref (bus);
 
-  g_print ("Playing backchannel shoveler\n");
-  gst_element_set_state (player->backpipe, GST_STATE_PLAYING);
 }
 
 gboolean RtspPlayer__is_mic_mute(RtspPlayer* self) {
@@ -392,6 +464,10 @@ find_backchannel (GstElement * rtspsrc, guint idx, GstCaps * caps,
   GstStructure *s;
   
   pthread_mutex_lock(player->player_lock);
+  if(!player->backpipe){
+    printf("Backchannel not setup\n");
+    goto exit;
+  }
 
   gchar *caps_str = gst_caps_to_string (caps);
   g_free (caps_str);
@@ -404,10 +480,14 @@ find_backchannel (GstElement * rtspsrc, guint idx, GstCaps * caps,
     gst_structure_set_name (s, "application/x-rtp");
     gst_structure_filter_and_map_in_place (s, remove_extra_fields, NULL);
     gst_caps_append_structure (caps, s);
-    setup_backchannel_shoveler (player, caps);
+
+    //Update appsink caps compatible with recipient
+    g_object_set (G_OBJECT (player->appsink), "caps", caps, NULL);
+    g_print ("Playing backchannel shoveler\n");
+    gst_element_set_state (player->backpipe, GST_STATE_PLAYING);
   }
 
-  
+exit:
   pthread_mutex_unlock(player->player_lock);
   return TRUE;
 }
@@ -739,8 +819,31 @@ void RtspPlayer__init(RtspPlayer* self) {
   self->video_bin = NULL;
   self->audio_bin = NULL;
   self->sink = NULL;
+  self->appsink = NULL;
 
   pthread_mutex_init(self->player_lock, NULL);
+
+  //Automatically retrieve functional Gstreamer microphone element and alsa devie. 
+  //TODO Support settings
+  char mic_element[13], mic_device[6];
+  retrieve_audiosrc(mic_element,mic_device);
+  if(strlen(mic_element) > 1){
+    self->mic_element = malloc(strlen(mic_element)+1);
+    strcpy(self->mic_element,mic_element);
+  } else {
+    self->mic_element = NULL;
+  }
+
+  if(strlen(mic_device) > 1){
+    self->mic_device = malloc(strlen(mic_device)+1);
+    strcpy(self->mic_device,mic_device);
+  } else {
+    self->mic_device = NULL;
+  }
+
+  //Create only one reusable microphone backpipe
+  setup_backchannel(self);
+
   create_pipeline(self);
   if (!self->pipeline){
     g_error ("Failed to parse pipeline");
@@ -762,8 +865,18 @@ void RtspPlayer__reset(RtspPlayer* self) {
 
 void RtspPlayer__destroy(RtspPlayer* self) {
   if (self) {
-     RtspPlayer__reset(self);
-     free(self);
+    RtspPlayer__reset(self);
+    if(self->mic_element){
+      free(self->mic_element);
+    }
+    if(self->mic_device){
+      free(self->mic_device);
+    }
+
+    pthread_mutex_destroy(self->player_lock);
+    free(self->player_lock);
+    free(self->overlay_state);
+    free(self);
   }
 }
 
@@ -800,10 +913,9 @@ void RtspPlayer__stop(RtspPlayer* self){
 
     GstStateChangeReturn ret;
 
-    //Backchannel clean up
+    //Pause backchannel
     if(GST_IS_ELEMENT(self->backpipe)){
-      ret = gst_element_set_state (self->backpipe, GST_STATE_NULL);
-      gst_object_unref (self->backpipe);
+      ret = gst_element_set_state (self->backpipe, GST_STATE_READY);
       if (ret == GST_STATE_CHANGE_FAILURE) {
           GST_ERROR ("Unable to set the backpipe to the ready state.\n");
           goto stop_out;
@@ -822,8 +934,6 @@ stop_out:
   //Destroy old pipeline
   if(GST_IS_ELEMENT(self->pipeline))
     gst_object_unref (self->pipeline);
-  if(GST_IS_ELEMENT(self->backpipe))
-    gst_object_unref (self->backpipe);
 
   // Create new pipeline
   create_pipeline(self);

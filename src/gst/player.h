@@ -8,11 +8,9 @@
 typedef struct _RtspPlayer RtspPlayer;
 
 typedef struct _RtspPlayer {
-  GstElement *pipeline; /* Our one and only pipeline */
-  GstElement *backpipe;
+  GstElement *pipeline;
   GstElement *src;  /* RtspSrc to support backchannel */
   GstElement *sink;  /* Video Sink */
-  GstElement *mic_volume_element;
   int pad_found;
   GstElement * video_bin;
   int no_video;
@@ -20,6 +18,14 @@ typedef struct _RtspPlayer {
   GstElement * audio_bin;
   int no_audio;
   int audio_done;
+  
+  //Backpipe related properties
+  GstElement *backpipe;
+  GstElement *mic_volume_element;
+  GstElement *appsink;
+  char * mic_element;
+  char * mic_device;
+
   GstVideoOverlay *overlay; //Overlay rendered on the canvas widget
   OverlayState *overlay_state;
 

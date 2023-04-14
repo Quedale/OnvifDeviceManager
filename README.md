@@ -13,12 +13,13 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Prototype Soundlevel indicator
 - WS-Security
 - Support system and static libraries. (static recommended)
+- Support Multiple ONVIF Profiles
 
 # TODO
-- Support Multiple Onvif Profiles
+- EventQueue : Interupt pending events when needed
+- Support MJPEG stream
 - Credential Storage 
 - Add option to scale up stream.
-- EventQueue : Interupt pending events when needed
 - Edit Onvif device identification
 - Display Onvif network information
 - Display Media information

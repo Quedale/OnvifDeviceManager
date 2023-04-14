@@ -5,7 +5,9 @@
 #include <gtk/gtk.h>
 #include "../queue/event_queue.h"
 
-typedef struct {
+typedef struct _Device Device;
+
+typedef struct _Device {
   OnvifDevice * onvif_device;
   GtkWidget * image_handle;
   GtkWidget * profile_dropdown;
@@ -14,6 +16,9 @@ typedef struct {
   int destroyed;
   int refcount;
   int selected;
+
+  void (*profile_callback)(Device *, void *);
+  void * profile_userdata;
 } Device;
 
 typedef struct {
@@ -33,6 +38,7 @@ Device * Device__create(OnvifDevice * onvif_device);
 int Device__addref(Device* device); 
 void Device__unref(Device* device); 
 int Device__is_valid(Device* device); 
+void Device__set_profile_callback(Device * device, void (*profile_callback)(Device *, void *), void * profile_userdata);
 void Device__lookup_hostname(Device* device, EventQueue * queue); 
 void Device__load_thumbnail(Device* device, EventQueue * queue);
 void Device__load_profiles(Device* device, EventQueue * queue);
