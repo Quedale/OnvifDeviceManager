@@ -730,7 +730,7 @@ if [ $ret != 0 ]; then
   fi
 
   echo "-- Building gsoap libgsoap-dev --"
-  downloadAndExtract file="gsoap.zip" path="https://sourceforge.net/projects/gsoap2/files/gsoap_2.8.123.zip/download"
+  downloadAndExtract file="gsoap.zip" path="https://sourceforge.net/projects/gsoap2/files/gsoap_2.8.129.zip/download"
   if [ $FAILED -eq 1 ]; then exit 1; fi
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG:$ZLIB_PKG \
   C_INCLUDE_PATH="$SSL_INCLUDE:$ZLIB_INCLUDE:$C_INCLUDE_PATH" \
