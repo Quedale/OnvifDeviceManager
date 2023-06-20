@@ -91,12 +91,15 @@ AM_COND_IF([GSTBUILDCOND],[
     SET_GST_PKG_PATH
 ], [
     PKG_CHECK_MODULES(gstreamer, [
-        gstreamer-1.0 >= 1.20.3
+        gstreamer-1.0 >= 1.14.4
+        gstreamer-plugins-base-1.0 >= 1.14.4
+        gstreamer-plugins-good-1.0 >= 1.14.4
+        gstreamer-plugins-bad-1.0 >= 1.14.4
     ], [
-        AC_MSG_NOTICE([gstreamer >= 1.20.3 found - Using shared libraries])
+        AC_MSG_NOTICE([gstreamer >= 1.14.4 found - Using shared libraries])
         AC_SUBST(GST_LINK_TYPE, [-Wl,-Bdynamic])
     ], [
-        AC_MSG_NOTICE([gstreamer >= 1.20.3 not found. - Using latest static libraries])
+        AC_MSG_NOTICE([gstreamer >= 1.14.4 not found. - Using latest static libraries])
         SET_GST_PKG_PATH
     ])
 ])

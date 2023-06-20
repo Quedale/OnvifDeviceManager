@@ -3,33 +3,29 @@
 
 #include <stdlib.h>
 
+typedef enum {
+  EVENTQUEUE_DISPATCHING               = 0,
+  EVENTQUEUE_DISPATCHED             = 1,
+  EVENTQUEUE_STARTED                = 2
+  //TODO Handle more types
+} EventQueueType;
+
+typedef struct _EventQueue EventQueue;
+
 typedef struct {
-    void * user_data;
-    void (*callback)();
-    // int * empty;
+  void * user_data;
+  void (*callback)();
+  // int * empty;
 } QueueEvent;
 
+EventQueue* EventQueue__create(void (*queue_event_cb)(EventQueue * queue, EventQueueType type,void * user_data),void * user_data); 
 
-typedef struct {
-  int event_count;
-  pthread_t tid;
-  pthread_cond_t * sleep_cond;
-  pthread_mutex_t * sleep_lock;
-  pthread_cond_t * pop_cond;
-  pthread_mutex_t * pop_lock;
-  QueueEvent *events;
-} EventQueue;
-
-__attribute__ ((visibility("default"))) 
-extern EventQueue* EventQueue__create(); 
-
-__attribute__ ((visibility("default"))) 
-extern void EventQueue__destroy(EventQueue* onvifDeviceList);
-__attribute__ ((visibility("default"))) 
-extern void EventQueue__insert(EventQueue* queue, void (*callback)(), void * user_data);
-__attribute__ ((visibility("default"))) 
-extern QueueEvent EventQueue__pop(EventQueue* self);
-__attribute__ ((visibility("default"))) 
-extern void EventQueue__start(EventQueue* self);
+void EventQueue__destroy(EventQueue* onvifDeviceList);
+void EventQueue__insert(EventQueue* queue, void (*callback)(), void * user_data);
+QueueEvent EventQueue__pop(EventQueue* self);
+void EventQueue__start(EventQueue* self);
+int EventQueue__get_running_event_count(EventQueue * self);
+int EventQueue__get_pending_event_count(EventQueue * self);
+int EventQueue__get_thread_count(EventQueue * self);
 
 #endif

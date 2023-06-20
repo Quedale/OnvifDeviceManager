@@ -5,10 +5,27 @@
 #include <unistd.h>
 #include "event_queue.h"
 
+ 
+typedef struct _EventQueue {
+    int running_events;
+    int event_count;
+    int thread_count;
+    pthread_cond_t * sleep_cond;
+    pthread_mutex_t * sleep_lock;
+    pthread_cond_t * pop_cond;
+    pthread_mutex_t * pop_lock;
+
+    void (*queue_event_cb)(EventQueue * queue, EventQueueType type, void * user_data);
+    void * user_data;
+
+    QueueEvent *events;
+} EventQueue;
 
 void EventQueue__init(EventQueue* self) {
     self->events=malloc(0);
     self->event_count=0;
+    self->thread_count = 0;
+    self->running_events=0;
 
     self->sleep_lock =malloc(sizeof(pthread_mutex_t));
     pthread_mutex_init(self->sleep_lock, NULL);
@@ -20,13 +37,26 @@ void EventQueue__init(EventQueue* self) {
     pthread_cond_init(self->sleep_cond, NULL);
 }
 
-EventQueue* EventQueue__create() {
+EventQueue* EventQueue__create(void (*queue_event_cb)(EventQueue * queue, EventQueueType type, void * user_data), void * user_data) {
     printf("EventQueue__create...\n");
     EventQueue* result = (EventQueue*) malloc(sizeof(EventQueue));
+    result->queue_event_cb = queue_event_cb;
+    result->user_data = user_data;
     EventQueue__init(result);
     return result;
 }
 
+int EventQueue__get_running_event_count(EventQueue * self){
+    return self->running_events;
+}
+
+int EventQueue__get_pending_event_count(EventQueue * self){
+    return self->event_count;
+}
+
+int EventQueue__get_thread_count(EventQueue * self){
+    return self->thread_count;
+}
 
 void EventQueue__reset(EventQueue* self) {
 }
@@ -124,15 +154,28 @@ void * queue_thread_cb(void * data){
         if(!event.callback){ //Happens if pop happens simultaniously at 0. Continue to wait on condition call
             continue;
         }
-
+        queue->running_events++;
+        if(queue->queue_event_cb){
+            queue->queue_event_cb(queue,EVENTQUEUE_DISPATCHING,queue->user_data);
+        }
         (*(event.callback))(event.user_data);
+        queue->running_events--;
+        if(queue->queue_event_cb){
+            queue->queue_event_cb(queue,EVENTQUEUE_DISPATCHED,queue->user_data);
+        }
     }
     return NULL;
 };
 
 void EventQueue__start(EventQueue* self){
     printf("EventQueue__start...\n");
+    
+    //TODO Store tid in array
     pthread_t tid;
     pthread_create(&tid, NULL, queue_thread_cb, self);
-    self->tid = tid;
+    self->thread_count++;
+
+    if(self->queue_event_cb){
+        self->queue_event_cb(self,EVENTQUEUE_STARTED,self->user_data);
+    }
 };

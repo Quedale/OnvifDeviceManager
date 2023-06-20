@@ -8,6 +8,7 @@
 #include "../queue/event_queue.h"
 #include "../gst/player.h"
 #include "discoverer.h"
+#include "task_manager.h"
 
 typedef struct _OnvifApp {
     Device* device; /* Currently selected device */
@@ -16,6 +17,7 @@ typedef struct _OnvifApp {
     GtkWidget *listbox;
     GtkWidget *main_notebook;
     GtkWidget *player_loading_handle;
+    GtkWidget *task_label;
 
     CredentialsDialog * dialog;
 
@@ -23,6 +25,7 @@ typedef struct _OnvifApp {
 
     OnvifDetails * details;
     AppSettings * settings;
+    TaskMgr * taskmgr;
 
     EventQueue * queue;
     RtspPlayer * player;
@@ -401,6 +404,32 @@ void create_ui (OnvifApp * app) {
 
     gtk_notebook_append_page (GTK_NOTEBOOK (app->main_notebook), widget, hbox);
 
+
+
+    label = gtk_label_new ("Task Manager");
+    //Hidden spinner used to display stream start loading
+    // widget = gtk_spinner_new ();
+    // TaskMgr__set_loading_handle(app->taskmgr,widget);
+
+    //Only show label and keep loading hidden
+    hbox = gtk_box_new (GTK_ORIENTATION_HORIZONTAL,  6);
+    gtk_box_pack_start (GTK_BOX(hbox),label,TRUE,TRUE,0);
+
+    int running = EventQueue__get_running_event_count(app->queue);
+    int pending = EventQueue__get_pending_event_count(app->queue);
+    int total = EventQueue__get_thread_count(app->queue);
+    char str[7];
+    sprintf(str, "[%d/%d]", running + pending,total);
+    app->task_label = gtk_label_new (str);
+    gtk_box_pack_start(GTK_BOX(hbox),app->task_label,FALSE,FALSE,0);
+    // gtk_box_pack_start(GTK_BOX(hbox),widget,FALSE,FALSE,0);
+    gtk_widget_show_all(hbox);
+
+    widget = TaskMgr__get_widget(app->taskmgr);
+
+    gtk_notebook_append_page (GTK_NOTEBOOK (app->main_notebook), widget, hbox);
+
+
     GdkMonitor* monitor = gdk_display_get_primary_monitor(gdk_display_get_default());
     if(monitor){
         GdkRectangle workarea = {0};
@@ -482,14 +511,51 @@ void _overscale_cb(AppSettings * settings, int allow_overscale, void * user_data
     RtspPlayer__allow_overscale(app->player,allow_overscale);
 }
 
+struct GUILabelUpdate {
+    GtkWidget * label;
+    char * text;
+};
+
+gboolean * gui_set_task_label (void * user_data){
+    struct GUILabelUpdate * update = (struct  GUILabelUpdate *) user_data;
+    gtk_label_set_text(GTK_LABEL(update->label),update->text);
+
+    free(update->text);
+    free(update);
+
+    return FALSE;
+}
+
+void eventqueue_dispatch_cb(EventQueue * queue, EventQueueType type, void * user_data){
+    OnvifApp * app = (OnvifApp *) user_data;
+    if(!GTK_IS_WIDGET(app->task_label)){
+        return;
+    }
+    int running = EventQueue__get_running_event_count(queue);
+    int pending = EventQueue__get_pending_event_count(queue);
+    int total = EventQueue__get_thread_count(queue);
+    printf("----------------------------------eventqueue_dispatch_cb [%i/%i/%i]\n",running,running+pending,total);
+
+    char str[7];
+    sprintf(str, "[%d/%d]", running + pending,total);
+    struct GUILabelUpdate * update = malloc(sizeof(struct GUILabelUpdate));
+    update->label = app->task_label;
+
+    update->text = malloc(strlen(str)+1);
+    strcpy(update->text,str);
+    gdk_threads_add_idle((void *)gui_set_task_label,update);
+}
+
 OnvifApp * OnvifApp__create(){
     OnvifApp *app  =  malloc(sizeof(OnvifApp));
     app->device_list = DeviceList__create();
     app->device = NULL;
     app->dialog = CredentialsDialog__create(dialog_login_cb, dialog_cancel_cb);
-    app->queue = EventQueue__create();
+    app->queue = EventQueue__create(eventqueue_dispatch_cb,app);
     app->details = OnvifDetails__create(app->queue);
     app->settings = AppSettings__create(app->queue);
+    app->taskmgr = TaskMgr__create();
+
     AppSettings__set_overscale_callback(app->settings,_overscale_cb,app);
     app->current_page = 0;
     app->player = RtspPlayer__create();
@@ -520,6 +586,7 @@ void OnvifApp__destroy(OnvifApp* self){
     if (self) {
         OnvifDetails__destroy(self->details);
         AppSettings__destroy(self->settings);
+        TaskMgr__destroy(self->taskmgr);
         CredentialsDialog__destroy(self->dialog);
         RtspPlayer__destroy(self->player);
         EventQueue__destroy(self->queue);

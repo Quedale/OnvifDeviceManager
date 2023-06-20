@@ -887,16 +887,24 @@ FFMPEG_PKG=$SUBPROJECT_DIR/FFmpeg/dist/lib/pkgconfig
 GST_OMX_PKG_PATH=$SUBPROJECT_DIR/gstreamer/build_omx/dist/lib/gstreamer-1.0/pkgconfig
 GST_PKG_PATH=:$SUBPROJECT_DIR/gstreamer/build/dist/lib/pkgconfig:$SUBPROJECT_DIR/gstreamer/build/dist/lib/gstreamer-1.0/pkgconfig
 gst_ret=0
-gst_plg_ret=0
 gst_libav_ret=0
-GSTREAMER_LATEST=1.22.1
+gst_plg_base=0
+gst_plg_good=0
+gst_plg_bad=0
+GSTREAMER_LATEST=1.22.3
 
 PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB \
 pkg-config --exists --print-errors "gstreamer-1.0 >= 1.14.4"
 gst_ret=$?
 PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB \
-pkg-config --exists --print-errors "gstreamer-rtsp-server-1.0 >= 1.14.4"
-gst_plg_ret=$?
+pkg-config --exists --print-errors "gstreamer-plugins-base-1.0 >= 1.14.4"
+gst_plg_base=$?
+PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB \
+pkg-config --exists --print-errors "gstreamer-plugins-good-1.0 >= 1.14.4"
+gst_plg_good=$?
+PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB \
+pkg-config --exists --print-errors "gstreamer-plugins-bad-1.0 >= 1.14.4"
+gst_plg_bad=$?
 if [ $ENABLE_LIBAV -eq 1 ]; then
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB:$FFMPEG_PKG \
   pkg-config --exists --print-errors "gstlibav >= 1.14.4"
@@ -904,14 +912,11 @@ if [ $ENABLE_LIBAV -eq 1 ]; then
 fi
 
 #Check to see if gstreamer exist on the system
-if [ $gst_ret != 0 ] || [ $gst_plg_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
+if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $ENABLE_LATEST != 0 ] || [ $gst_plg_base != 0 ] || [ $gst_plg_good != 0 ] || [ $gst_plg_bad != 0 ]; then
 
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB \
   pkg-config --exists --print-errors "gstreamer-1.0 >= $GSTREAMER_LATEST"
   gst_ret=$?
-  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB \
-  pkg-config --exists --print-errors "gstreamer-rtsp-server-1.0 >= $GSTREAMER_LATEST"
-  gst_plg_ret=$?
   if [ $ENABLE_LIBAV -eq 1 ]; then
     PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB:$FFMPEG_PKG \
     pkg-config --exists --print-errors "gstlibav >= $GSTREAMER_LATEST"
@@ -919,7 +924,7 @@ if [ $gst_ret != 0 ] || [ $gst_plg_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $E
   fi
 
   #Global check if gstreamer is already built
-  if [ $gst_ret != 0 ] || [ $gst_plg_ret != 0 ] || [ $gst_libav_ret != 0 ]; then
+  if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ]; then
     ################################################################
     # 
     #    Build gettext and libgettext dependency
@@ -1214,8 +1219,8 @@ if [ $gst_ret != 0 ] || [ $gst_plg_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $E
         echo "nasm already installed."
     fi
 
-    echo "gst_ret : $gst_ret | gst_plg_ret : $gst_plg_ret | gst_libav_ret : $gst_libav_ret"
-    if [ $gst_ret != 0 ] || [ $gst_plg_ret != 0 ] || [ $gst_libav_ret != 0 ]; then
+    echo "gst_ret : $gst_ret | gst_libav_ret : $gst_libav_ret"
+    if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ]; then
         MESON_PARAMS=""
         if [ $ENABLE_LIBAV -eq 1 ]; then
             echo "LIBAV Feature enabled..."
@@ -1284,7 +1289,6 @@ if [ $gst_ret != 0 ] || [ $gst_plg_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $E
         MESON_PARAMS="$MESON_PARAMS -Dgood=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dbad=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgpl=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Drtsp_server=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:app=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:typefind=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:audiotestsrc=enabled"

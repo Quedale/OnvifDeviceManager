@@ -80,7 +80,8 @@ make install
 I have very little spare time to work on any personal project, so this might take a while.
 This is my very first C project, so I'm learning as I go. 
  
- 
+# Known issues
+1. GTKComboBox intercept scroll event meant for the camera list. (Fixed in MR [!4405](https://gitlab.gnome.org/GNOME/gtk/-/merge_requests/4405/diffs#1b2782cecf88934dfff50b3eadda7a2b036acfe1))
 
 # 
 # Feedback is more than welcome

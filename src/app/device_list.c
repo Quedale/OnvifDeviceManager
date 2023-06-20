@@ -292,10 +292,6 @@ void profile_changed(GtkComboBox* self, Device * device){
     }
 }
 
-//Prevent profile dropdown scroll to avoid useless event dispatched. Rely on click selection
-gboolean override_scroll_event (GtkWidget* self,GdkEventScroll event,gpointer user_data){
-    return TRUE;
-}
 
 GtkWidget * Device__create_row (Device * device, char * uri, char* name, char * hardware, char * location){
     GtkWidget *row;
@@ -359,8 +355,6 @@ GtkWidget * Device__create_row (Device * device, char * uri, char* name, char * 
     gtk_widget_set_sensitive (device->profile_dropdown, FALSE);
     gtk_grid_attach (GTK_GRID (grid), device->profile_dropdown, 0, 4, 2, 1);
 
-    //Disable scrollable section change to prevent useless event dispatch
-    g_signal_connect (G_OBJECT (device->profile_dropdown), "scroll_event", G_CALLBACK(override_scroll_event), device);
     g_signal_connect (G_OBJECT (device->profile_dropdown), "changed", G_CALLBACK (profile_changed), device);
 
     gtk_container_add (GTK_CONTAINER (row), grid);
