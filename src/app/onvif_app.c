@@ -550,6 +550,7 @@ OnvifApp * OnvifApp__create(){
     OnvifApp *app  =  malloc(sizeof(OnvifApp));
     app->device_list = DeviceList__create();
     app->device = NULL;
+    app->task_label = NULL;
     app->dialog = CredentialsDialog__create(dialog_login_cb, dialog_cancel_cb);
     app->queue = EventQueue__create(eventqueue_dispatch_cb,app);
     app->details = OnvifDetails__create(app->queue);

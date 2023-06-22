@@ -10,6 +10,9 @@ SUBPROJECT_DIR=$SCRT_DIR/subprojects
 #Cache folder for downloaded sources
 SRC_CACHE_DIR=$SUBPROJECT_DIR/.cache
 
+#meson utility location set for pip source
+MESON_TOOL=$HOME/.local/bin/meson
+
 #Failure marker
 FAILED=0
 
@@ -449,7 +452,7 @@ buildMesonProject() {
           printf "${ORANGE}*****************************\n${NC}"
           printf "${ORANGE}*** Download Subprojects ${srcdir} ***\n${NC}"
           printf "${ORANGE}*****************************\n${NC}"
-          #     meson subprojects download
+          #     $MESON_TOOL subprojects download
       fi
 
       echo "setup patch : ${setuppatch}"
@@ -473,7 +476,7 @@ buildMesonProject() {
       printf "${ORANGE}*****************************\n${NC}"
       printf "${ORANGE}*** Meson Setup ${srcdir} ***\n${NC}"
       printf "${ORANGE}*****************************\n${NC}"
-      meson setup $build_dir \
+      $MESON_TOOL setup $build_dir \
           ${mesonargs} \
           --default-library=$default_lib \
           --prefix=${prefix} \
@@ -497,7 +500,7 @@ buildMesonProject() {
           printf "${ORANGE}*****************************\n${NC}"
           printf "${ORANGE}*** Meson Update ${srcdir} ***\n${NC}"
           printf "${ORANGE}*****************************\n${NC}"
-          #     meson subprojects update
+          #     $MESON_TOOL subprojects update
       fi
 
       if [ ! -z "${setuppatch}" ]; then
@@ -520,7 +523,7 @@ buildMesonProject() {
       printf "${ORANGE}*****************************\n${NC}"
       printf "${ORANGE}*** Meson Reconfigure $(pwd) ${srcdir} ***\n${NC}"
       printf "${ORANGE}*****************************\n${NC}"
-      meson setup $build_dir \
+      $MESON_TOOL setup $build_dir \
           ${mesonargs} \
           --default-library=$default_lib \
           --prefix=${prefix} \
@@ -545,7 +548,7 @@ buildMesonProject() {
   printf "${ORANGE}*****************************\n${NC}"
   printf "${ORANGE}*** Meson Compile ${srcdir} ***\n${NC}"
   printf "${ORANGE}*****************************\n${NC}"
-  meson compile -C $build_dir
+  $MESON_TOOL compile -C $build_dir
   status=$?
   if [ $status -ne 0 ]; then
       printf "${RED}*****************************\n${NC}"
@@ -559,7 +562,7 @@ buildMesonProject() {
   printf "${ORANGE}*****************************\n${NC}"
   printf "${ORANGE}*** Meson Install ${srcdir} ***\n${NC}"
   printf "${ORANGE}*****************************\n${NC}"
-  DESTDIR=${destdir} meson install -C $build_dir
+  DESTDIR=${destdir} $MESON_TOOL install -C $build_dir
   status=$?
   if [ $status -ne 0 ]; then
       printf "${RED}*****************************\n${NC}"
@@ -601,9 +604,9 @@ checkProg () {
 
 # Hard dependency check
 MISSING_DEP=0
-if [ -z "$(checkProg name='meson' args='--version' path=$PATH)" ]; then
-  MISSING_DEP=1
-  echo "meson build utility not found! Aborting..."
+if [ -z "$(checkProg name='make' args='--version' path=$PATH)" ]; then
+ MISSING_DEP=1
+ echo "make build utility not found! Aborting..."
 fi
 
 if [ -z "$(checkProg name='ninja' args='--version' path=$PATH)" ]; then
@@ -642,8 +645,8 @@ if [ -z "$(checkProg name='pkg-config' args='--version' path=$PATH)" ]; then
 fi
 
 if [ -z "$(checkProg name='g++' args='--version' path=$PATH)" ]; then
-  MISSING_DEP=1
-  echo "g++ build utility not found! Aborting..."
+ MISSING_DEP=1
+ echo "g++ build utility not found! Aborting..."
 fi
 
 pkg-config --exists "gtk+-3.0"
@@ -658,6 +661,20 @@ if [ $MISSING_DEP -eq 1 ]; then
   exit 1
 fi
 
+#Setup pip
+if [ -z "$(checkProg name='python3' args='-m pip --version' path=$PATH)" ]; then
+  wget https://bootstrap.pypa.io/get-pip.py
+  python3 get-pip.py
+else
+  echo "python3 pip already installed"
+fi
+
+#Setup meson
+if [ -z "$(checkProg name='$MESON_TOOL' args='--version' path=$PATH)" ]; then
+  python3 -m pip install meson --user
+else
+  echo "Meson already installed."
+fi
 
 #Change to the project folder to run autoconf and automake
 cd $SCRT_DIR
@@ -684,7 +701,7 @@ cd $SUBPROJECT_DIR
 ################################################################
 OPENSSL_PKG=$SUBPROJECT_DIR/openssl/build/dist/lib/pkgconfig
 PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG \
-pkg-config --exists --print-errors "libcrypto >= 1.1.1q"
+pkg-config --exists --print-errors "libcrypto >= 1.1.1f"
 ret=$?
 if [ $ret != 0 ]; then 
   pullOrClone path="https://github.com/openssl/openssl.git" tag="OpenSSL_1_1_1q"
@@ -737,6 +754,7 @@ if [ $ret != 0 ]; then
   CPLUS_INCLUDE_PATH="$SSL_INCLUDE:$ZLIB_INCLUDE:$CPLUS_INCLUDE_PATH" \
   LIBRARY_PATH="$SSL_LIBS:$ZLIB_LIBS:$LIBRARY_PATH" \
   LD_LIBRARY_PATH="$SSL_LIBS:$ZLIB_LIBS:$LD_LIBRARY_PATH" \
+  LIBS='-ldl -lpthread' \
   buildMakeProject srcdir="gsoap-2.8" prefix="$SUBPROJECT_DIR/gsoap-2.8/build/dist" autogen="skip" configure="--with-openssl=/usr/lib/ssl"
   if [ $FAILED -eq 1 ]; then exit 1; fi
 else
@@ -971,7 +989,8 @@ if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $ENABLE_LATEST != 0 ] || [ 
       ret=$?
       if [ $ret != 0 ]; then
         echo "not found libcap"
-        pullOrClone path=git://git.kernel.org/pub/scm/linux/kernel/git/morgan/libcap.git tag=libcap-2.53
+        #old link git://git.kernel.org/pub/scm/linux/kernel/git/morgan/libcap.git
+        pullOrClone path=https://kernel.googlesource.com/pub/scm/libs/libcap/libcap tag=libcap-2.69
         buildMakeProject srcdir="libcap" prefix="$SUBPROJECT_DIR/libcap/dist" installargs="DESTDIR=$SUBPROJECT_DIR/libcap/dist"
         if [ $FAILED -eq 1 ]; then exit 1; fi
       else
@@ -990,6 +1009,14 @@ if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $ENABLE_LATEST != 0 ] || [ 
         if [ $FAILED -eq 1 ]; then exit 1; fi
       else
         echo "mount already found."
+      fi
+
+      python3 -c 'from setuptools import setup'
+      ret=$?
+      if [ $ret != 0 ]; then
+        python3 -m pip install setuptools --user
+      else
+        echo "python3 setuptools already found."
       fi
 
       python3 -c 'import jinja2'

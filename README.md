@@ -46,7 +46,7 @@ cd OnvifDeviceManager
 autogen.sh will attempt download and build missing dependencies.   
 **[Mandatory]** The following package dependencies are mandatory and are not yet automatically built:
 ```
-sudo apt install meson 
+sudo apt install make
 sudo apt install ninja-build
 sudo apt install bison 
 sudo apt install flex 
@@ -57,6 +57,8 @@ sudo apt install g++
 ```
 **[Optional]** The following package are optional, but will reduce the runtime of autogen.sh if installed.
 ```
+sudo apt install python3-pip
+python3 -m pip install meson
 sudo apt install libssl-dev
 sudo apt install zlib1g-dev
 sudo apt install libasound2-dev

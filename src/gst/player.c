@@ -165,6 +165,8 @@ state_changed_cb (GstBus * bus, GstMessage * msg, RtspPlayer * data)
 static void 
 message_handler (GstBus * bus, GstMessage * message, gpointer p)
 { 
+  const GstStructure *s;
+  const gchar *name;
   RtspPlayer *player = (RtspPlayer *) p;
   switch(GST_MESSAGE_TYPE(message)){
     case GST_MESSAGE_UNKNOWN:
@@ -225,8 +227,8 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
       printf("msg : GST_MESSAGE_APPLICATION\n");
       break;
     case GST_MESSAGE_ELEMENT:
-      const GstStructure *s = gst_message_get_structure (message);
-      const gchar *name = gst_structure_get_name (s);
+      s = gst_message_get_structure (message);
+      name = gst_structure_get_name (s);
       if (strcmp (name, "level") == 0) {
         level_handler(bus,message,player,s);
       } else if (strcmp (name, "GstNavigationMessage") == 0 || 
@@ -375,6 +377,7 @@ back_message_handler (GstBus * bus, GstMessage * message, gpointer p)
       break;
     case GST_MESSAGE_WARNING:
     default:
+      break;
   }
 }
 
