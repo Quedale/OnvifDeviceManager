@@ -11,7 +11,7 @@ SUBPROJECT_DIR=$SCRT_DIR/subprojects
 SRC_CACHE_DIR=$SUBPROJECT_DIR/.cache
 
 #meson utility location set for pip source
-MESON_TOOL=$HOME/.local/bin/meson
+MESON_TOOL=meson
 
 #Failure marker
 FAILED=0
@@ -602,6 +602,51 @@ checkProg () {
   fi
 }
 
+isMesonInstalled(){
+  local major minor micro # reset first
+  local "${@}"
+
+  ret=0
+  MESONVERSION=$(meson --version)
+  ret=$?
+  if [[ $status -eq 0 ]]; then
+    IFS='.' read -ra ADDR <<< "$MESONVERSION"
+    index=0
+    success=0
+    for i in "${ADDR[@]}"; do
+      if [ "$index" == "0" ]; then
+        valuetocomapre="${major}" #Major version
+      elif [ "$index" == "1" ]; then
+        valuetocomapre="${minor}" #Minor version
+      elif [ "$index" == "2" ]; then
+        valuetocomapre="${micro}" #Micro version
+      fi
+      
+      if [ "$i" -gt "$valuetocomapre" ]; then
+        success=1
+        break
+      elif [ "$i" -lt "$valuetocomapre" ]; then
+        success=0
+        break
+      fi
+
+      if [ "$index" == "2" ]; then
+        success=1
+      fi
+      ((index=index+1))
+    done
+
+    if [ $success -eq "1" ]; then
+      return
+    else
+      echo "nope"
+    fi
+
+  else
+    echo "nope"
+  fi
+}
+
 # Hard dependency check
 MISSING_DEP=0
 if [ -z "$(checkProg name='make' args='--version' path=$PATH)" ]; then
@@ -670,8 +715,11 @@ else
 fi
 
 #Setup meson
-if [ -z "$(checkProg name='$MESON_TOOL' args='--version' path=$PATH)" ]; then
-  python3 -m pip install meson --user
+if [ ! -z "$(isMesonInstalled major=0 minor=63 micro=2)" ]; then
+  python3 -m pip install meson --user --upgrade
+  #Override potentially existant older meson version
+  #/usr/bin/meson only exist if installed via apt as well
+  MESON_TOOL=$HOME/.local/bin/meson
 else
   echo "Meson already installed."
 fi
