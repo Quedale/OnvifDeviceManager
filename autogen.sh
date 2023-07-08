@@ -654,10 +654,6 @@ if [ -z "$(checkProg name='make' args='--version' path=$PATH)" ]; then
  echo "make build utility not found! Aborting..."
 fi
 
-if [ -z "$(checkProg name='ninja' args='--version' path=$PATH)" ]; then
-  MISSING_DEP=1
-  echo "ninja build utility not found! Aborting..."
-fi
 
 if [ -z "$(checkProg name='bison' args='--version' path=$PATH)" ]; then
   MISSING_DEP=1
@@ -706,24 +702,6 @@ if [ $MISSING_DEP -eq 1 ]; then
   exit 1
 fi
 
-#Setup pip
-if [ -z "$(checkProg name='python3' args='-m pip --version' path=$PATH)" ]; then
-  wget https://bootstrap.pypa.io/get-pip.py
-  python3 get-pip.py
-else
-  echo "python3 pip already installed"
-fi
-
-#Setup meson
-if [ ! -z "$(isMesonInstalled major=0 minor=63 micro=2)" ]; then
-  python3 -m pip install meson --user --upgrade
-  #Override potentially existant older meson version
-  #/usr/bin/meson only exist if installed via apt as well
-  MESON_TOOL=$HOME/.local/bin/meson
-else
-  echo "Meson already installed."
-fi
-
 #Change to the project folder to run autoconf and automake
 cd $SCRT_DIR
 
@@ -737,6 +715,34 @@ mkdir -p $SUBPROJECT_DIR
 mkdir -p $SRC_CACHE_DIR
 
 cd $SUBPROJECT_DIR
+
+#Download virtualenv tool
+if [ ! -f "virtualenv.pyz" ]; then
+  wget https://bootstrap.pypa.io/virtualenv.pyz
+fi
+
+#Setting up Virtual Python environment
+if [ ! -f "./venvfolder/bin/activate" ]; then
+  python3 virtualenv.pyz ./venvfolder
+fi
+
+#Activate virtual environment
+source venvfolder/bin/activate
+
+#Setup meson
+if [ ! -z "$(isMesonInstalled major=0 minor=63 micro=2)" ]; then
+  echo "ninja build utility not found. Installing from pip..."
+  python3 -m pip install meson --upgrade
+else
+  echo "Meson $($MESON_TOOL --version) already installed."
+fi
+
+if [ -z "$(checkProg name='ninja' args='--version' path=$PATH)" ]; then
+  echo "ninja build utility not found. Installing from pip..."
+  python3 -m pip install ninja --upgrade
+else
+  echo "Ninja $(ninja --version) already installed."
+fi
 
 # pullOrClone path="https://gitlab.gnome.org/GNOME/gtk.git" tag="3.24.34"
 # buildMesonProject srcdir="gtk" prefix="$SUBPROJECT_DIR/gtk/dist" mesonargs="-Dtests=false -Dintrospection=false -Ddemos=false -Dexamples=false -Dlibepoxy:tests=false"
@@ -957,7 +963,7 @@ gst_libav_ret=0
 gst_plg_base=0
 gst_plg_good=0
 gst_plg_bad=0
-GSTREAMER_LATEST=1.22.3
+GSTREAMER_LATEST=1.22.4
 
 PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB \
 pkg-config --exists --print-errors "gstreamer-1.0 >= 1.14.4"
@@ -1062,7 +1068,7 @@ if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $ENABLE_LATEST != 0 ] || [ 
       python3 -c 'from setuptools import setup'
       ret=$?
       if [ $ret != 0 ]; then
-        python3 -m pip install setuptools --user
+        python3 -m pip install setuptools
       else
         echo "python3 setuptools already found."
       fi
@@ -1072,7 +1078,7 @@ if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $ENABLE_LATEST != 0 ] || [ 
       if [ $ret != 0 ]; then
         git -C jinja pull 2> /dev/null || git clone -b 3.1.2 https://github.com/pallets/jinja.git
         cd jinja
-        python3 setup.py install --user
+        python3 setup.py install
         cd ..
       else
         echo "python3 jinja2 already found."

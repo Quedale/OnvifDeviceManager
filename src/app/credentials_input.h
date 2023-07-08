@@ -19,9 +19,9 @@ typedef struct {
     void * user_data;
 } LoginEvent;
 
-CredentialsDialog * CredentialsDialog__create(void (*login_callback)(LoginEvent *), void (*cancel_callback)(CredentialsDialog *));
+CredentialsDialog * CredentialsDialog__create();
 void CredentialsDialog__destroy(CredentialsDialog* dialog);
-void CredentialsDialog__show(CredentialsDialog* dialog, void * user_data);
+void CredentialsDialog__show(CredentialsDialog* dialog, void (*login_callback)(LoginEvent *), void (*cancel_callback)(CredentialsDialog *), void * user_data);
 void CredentialsDialog__hide(CredentialsDialog* dialog);
 LoginEvent * LoginEvent_copy(LoginEvent * original);
 

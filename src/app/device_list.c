@@ -178,7 +178,7 @@ void _load_thumbnail(void * user_data){
     GError *error = NULL;
     GdkPixbuf *pixbuf = NULL;
     GdkPixbuf *scaled_pixbuf = NULL;
-    double size;
+    double size = -1;
     char * imgdata = NULL;
     int freeimgdata = 0;
     GdkPixbufLoader *loader = gdk_pixbuf_loader_new ();
@@ -189,7 +189,7 @@ void _load_thumbnail(void * user_data){
         goto exit;
     }
 
-    if(device->onvif_device->authorized){
+    if(device->onvif_device->last_error == ONVIF_ERROR_NONE){
         //TODO handle profiles
         struct chunk * imgchunk = OnvifDevice__media_getSnapshot(device->onvif_device,device->profile_index);
         if(!imgchunk){
@@ -201,7 +201,7 @@ void _load_thumbnail(void * user_data){
         size = imgchunk->size;
         freeimgdata = 1;
         free(imgchunk);
-    } else {
+    } else if(device->onvif_device->last_error == ONVIF_NOT_AUTHORIZED){
         imgdata = _binary_locked_icon_png_start;
         size = _binary_locked_icon_png_end - _binary_locked_icon_png_start;
     }
@@ -373,7 +373,7 @@ void Device__set_profile_callback(Device * self, void (*profile_callback)(Device
 
 gboolean * gui_display_profiles (void * user_data){
     Device * device = (Device *) user_data;
-    if(!Device__addref(device) || !device->onvif_device->authorized){
+    if(!Device__addref(device) || device->onvif_device->last_error == ONVIF_NOT_AUTHORIZED){
         return FALSE;
     }
     
@@ -398,7 +398,7 @@ gboolean * gui_display_profiles (void * user_data){
 void _load_profiles(void * user_data){
     Device * device = (Device *) user_data;
 
-    if(!Device__addref(device) || !device->onvif_device->authorized){
+    if(!Device__addref(device) || device->onvif_device->last_error == ONVIF_NOT_AUTHORIZED){
         return;
     }
 

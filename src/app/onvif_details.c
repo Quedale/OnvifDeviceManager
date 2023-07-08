@@ -30,6 +30,9 @@ void update_details_priv(OnvifDetails * self){
     if(!Device__is_valid(self->device)){
         return;
     }
+    if(self->device->onvif_device->last_error == ONVIF_NOT_AUTHORIZED){
+        return;
+    }
     gtk_spinner_start (GTK_SPINNER (self->details_loading_handle));
 
     if(self->current_page == 0){
