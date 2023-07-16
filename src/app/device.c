@@ -2,7 +2,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include "client.h"
-#include "device_list.h"
+#include "device.h"
 #include "gui_utils.h"
 #include <netdb.h>
 #include <arpa/inet.h>
@@ -19,130 +19,35 @@ extern char _binary_warning_png_size[];
 extern char _binary_warning_png_start[];
 extern char _binary_warning_png_end[];
 
-void DeviceList__init(DeviceList* self) {
-    self->devices=malloc(0);
-    self->device_count=0;
-}
+struct _Device {
+  CObject parent;
 
-DeviceList* DeviceList__create() {
-   DeviceList* result = (DeviceList*) malloc(sizeof(DeviceList));
-   DeviceList__init(result);
-   return result;
-}
+  OnvifDevice * onvif_device;
+  GtkWidget * image_handle;
+  GtkWidget * profile_dropdown;
+  int profile_index;
+  int selected;
 
-void DeviceList__destroy(DeviceList* self) {
-  if (self) {
-     DeviceList__clear(self);
-     free(self->devices);
-     free(self);
-  }
-}
-
-Device ** DeviceList__remove_element_and_shift(DeviceList* self, Device **array, int index, int array_length)
-{
-    int i;
-    for(i = index; i < array_length; i++) {
-        array[i] = array[i + 1];
-    }
-    return array;
+  void (*profile_callback)(Device *, void *);
+  void * profile_userdata;
 };
 
-void DeviceList__insert_element(DeviceList* self, Device * record, int index)
-{ 
-    int i;
-    int count = self->device_count;
-    self->devices = realloc (self->devices,sizeof (Device) * (count+1));
-    for(i=self->device_count; i> index; i--){
-        self->devices[i] = self->devices[i-1];
-    }
-    self->devices[index]=record;
-    self->device_count++;
-};
+void priv_Device__destroy(CObject * self);
+void priv_Device__profile_changed(GtkComboBox* self, Device * device);
+void _priv_Device__lookup_hostname(void * user_data);
+void _priv_Device__load_thumbnail(void * user_data);
+void _priv_Device__load_profiles(void * user_data);
+gboolean * gui_Device__display_profiles (void * user_data);
 
-void DeviceList__clear(DeviceList* self){
-    int i;
-    for(i=0; i < self->device_count; i++){
-        Device__destroy(self->devices[i]);
-    }
-    self->device_count = 0;
-    self->devices = realloc(self->devices,0);
+void priv_Device__destroy(CObject * self){
+    OnvifDevice__destroy(((Device*)self)->onvif_device);
 }
 
-void DeviceList__remove_element(DeviceList* self, int index){
-    //Remove element and shift content
-    self->devices = DeviceList__remove_element_and_shift(self,self->devices, index, self->device_count);  /* First shift the elements, then reallocate */
-    //Resize count
-    self->device_count--;
-    //Assign arythmatic
-    int count = self->device_count; 
-    //Resize array memory
-    self->devices = realloc (self->devices,sizeof(Device) * count);
-};
-
-
-void Device__init(Device* self, OnvifDevice * onvif_device) {
-    self->onvif_device = onvif_device;
-    self->refcount = 1;
-    self->destroyed = 0;
-    self->selected=0;
-    self->profile_index=0;
-    self->ref_lock =malloc(sizeof(pthread_mutex_t));
-    pthread_mutex_init(self->ref_lock, NULL);
-}
-
-Device * Device__create(OnvifDevice * onvif_device){
-    Device* result = (Device*) malloc(sizeof(Device));
-    Device__init(result, onvif_device);
-    return result;
-}
-
-void Device__destroy(Device* self) {
-  if (self && self->refcount == 0) {
-     OnvifDevice__destroy(self->onvif_device);
-     pthread_mutex_destroy(self->ref_lock);
-     free(self->ref_lock);
-     free(self);
-  } else if(self){
-    self->destroyed=1;
-    Device__unref(self);
-  }
-}
-
-int Device__addref(Device *self){
-    if(Device__is_valid(self)){
-        pthread_mutex_lock(self->ref_lock);
-        self->refcount++;
-        pthread_mutex_unlock(self->ref_lock);
-        return 1;
-    }
-
-    return 0;
-}
-
-void Device__unref(Device *self){
-    if(self){
-        pthread_mutex_lock(self->ref_lock);
-        self->refcount--;
-        pthread_mutex_unlock(self->ref_lock);
-        if(self->refcount == 0){
-            Device__destroy(self);
-        }
-    }
-}
-
-int Device__is_valid(Device* device){
-    if(device && device->refcount > 0 && !device->destroyed){
-        return 1;
-    }
-
-    return 0;
-}
-
-void _lookup_hostname(void * user_data){
+void _priv_Device__lookup_hostname(void * user_data){
     Device * device = (Device *) user_data;
     char * hostname;
 
-    if(!Device__addref(device)){
+    if(!CObject__addref((CObject*)device)){
         goto exit;
     }
 
@@ -165,15 +70,10 @@ void _lookup_hostname(void * user_data){
     printf("Retrieved hostname : %s\n",hostname);
 
 exit:
-    Device__unref(device);
+    CObject__unref((CObject*)device);
 }
 
-
-void Device__lookup_hostname(Device* device, EventQueue * queue){
-    EventQueue__insert(queue,_lookup_hostname,device);
-}
-
-void _load_thumbnail(void * user_data){
+void _priv_Device__load_thumbnail(void * user_data){
     GtkWidget *image;
     GError *error = NULL;
     GdkPixbuf *pixbuf = NULL;
@@ -185,10 +85,10 @@ void _load_thumbnail(void * user_data){
 
     Device * device = (Device *) user_data;
 
-    if(!Device__addref(device)){
+    if(!CObject__addref((CObject*)device)){
         goto exit;
     }
-
+    
     if(device->onvif_device->last_error == ONVIF_ERROR_NONE){
         //TODO handle profiles
         struct chunk * imgchunk = OnvifDevice__media_getSnapshot(device->onvif_device,device->profile_index);
@@ -204,10 +104,12 @@ void _load_thumbnail(void * user_data){
     } else if(device->onvif_device->last_error == ONVIF_NOT_AUTHORIZED){
         imgdata = _binary_locked_icon_png_start;
         size = _binary_locked_icon_png_end - _binary_locked_icon_png_start;
+    } else {
+        goto warning;
     }
 
     //Check is device is still valid. (User performed scan before snapshot finished)
-    if(!Device__is_valid(device)){
+    if(!CObject__is_valid((CObject*)device)){
         goto exit;
     }
 
@@ -221,10 +123,10 @@ void _load_thumbnail(void * user_data){
             printf("Error writing png to GtkPixbufLoader : [null]\n");
         }
     }
-  
+
 warning:
     //Check is device is still valid. (User performed scan before snapshot finished)
-    if(!Device__is_valid(device)){
+    if(!CObject__is_valid((CObject*)device)){
         goto exit;
     }
 
@@ -242,7 +144,7 @@ warning:
     }
 
     //Check is device is still valid. (User performed scan before spinner showed)
-    if(!Device__is_valid(device)){
+    if(!CObject__is_valid((CObject*)device)){
         goto exit;
     }
 
@@ -255,7 +157,7 @@ warning:
         image = gtk_image_new_from_pixbuf (scaled_pixbuf);
 
         //Check is device is still valid. (User performed scan before scale finished)
-        if(!Device__is_valid(device)){
+        if(!CObject__is_valid((CObject*)device)){
             goto exit;
         }
 
@@ -275,14 +177,10 @@ exit:
     if(freeimgdata){
         free(imgdata);
     }
-    Device__unref(device);
+    CObject__unref((CObject*)device);
 } 
 
-void Device__load_thumbnail(Device* device, EventQueue * queue){
-    EventQueue__insert(queue,_load_thumbnail,device);
-}
-
-void profile_changed(GtkComboBox* self, Device * device){
+void priv_Device__profile_changed(GtkComboBox* self, Device * device){
     int new_index = gtk_combo_box_get_active(self);
     if(new_index != device->profile_index){
         device->profile_index = new_index;
@@ -292,6 +190,68 @@ void profile_changed(GtkComboBox* self, Device * device){
     }
 }
 
+gboolean * gui_Device__display_profiles (void * user_data){
+    Device * device = (Device *) user_data;
+    if(!CObject__addref((CObject*)device) || device->onvif_device->last_error == ONVIF_NOT_AUTHORIZED){
+        return FALSE;
+    }
+    
+    GtkListStore *liststore = GTK_LIST_STORE(gtk_combo_box_get_model(GTK_COMBO_BOX(device->profile_dropdown)));
+    for (int i = 0; i < device->onvif_device->sizeSrofiles; i++){
+        printf("Profile name: %s\n", device->onvif_device->profiles[i].name);
+        printf("Profile token: %s\n", device->onvif_device->profiles[i].token);
+
+        gtk_list_store_insert_with_values(liststore, NULL, -1,
+                                        // 0, "red",
+                                        1, device->onvif_device->profiles[i].name,
+                                        -1);
+    }
+    gtk_combo_box_set_active(GTK_COMBO_BOX(device->profile_dropdown),0);
+    gtk_widget_set_sensitive (device->profile_dropdown, TRUE);
+
+    CObject__unref((CObject*)device);
+    return FALSE;
+}
+
+//WIP Profile selection
+void _priv_Device__load_profiles(void * user_data){
+    Device * device = (Device *) user_data;
+
+    if(!CObject__addref((CObject*)device) || device->onvif_device->last_error == ONVIF_NOT_AUTHORIZED){
+        return;
+    }
+
+    OnvifDevice_get_profiles(device->onvif_device);
+    if(CObject__is_valid((CObject*)device) && device->onvif_device->last_error == ONVIF_ERROR_NONE){
+        gdk_threads_add_idle((void *)gui_Device__display_profiles,device);
+    }
+
+    CObject__unref((CObject*)device);
+}
+
+void Device__init(Device* self, OnvifDevice * onvif_device) {
+    CObject__init((CObject*)self);
+    CObject__set_destroy_callback((CObject*)self,priv_Device__destroy);
+    self->onvif_device = onvif_device;
+    self->selected=0;
+    self->profile_index=0;
+    self->profile_callback = NULL;
+    self->profile_userdata = NULL;
+}
+
+Device * Device__create(OnvifDevice * onvif_device){
+    Device* result = (Device*) malloc(sizeof(Device));
+    Device__init(result, onvif_device);
+    return result;
+}
+
+void Device__lookup_hostname(Device* device, EventQueue * queue){
+    EventQueue__insert(queue,_priv_Device__lookup_hostname,device);
+}
+
+void Device__load_thumbnail(Device* device, EventQueue * queue){
+    EventQueue__insert(queue,_priv_Device__load_thumbnail,device);
+}
 
 GtkWidget * Device__create_row (Device * device, char * uri, char* name, char * hardware, char * location){
     GtkWidget *row;
@@ -355,7 +315,7 @@ GtkWidget * Device__create_row (Device * device, char * uri, char* name, char * 
     gtk_widget_set_sensitive (device->profile_dropdown, FALSE);
     gtk_grid_attach (GTK_GRID (grid), device->profile_dropdown, 0, 4, 2, 1);
 
-    g_signal_connect (G_OBJECT (device->profile_dropdown), "changed", G_CALLBACK (profile_changed), device);
+    g_signal_connect (G_OBJECT (device->profile_dropdown), "changed", G_CALLBACK (priv_Device__profile_changed), device);
 
     gtk_container_add (GTK_CONTAINER (row), grid);
   
@@ -371,43 +331,26 @@ void Device__set_profile_callback(Device * self, void (*profile_callback)(Device
     self->profile_userdata = profile_userdata;
 }
 
-gboolean * gui_display_profiles (void * user_data){
-    Device * device = (Device *) user_data;
-    if(!Device__addref(device) || device->onvif_device->last_error == ONVIF_NOT_AUTHORIZED){
-        return FALSE;
-    }
-    
-    GtkListStore *liststore = GTK_LIST_STORE(gtk_combo_box_get_model(GTK_COMBO_BOX(device->profile_dropdown)));
-    for (int i = 0; i < device->onvif_device->sizeSrofiles; i++){
-        printf("Profile name: %s\n", device->onvif_device->profiles[i].name);
-        printf("Profile token: %s\n", device->onvif_device->profiles[i].token);
-
-        gtk_list_store_insert_with_values(liststore, NULL, -1,
-                                        // 0, "red",
-                                        1, device->onvif_device->profiles[i].name,
-                                        -1);
-    }
-    gtk_combo_box_set_active(GTK_COMBO_BOX(device->profile_dropdown),0);
-    gtk_widget_set_sensitive (device->profile_dropdown, TRUE);
-
-    Device__unref(device);
-    return FALSE;
-}
-
-//WIP Profile selection
-void _load_profiles(void * user_data){
-    Device * device = (Device *) user_data;
-
-    if(!Device__addref(device) || device->onvif_device->last_error == ONVIF_NOT_AUTHORIZED){
-        return;
-    }
-
-    OnvifDevice_get_profiles(device->onvif_device);
-    gdk_threads_add_idle((void *)gui_display_profiles,device);
-
-    Device__unref(device);
-}
-
 void Device__load_profiles(Device* device, EventQueue * queue){
-    EventQueue__insert(queue,_load_profiles,device);
+    EventQueue__insert(queue,_priv_Device__load_profiles,device);
+}
+
+OnvifDevice * Device__get_device(Device * self){
+    return self->onvif_device;
+}
+
+int Device__is_selected(Device * self){
+    return self->selected;
+}
+
+void Device__set_selected(Device * self, int selected){
+    self->selected = selected;
+}
+
+int Device__get_selected_profile(Device * self){
+    return self->profile_index;
+}
+
+void Device__set_thumbnail(Device * self, GtkWidget * image){
+    gui_update_widget_image(image,self->image_handle);
 }

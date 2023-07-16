@@ -19,7 +19,6 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - EventQueue : Interupt pending events when needed
 - Support MJPEG stream
 - Credential Storage 
-- Add option to scale up stream.
 - Edit Onvif device identification
 - Display Onvif network information
 - Display Media information
@@ -28,6 +27,7 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Record video
 - JPEG Snapshot
 - Check for better backchannel audio support. (PCMU@8000 might be Onvif's spec limit)
+- And a lot more...
 
 # Use-case
 1. Doorbell-like security camera terminal

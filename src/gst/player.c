@@ -860,22 +860,14 @@ RtspPlayer * RtspPlayer__create() {
     return result;
 }
 
-void RtspPlayer__reset(RtspPlayer* self) {
-    free(self->overlay_state);
-    pthread_mutex_destroy(self->player_lock);
-    free(self->player_lock);
-}
-
 void RtspPlayer__destroy(RtspPlayer* self) {
   if (self) {
-    RtspPlayer__reset(self);
     if(self->mic_element){
       free(self->mic_element);
     }
     if(self->mic_device){
       free(self->mic_device);
     }
-
     pthread_mutex_destroy(self->player_lock);
     free(self->player_lock);
     free(self->overlay_state);
@@ -911,8 +903,28 @@ void RtspPlayer__set_playback_url(RtspPlayer* self, char *url) {
 }
 
 void RtspPlayer__stop(RtspPlayer* self){
+  if(!self){
+    return;
+  }
+
     pthread_mutex_lock(self->player_lock);
-    printf("RtspPlayer__stop \n");
+
+
+    //Check if state is already stopped or stopping
+    GstState current_state_pipe;
+    GstState current_state_back;
+    int ret_1 = gst_element_get_state (self->pipeline,&current_state_pipe, NULL, GST_CLOCK_TIME_NONE);
+    int ret_2 = gst_element_get_state (self->backpipe, &current_state_back, NULL, GST_CLOCK_TIME_NONE);
+    if(ret_1 == GST_STATE_CHANGE_ASYNC){
+      ret_1 = gst_element_get_state (self->pipeline, NULL, &current_state_pipe, GST_CLOCK_TIME_NONE);
+    }
+    if(ret_2 == GST_STATE_CHANGE_ASYNC){
+      ret_2 = gst_element_get_state (self->pipeline, NULL, &current_state_back, GST_CLOCK_TIME_NONE);
+    }
+
+    if((ret_1 == GST_STATE_CHANGE_SUCCESS && current_state_pipe <= GST_STATE_READY) && (ret_2 == GST_STATE_CHANGE_SUCCESS && current_state_back <= GST_STATE_READY)){
+      goto unlock;
+    }
 
     GstStateChangeReturn ret;
 
@@ -949,6 +961,7 @@ stop_out:
   if(self->stopped_callback){
     (*(self->stopped_callback))(self, self->stopped_user_data);
   }
+unlock:
   pthread_mutex_unlock(self->player_lock);
 }
 

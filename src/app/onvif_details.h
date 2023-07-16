@@ -1,7 +1,7 @@
 #ifndef ONVIF_DETAILS_H_ 
 #define ONVIF_DETAILS_H_
 
-#include "device_list.h"
+#include "device.h"
 #include "../queue/event_queue.h"
 
 typedef struct _OnvifDetails OnvifDetails;

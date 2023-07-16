@@ -2,7 +2,7 @@
 #define ONVIF_INFO_DETAILS_H_
 
 #include "../queue/event_queue.h"
-#include "device_list.h"
+#include "device.h"
 
 typedef struct _OnvifInfo OnvifInfo;
 

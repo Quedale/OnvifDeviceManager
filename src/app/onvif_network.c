@@ -44,7 +44,7 @@ gboolean * onvif_network_gui_update (void * user_data){
 
 void _update_network_page(void * user_data){
     OnvifNetwork * self = (OnvifNetwork *) user_data;
-    if(!Device__addref(self->device) || !self->device->selected){
+    if(!CObject__addref((CObject*)self->device) || !Device__is_selected(self->device)){
         goto exit;
     }
 
@@ -55,7 +55,7 @@ void _update_network_page(void * user_data){
     gdk_threads_add_idle((void *)onvif_network_gui_update,gui_update);
 
 exit:
-    Device__unref(self->device);
+    CObject__unref((CObject*)self->device);
 }
 
 void OnvifNetwork_update_details(OnvifNetwork * self, Device * device){

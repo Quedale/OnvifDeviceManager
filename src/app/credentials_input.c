@@ -1,172 +1,47 @@
 #include "credentials_input.h"
 #include "../queue/event_queue.h"
 
+#define ADD_DEVICE_TITLE "ONVIF Device Authentication"
+#define ADD_DEVICE_SUBMIT_LABEL "Login"
+
 typedef struct { 
     GtkWidget * txtuser;
     GtkWidget * txtpassword;
-    GtkWidget * btnCancel;
-    GtkWidget * btnLogin;
-    GtkWidget * focusedWidget;
-    int keysignalid;
 } DialogElements;
 
-LoginEvent * LoginEvent_copy(LoginEvent * original){
-   LoginEvent * evt = malloc(sizeof(LoginEvent));
-   evt->dialog = original->dialog;
-   evt->pass = original->pass;
-   evt->user = original->user;
-   evt->user_data = original->user_data;
-   return evt;
+GtkWidget * priv_CredentialsDialog__create_ui(AppDialogEvent * event);
+void priv_CredentialsDialog__show_cb(AppDialogEvent * event);
+void priv_CredentialsDialog__destroy(AppDialog* dialog);
+
+const char * CredentialsDialog__get_username(CredentialsDialog * self){
+    DialogElements * elements = (DialogElements *) self->elements;
+    return gtk_entry_get_text(GTK_ENTRY(elements->txtuser));
 }
 
-
-void cedentials_dialog_login_cb (GtkWidget *widget, CredentialsDialog * dialog) {
-    LoginEvent * evt = malloc(sizeof(LoginEvent));
-    DialogElements * elements = (DialogElements*) dialog->private;
-    evt->dialog = dialog;
-    evt->user_data = dialog->user_data;
-    evt->user = (char *) gtk_entry_get_text(GTK_ENTRY(elements->txtuser));
-    evt->pass = (char *) gtk_entry_get_text(GTK_ENTRY(elements->txtpassword));
-
-    (*(dialog->login_callback))(evt);
-    free(evt);
+const char * CredentialsDialog__get_password(CredentialsDialog * self){
+    DialogElements * elements = (DialogElements *) self->elements;
+    return gtk_entry_get_text(GTK_ENTRY(elements->txtpassword));
 }
 
-void cedentials_dialog_cancel_cb (GtkWidget *widget, CredentialsDialog * dialog) {
-    (*(dialog->cancel_callback))(dialog);
-    CredentialsDialog__hide(dialog);
+CredentialsDialog * CredentialsDialog__create(){
+    CredentialsDialog * dialog = malloc(sizeof(CredentialsDialog));
+    dialog->elements = malloc(sizeof(DialogElements));
+    AppDialog__init((AppDialog*)dialog,ADD_DEVICE_TITLE, ADD_DEVICE_SUBMIT_LABEL, priv_CredentialsDialog__create_ui);
+    AppDialog__set_show_callback((AppDialog *)dialog,priv_CredentialsDialog__show_cb);
+    AppDialog__set_destroy_callback((AppDialog*)dialog,priv_CredentialsDialog__destroy);
+    return dialog;
 }
 
-gboolean credentials_dialog_keypress_function (GtkWidget *widget, GdkEventKey *event, CredentialsDialog * dialog) {
-    DialogElements * elements = (DialogElements*) dialog->private;
-    if (event->keyval == GDK_KEY_Escape){
-        cedentials_dialog_cancel_cb(widget,dialog);
-        return TRUE;
-    } else if ((event->keyval == GDK_KEY_KP_Enter || event->keyval == GDK_KEY_Return)
-        && !gtk_widget_has_focus(elements->btnCancel)
-        && !gtk_widget_has_focus(elements->btnLogin)){
-        cedentials_dialog_login_cb(widget,dialog);
-        return TRUE;
-    }
-    return FALSE;
+void priv_CredentialsDialog__destroy(AppDialog * dialog){
+    CredentialsDialog* cdialog = (CredentialsDialog*)dialog;
+    free(cdialog->elements);
 }
 
-void
-credentials_dialog_set_nofocus(GtkWidget *widget, GtkWidget * dialog_root)
-{
-    if(widget != dialog_root){
-        gtk_widget_set_can_focus(widget,FALSE);
-    } else {
-        gtk_widget_set_can_focus(widget,TRUE);
-    }
-}
-void
-credentials_dialog_set_onlyfocus (GtkWidget *widget, GtkWidget * dialog_root)
-{
-    if(widget == dialog_root){
-        gtk_widget_set_can_focus(widget,FALSE);
-    } else {
-        gtk_widget_set_can_focus(widget,TRUE);
-    }
-}
-
-void CredentialsDialog__show (CredentialsDialog * dialog, void (*login_callback)(LoginEvent *), void (*cancel_callback)(CredentialsDialog *), void * user_data){
-    if(dialog->visible == 1){
-        return;
-    }
-    dialog->cancel_callback = cancel_callback;
-    dialog->login_callback = login_callback;
-
-    printf("CredentialsDialog__show\n");
-    dialog->visible = 1;
-
-    //Set input userdata for current dialog session
-    dialog->user_data = user_data;
-
-    //Conncet keyboard handler. ESC = Cancel, Enter/Return = Login
-    GtkWidget *window = gtk_widget_get_toplevel (dialog->root);
-    DialogElements * elements = (DialogElements *) dialog->private; 
-    if (gtk_widget_is_toplevel (window)){  
-        elements->focusedWidget = gtk_window_get_focus(GTK_WINDOW(window));
-        gtk_widget_add_events(window, GDK_KEY_PRESS_MASK);
-        elements->keysignalid = g_signal_connect (G_OBJECT (window), "key_press_event", G_CALLBACK (credentials_dialog_keypress_function), dialog);
-    }
-
-    //Prevent overlayed widget from getting focus
-    GtkWidget *parent = gtk_widget_get_parent(dialog->root);
-    gtk_container_foreach (GTK_CONTAINER (parent), (GtkCallback)credentials_dialog_set_onlyfocus, dialog->root);
-    
-    //Steal focus
-    gtk_widget_grab_focus(elements->txtuser);
-    
-    //Clear previous credentials
-    gtk_entry_set_text(GTK_ENTRY(elements->txtuser),"");
-    gtk_entry_set_text(GTK_ENTRY(elements->txtpassword),"");
-
-    gtk_widget_set_visible(dialog->root,TRUE);
-}
-
-void CredentialsDialog__hide (CredentialsDialog * dialog){
-    if(dialog->visible == 0){
-        return;
-    }
-    printf("CredentialsDialog__hide\n");
-    dialog->visible = 0;
-    
-    //Disconnect keyboard handler.
-    GtkWidget *window = gtk_widget_get_toplevel (dialog->root);
-    DialogElements * elements = (DialogElements *) dialog->private; 
-    if (gtk_widget_is_toplevel (window)){  
-        g_signal_handler_disconnect (G_OBJECT (window), elements->keysignalid);
-        elements->keysignalid = 0;
-    }
-
-    //Restore focus capabilities to previous widget
-    GtkWidget *parent = gtk_widget_get_parent(dialog->root);
-    gtk_container_foreach (GTK_CONTAINER (parent), (GtkCallback)credentials_dialog_set_nofocus, dialog->root);
-
-    //Restore stolen focus
-    gtk_widget_grab_focus(elements->focusedWidget);
-    gtk_widget_set_visible(dialog->root,FALSE);
-}
-
-GtkWidget * create_credentials_buttons(CredentialsDialog * dialog){
-    GtkWidget * label;
-    DialogElements * elements = (DialogElements *) dialog->private; 
-    GtkWidget * grid = gtk_grid_new ();
-    g_object_set (grid, "margin", 5, NULL);
-
-    label = gtk_label_new("");
-    gtk_widget_set_hexpand (label, TRUE);
-    gtk_grid_attach (GTK_GRID (grid), label, 0, 0, 1, 1);
-
-    elements->btnLogin = gtk_button_new ();
-    label = gtk_label_new("Login");
-    g_object_set (elements->btnLogin, "margin-end", 10, NULL);
-    gtk_container_add (GTK_CONTAINER (elements->btnLogin), label);
-    gtk_widget_set_opacity(elements->btnLogin,1);
-    g_signal_connect (elements->btnLogin, "clicked", G_CALLBACK (cedentials_dialog_login_cb), dialog);
-    
-    gtk_grid_attach (GTK_GRID (grid), elements->btnLogin, 1, 0, 1, 1);
-
-    elements->btnCancel = gtk_button_new ();
-    label = gtk_label_new("Cancel");
-    gtk_container_add (GTK_CONTAINER (elements->btnCancel), label);
-    gtk_widget_set_opacity(elements->btnCancel,1);
-    gtk_grid_attach (GTK_GRID (grid), elements->btnCancel, 2, 0, 1, 1);
-    g_signal_connect (elements->btnCancel, "clicked", G_CALLBACK (cedentials_dialog_cancel_cb), dialog);
-
-    label = gtk_label_new("");
-    gtk_widget_set_hexpand (label, TRUE);
-    gtk_grid_attach (GTK_GRID (grid), label, 3, 0, 1, 1);
-
-    return grid;
-}
-
-GtkWidget * create_credentials_panel(CredentialsDialog * dialog){
+GtkWidget * priv_CredentialsDialog__create_ui(AppDialogEvent * event){
+    CredentialsDialog * dialog = (CredentialsDialog *) event->dialog;
     GtkWidget * widget;
     GtkWidget * grid = gtk_grid_new ();
-    DialogElements * elements = (DialogElements *) dialog->private;
+    DialogElements * elements = (DialogElements *) dialog->elements;
     
     widget = gtk_label_new("Username :");
     gtk_widget_set_hexpand (widget, TRUE);
@@ -187,106 +62,17 @@ GtkWidget * create_credentials_panel(CredentialsDialog * dialog){
     gtk_widget_set_hexpand (elements->txtpassword, TRUE);
     gtk_grid_attach (GTK_GRID (grid), elements->txtpassword, 1, 1, 1, 1);
 
-
-    gtk_grid_attach (GTK_GRID (grid), create_credentials_buttons(dialog), 0, 2, 2, 1);
-
     return grid;
 }
 
-GtkWidget * create_credentials_dialog(CredentialsDialog * dialog){
-    GtkWidget * widget;
-    GtkWidget * grid = gtk_grid_new ();
+void priv_CredentialsDialog__show_cb(AppDialogEvent * event){
+    CredentialsDialog * dialog = (CredentialsDialog *) event->dialog;
+    DialogElements * elements = (DialogElements *) dialog->elements;
 
-    GtkCssProvider * cssProvider;
-    GtkStyleContext * context;
-
-    //Add title strip
-    widget = gtk_label_new("");
-    gtk_label_set_markup (GTK_LABEL (widget), "<span size=\"x-large\">Onvif Device Authentication</span>");
-    g_object_set (widget, "margin", 10, NULL);
-    gtk_widget_set_hexpand (widget, TRUE);
-    gtk_grid_attach (GTK_GRID (grid), widget, 0, 0, 1, 1);
-
-    //Lightgrey background for the title strip
-    cssProvider = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(cssProvider, "* { background-image:none; border-radius: 10px; background: linear-gradient(to top, @theme_bg_color);}",-1,NULL); 
-    context = gtk_widget_get_style_context(grid);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
-
-    gtk_grid_attach (GTK_GRID (grid), create_credentials_panel(dialog), 0, 1, 1, 1);
-
-    g_object_unref (cssProvider);
-
-    return grid;
-}
-
-
-void CredentialsDialog__root_panel_show_cb (GtkWidget* self, CredentialsDialog * dialog){
-    if(!dialog->visible){
-        gtk_widget_set_visible(self,FALSE);
-    } else {
-        gtk_widget_set_visible(self,TRUE);
-    }
-}
-
-CredentialsDialog * CredentialsDialog__create(){
-    CredentialsDialog * dialog = malloc(sizeof(CredentialsDialog));
-    dialog->private = malloc(sizeof(DialogElements));
+    //Steal focus
+    gtk_widget_grab_focus(elements->txtuser);
     
-    GtkWidget * empty;
-    dialog->root = gtk_grid_new ();
-    dialog->visible = 0;
-
-    GtkCssProvider * cssProvider;
-    GtkStyleContext * context;
-
-
-    //See-through overlay background
-    cssProvider = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(cssProvider, "* { background-image:none; background-color:black; opacity:0.3;}",-1,NULL); 
-
-    //Remove this to align left
-    empty = gtk_label_new("");
-    gtk_widget_set_vexpand (empty, TRUE);
-    gtk_widget_set_hexpand (empty, TRUE);
-    gtk_grid_attach (GTK_GRID (dialog->root), empty, 0, 0, 1, 3);
-    context = gtk_widget_get_style_context(empty);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
-
-    //Remove this to align rights
-    empty = gtk_label_new("");
-    gtk_widget_set_vexpand (empty, TRUE);
-    gtk_widget_set_hexpand (empty, TRUE);
-    gtk_grid_attach (GTK_GRID (dialog->root), empty, 2, 0, 1, 3);
-    context = gtk_widget_get_style_context(empty);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
-
-    //Remove this to align top
-    empty = gtk_label_new("");
-    gtk_widget_set_vexpand (empty, TRUE);
-    gtk_widget_set_hexpand (empty, TRUE);
-    gtk_grid_attach (GTK_GRID (dialog->root), empty, 1, 0, 1, 1);
-    context = gtk_widget_get_style_context(empty);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
-
-    //Remove this to align bot
-    empty = gtk_label_new("");
-    gtk_widget_set_vexpand (empty, TRUE);
-    gtk_widget_set_hexpand (empty, TRUE);
-    gtk_grid_attach (GTK_GRID (dialog->root), empty, 1, 2, 1, 1);
-    context = gtk_widget_get_style_context(empty);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
-    
-    gtk_grid_attach (GTK_GRID (dialog->root), create_credentials_dialog(dialog), 1, 1, 1, 1);
-
-    g_object_unref (cssProvider);  
-    
-    g_signal_connect (G_OBJECT (dialog->root), "show", G_CALLBACK (CredentialsDialog__root_panel_show_cb), dialog);
-    
-    return dialog;
-}
-
-void CredentialsDialog__destroy(CredentialsDialog* dialog){
-    free(dialog->private);
-    free(dialog);
+    //Clear previous credentials
+    gtk_entry_set_text(GTK_ENTRY(elements->txtuser),"");
+    gtk_entry_set_text(GTK_ENTRY(elements->txtpassword),"");
 }

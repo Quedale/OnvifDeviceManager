@@ -3,7 +3,7 @@
 
 #include <gtk/gtk.h>
 #include "../queue/event_queue.h"
-#include "device_list.h"
+#include "device.h"
 
 typedef struct _OnvifNetwork OnvifNetwork;
 

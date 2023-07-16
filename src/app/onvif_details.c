@@ -27,10 +27,12 @@ void info_hide_loading_cb(OnvifInfo * self, void * user_data){
 }
 
 void update_details_priv(OnvifDetails * self){
-    if(!Device__is_valid(self->device)){
+    if(!CObject__is_valid((CObject*)self->device)){
         return;
     }
-    if(self->device->onvif_device->last_error == ONVIF_NOT_AUTHORIZED){
+
+    OnvifDevice * odev = Device__get_device(self->device);
+    if(odev->last_error == ONVIF_NOT_AUTHORIZED){
         return;
     }
     gtk_spinner_start (GTK_SPINNER (self->details_loading_handle));

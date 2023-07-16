@@ -3,6 +3,11 @@
 
 #include <stdlib.h>
 
+typedef struct _EventQueue EventQueue;
+
+#include "queue_thread.h"
+#include "queue_event.h"
+
 typedef enum {
   EVENTQUEUE_DISPATCHING               = 0,
   EVENTQUEUE_DISPATCHED             = 1,
@@ -10,22 +15,18 @@ typedef enum {
   //TODO Handle more types
 } EventQueueType;
 
-typedef struct _EventQueue EventQueue;
+EventQueue* EventQueue__create(void (*queue_event_cb)(QueueThread * thread, EventQueueType type,void * user_data),void * user_data); 
 
-typedef struct {
-  void * user_data;
-  void (*callback)();
-  // int * empty;
-} QueueEvent;
-
-EventQueue* EventQueue__create(void (*queue_event_cb)(EventQueue * queue, EventQueueType type,void * user_data),void * user_data); 
-
-void EventQueue__destroy(EventQueue* onvifDeviceList);
 void EventQueue__insert(EventQueue* queue, void (*callback)(), void * user_data);
-QueueEvent EventQueue__pop(EventQueue* self);
+QueueEvent * EventQueue__pop(EventQueue* self);
 void EventQueue__start(EventQueue* self);
+void EventQueue__stop(EventQueue* self, int nthread);
 int EventQueue__get_running_event_count(EventQueue * self);
 int EventQueue__get_pending_event_count(EventQueue * self);
 int EventQueue__get_thread_count(EventQueue * self);
+void EventQueue__wait_condition(EventQueue * self, pthread_mutex_t * lock);
+void EventQueue_notify_dispatching(EventQueue * self, QueueThread * thread);
+void EventQueue_notify_dispatched(EventQueue * self, QueueThread * thread);
+void EventQueue__remove_thread(EventQueue* self, QueueThread * qt);
 
 #endif
