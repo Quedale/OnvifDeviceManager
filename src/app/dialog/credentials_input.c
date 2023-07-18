@@ -1,8 +1,8 @@
 #include "credentials_input.h"
-#include "../queue/event_queue.h"
+#include "../../queue/event_queue.h"
 
-#define ADD_DEVICE_TITLE "ONVIF Device Authentication"
-#define ADD_DEVICE_SUBMIT_LABEL "Login"
+#define CREDENTIALS_DIALOG_TITLE "ONVIF Device Authentication"
+#define CREDENTIALS_DIALOG_LABEL "Login"
 
 typedef struct { 
     GtkWidget * txtuser;
@@ -24,9 +24,12 @@ const char * CredentialsDialog__get_password(CredentialsDialog * self){
 }
 
 CredentialsDialog * CredentialsDialog__create(){
+    printf("CredentialsDialog__create\n");
     CredentialsDialog * dialog = malloc(sizeof(CredentialsDialog));
     dialog->elements = malloc(sizeof(DialogElements));
-    AppDialog__init((AppDialog*)dialog,ADD_DEVICE_TITLE, ADD_DEVICE_SUBMIT_LABEL, priv_CredentialsDialog__create_ui);
+    AppDialog__init((AppDialog*)dialog,priv_CredentialsDialog__create_ui);
+    AppDialog__set_title((AppDialog *)dialog,CREDENTIALS_DIALOG_TITLE);
+    AppDialog__set_submit_label((AppDialog *)dialog,CREDENTIALS_DIALOG_LABEL);
     AppDialog__set_show_callback((AppDialog *)dialog,priv_CredentialsDialog__show_cb);
     AppDialog__set_destroy_callback((AppDialog*)dialog,priv_CredentialsDialog__destroy);
     return dialog;

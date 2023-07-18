@@ -1,6 +1,8 @@
 #include "onvif_app.h"
-#include "credentials_input.h"
-#include "add_device.h"
+#include "dialog/credentials_input.h"
+#include "dialog/add_device.h"
+#include "dialog/msg_dialog.h"
+#include "../animations/dotted_slider.h"
 #include "onvif_details.h"
 #include "onvif_nvt.h"
 #include "device.h"
@@ -24,6 +26,7 @@ typedef struct _OnvifApp {
 
     CredentialsDialog * cred_dialog;
     AddDeviceDialog * add_dialog;
+    MsgDialog * msg_dialog;
 
     int current_page;
 
@@ -90,6 +93,16 @@ static void quit_cb (GtkButton *button, OnvifApp *data) {
     * Before thread cleanup can be done, gui showin the progress should be created
     * This is to prevent hidden dangling process
     */
+
+    //wIP GUI
+    // GtkWidget * image = create_dotted_slider_animation(10,1);
+    // MsgDialog__set_icon(data->msg_dialog, image);
+    // AppDialog__set_closable((AppDialog*)data->msg_dialog, 0);
+    // AppDialog__hide_actions((AppDialog*)data->msg_dialog);
+    // AppDialog__set_title((AppDialog*)data->msg_dialog,"ALERT!!");
+    // MsgDialog__set_message(data->msg_dialog,"Waiting for running task to finish...");
+    // AppDialog__show((AppDialog *) data->msg_dialog,NULL,NULL,data);
+
     // gtk_widget_hide(data->window);
     // //Dispatch a new event to allow the window to hide.
     // gdk_threads_add_idle((void *)gui_destruction,data);
@@ -466,6 +479,12 @@ gboolean * gui_show_credentialsdialog_add (void * user_data){
     return FALSE;
 }
 
+gboolean * gui_hide_dialog (void * user_data){
+    AppDialog * dialog = (AppDialog *) user_data;
+    AppDialog__hide(dialog);
+    return FALSE;
+}
+
 void _onvif_device_add(void * user_data){
     AppDialogEvent * event = (AppDialogEvent *) user_data;
     AddDeviceDialog * dialog = (AddDeviceDialog *) event->dialog;
@@ -486,6 +505,7 @@ void _onvif_device_add(void * user_data){
         input->app = (OnvifApp *) event->user_data;
         input->device = onvif_dev;
         gdk_threads_add_idle((void *)gui_show_credentialsdialog_add,input);
+        goto exit;
     } else if(onvif_dev->last_error == ONVIF_ERROR_NONE) {
         //Extract scope
         OnvifScopes * scopes = OnvifDevice__device_getScopes(onvif_dev);
@@ -497,11 +517,14 @@ void _onvif_device_add(void * user_data){
     } else if(onvif_dev->last_error == ONVIF_CONNECTION_ERROR) {
         printf("An conncetion error was encountered\n");
         OnvifDevice__destroy(onvif_dev);
+        goto exit;
     } else if(onvif_dev->last_error == ONVIF_SOAP_ERROR) {
         printf("An soap error was encountered \n");
         OnvifDevice__destroy(onvif_dev);
+        goto exit;
     }
 
+    gdk_threads_add_idle((void *)gui_hide_dialog,dialog);
 exit:
     free(event);
 }
@@ -541,7 +564,7 @@ void create_ui (OnvifApp * app) {
 
     AppDialog__add_to_overlay((AppDialog *) app->add_dialog,GTK_OVERLAY(overlay));
     AppDialog__add_to_overlay((AppDialog *) app->cred_dialog,GTK_OVERLAY(overlay));
-
+    AppDialog__add_to_overlay((AppDialog *) app->msg_dialog, GTK_OVERLAY(overlay));
     GtkWidget * left_grid = gtk_grid_new ();
 
     widget = gtk_button_new ();
@@ -749,6 +772,7 @@ OnvifApp * OnvifApp__create(){
     app->task_label = NULL;
     app->add_dialog = AddDeviceDialog__create();
     app->cred_dialog = CredentialsDialog__create();
+    app->msg_dialog = MsgDialog__create();
     app->queue = EventQueue__create(eventqueue_dispatch_cb,app);
     app->details = OnvifDetails__create(app->queue);
     app->settings = AppSettings__create(app->queue);
@@ -787,6 +811,7 @@ void OnvifApp__destroy(OnvifApp* self){
         TaskMgr__destroy(self->taskmgr);
         CObject__destroy((CObject*)self->add_dialog);
         CObject__destroy((CObject*)self->cred_dialog);
+        CObject__destroy((CObject*)self->msg_dialog);
         RtspPlayer__destroy(self->player);
         CObject__destroy((CObject*)self->queue);
         CObject__destroy((CObject *)self->device_list);

@@ -1,0 +1,50 @@
+.dsa{
+	animation-name:dot_slid;
+	animation-duration:2s;
+	animation-iteration-count:infinite;
+	animation-direction:normal;
+
+	border-radius:19px;
+}
+
+.dsa_1{
+	animation-delay:0.6s;
+}
+
+.dsa_2{
+	animation-delay:0.75s;
+}
+
+.dsa_3{
+	animation-delay:0.9s;
+}
+
+.dsa_4{
+	animation-delay:1.05s;
+}
+
+.dsa_5{
+	animation-delay:1.2s;
+}
+
+.dsa_6{
+	animation-delay:1.35s;
+}
+
+.dsa_7{
+	animation-delay:1.5s;
+}
+
+.dsa_8{
+	animation-delay:1.64s;
+}
+
+@keyframes dot_slid{
+	0%{
+        background-color: currentColor;
+	}
+
+	100%{
+		background-color:rgba(0,0,0,0);
+	}
+}

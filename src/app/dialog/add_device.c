@@ -1,6 +1,6 @@
 #include "add_device.h"
-#include "../queue/event_queue.h"
-#include "dialog/app_dialog.h"
+#include "../../queue/event_queue.h"
+#include "app_dialog.h"
 
 #define ADD_DEVICE_TITLE "ONVIF Add Device"
 #define ADD_DEVICE_SUBMIT_LABEL "Add"
@@ -40,7 +40,10 @@ GtkWidget * priv_AddDeviceDialog__create_iu(AppDialogEvent * event){
 AddDeviceDialog * AddDeviceDialog__create(){
     AddDeviceDialog * dialog = malloc(sizeof(AddDeviceDialog));
     dialog->elements = malloc(sizeof(DialogElements));
-    AppDialog__init((AppDialog *)dialog, ADD_DEVICE_TITLE, ADD_DEVICE_SUBMIT_LABEL, priv_AddDeviceDialog__create_iu);
+
+    AppDialog__init((AppDialog *)dialog, priv_AddDeviceDialog__create_iu);
+    AppDialog__set_title((AppDialog *)dialog,ADD_DEVICE_TITLE);
+    AppDialog__set_submit_label((AppDialog *)dialog,ADD_DEVICE_SUBMIT_LABEL);
     AppDialog__set_show_callback((AppDialog *)dialog,priv_AddDeviceDialog__show_cb);
     AppDialog__set_destroy_callback((AppDialog*)dialog,priv_AddDeviceDialog__destroy);
     return dialog;

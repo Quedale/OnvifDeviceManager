@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk+" version="3.22"/>
+      <object class="GtkFixed" id="dsa_">
+        <property name="name">dsa_</property>
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="margin">10px</property>
+        <child>
+          <object class="GtkLabel" id="dsa_1">
+            <property name="name">dsa_1</property>
+            <property name="width_request">20</property>
+            <property name="height_request">20</property>
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+          </object>
+          <packing>
+            <property name="x">0</property>
+            <property name="y">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkLabel" id="dsa_2">
+            <property name="name">dsa_2</property>
+            <property name="width_request">20</property>
+            <property name="height_request">20</property>
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+          </object>
+          <packing>
+            <property name="x">29</property>
+            <property name="y">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkLabel" id="dsa_3">
+            <property name="name">dsa_3</property>
+            <property name="width_request">20</property>
+            <property name="height_request">20</property>
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+          </object>
+          <packing>
+            <property name="x">58</property>
+            <property name="y">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkLabel" id="dsa_4">
+            <property name="name">dsa_4</property>
+            <property name="width_request">20</property>
+            <property name="height_request">20</property>
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+          </object>
+          <packing>
+            <property name="x">88</property>
+            <property name="y">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkLabel" id="dsa_5">
+            <property name="name">dsa_5</property>
+            <property name="width_request">20</property>
+            <property name="height_request">20</property>
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+          </object>
+          <packing>
+            <property name="x">117</property>
+            <property name="y">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkLabel" id="dsa_6">
+            <property name="name">dsa_6</property>
+            <property name="width_request">20</property>
+            <property name="height_request">20</property>
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+          </object>
+          <packing>
+            <property name="x">146</property>
+            <property name="y">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkLabel" id="dsa_7">
+            <property name="name">dsa_7</property>
+            <property name="width_request">20</property>
+            <property name="height_request">20</property>
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+          </object>
+          <packing>
+            <property name="x">175</property>
+            <property name="y">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkLabel" id="dsa_8">
+            <property name="name">dsa_8</property>
+            <property name="width_request">20</property>
+            <property name="height_request">20</property>
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+          </object>
+          <packing>
+            <property name="x">205</property>
+            <property name="y">0</property>
+          </packing>
+        </child>
+      </object>
+</interface>

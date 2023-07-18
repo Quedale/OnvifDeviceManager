@@ -20,6 +20,8 @@ typedef struct _AppDialogEvent AppDialogEvent;
 struct _AppDialog {
     CObject parent;
     int visible;
+    int action_visible;
+    int closable;
     char * title;
     char * submit_label;
     GtkWidget * root;
@@ -38,14 +40,19 @@ struct _AppDialogEvent {
     void * user_data;
 };
 
-AppDialog * AppDialog__create(char * title, char * submit_label, GtkWidget * (*create_ui)(AppDialogEvent *));
-void AppDialog__init(AppDialog* dialog, char * title, char * submit_label, GtkWidget * (*create_ui)(AppDialogEvent *));
+AppDialog * AppDialog__create(GtkWidget * (*create_ui)(AppDialogEvent *));
+void AppDialog__init(AppDialog* dialog, GtkWidget * (*create_ui)(AppDialogEvent *));
 void AppDialog__show(AppDialog* dialog, void (*submit_callback)(AppDialogEvent *), void (*cancel_callback)(AppDialogEvent *), void * user_data);
 void AppDialog__hide(AppDialog* dialog);
+int AppDialog__has_focus(AppDialog* dialog);
 void AppDialog__set_show_callback(AppDialog* dialog, void (*show_callback)(AppDialogEvent *));
-void AppDialog__set_submit_label(char * label);
+void AppDialog__set_submit_label(AppDialog* dialog, char * label);
 void AppDialog__add_to_overlay(AppDialog * self, GtkOverlay * overlay);
 void AppDialog__set_destroy_callback(AppDialog* self, void (*destroy_callback)(AppDialog *)); 
+void AppDialog__set_title(AppDialog * self, char * title);
+void AppDialog__hide_actions(AppDialog * self);
+void AppDialog__show_actions(AppDialog * self);
+void AppDialog__set_closable(AppDialog * self, int closable);
 
 AppDialogEvent * AppDialogEvent_copy(AppDialogEvent * original);
 

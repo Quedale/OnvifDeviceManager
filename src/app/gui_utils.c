@@ -10,9 +10,10 @@ gboolean * gui_update_widget_image_priv(void * user_data){
     ImageGUIUpdate * iguiu = (ImageGUIUpdate *) user_data;
 
     gtk_container_foreach (GTK_CONTAINER (iguiu->handle), (void*) gtk_widget_destroy, NULL);
-    gtk_container_add (GTK_CONTAINER (iguiu->handle), iguiu->image);
-    gtk_widget_show (iguiu->image);
-
+    if(iguiu->image){
+        gtk_container_add (GTK_CONTAINER (iguiu->handle), iguiu->image);
+        gtk_widget_show (iguiu->image);
+    }
     free(iguiu);
     
     return FALSE;

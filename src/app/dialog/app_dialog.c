@@ -4,7 +4,9 @@
 typedef struct { 
     GtkWidget * submit_btn;
     GtkWidget * cancel_btn;
-    
+    GtkWidget * title_lbl;
+    GtkWidget * action_panel;
+    GtkWidget * dummy;
     GtkWidget * focusedWidget;
     int keysignalid;
 } AppDialogElements;
@@ -21,6 +23,10 @@ GtkWidget * priv_AppDialog__create_panel(AppDialog * dialog);
 GtkWidget * priv_AppDialog_create_parent_ui (AppDialog * dialog);
 GtkWidget * priv_AppDialog__create_buttons(AppDialog * dialog);
 gboolean priv_AppDialog__keypress_function (GtkWidget *widget, GdkEventKey *event, AppDialog * dialog);
+void priv_AppDialog__update_title(AppDialog * dialog);
+void priv_AppDialog__update_submit_label(AppDialog * dialog);
+void priv_AppDialog__toggle_actions_visibility(AppDialog * self);
+int priv_AppDialog__has_focus(GtkWidget * widget);
 
 void priv_AppDialolg__destroy(CObject * self) {
     AppDialog * dialog = (AppDialog *)self;
@@ -28,6 +34,9 @@ void priv_AppDialolg__destroy(CObject * self) {
         dialog->destroy_callback(dialog);
     }
     free(dialog->private);
+    if(dialog->title){
+        free(dialog->title);
+    }
 }
 
 AppDialogEvent * AppDialogEvent_copy(AppDialogEvent * original){
@@ -46,24 +55,28 @@ void AppDialog__set_destroy_callback(AppDialog* self, void (*destroy_callback)(A
     self->destroy_callback = destroy_callback;
 }
 
-void AppDialog__init(AppDialog* self, char * title, char * submit_label, GtkWidget * (*create_ui)(AppDialogEvent *)) {
+void AppDialog__init(AppDialog* self, GtkWidget * (*create_ui)(AppDialogEvent *)) {
     CObject__init((CObject*)self);
     CObject__set_destroy_callback((CObject*)self,priv_AppDialolg__destroy);
-    self->title = title;
-    self->submit_label = submit_label;
+    printf("AppDialog__init\n");
+    self->title = NULL;
+    self->submit_label = NULL;
     self->visible = 0;
+    self->action_visible = 1;
     self->root = NULL;
     self->submit_callback = NULL;
     self->cancel_callback = NULL;
+    self->show_callback = NULL;
     self->user_data = NULL;
+    self->closable = 1;
     self->private = malloc(sizeof(AppDialogElements));
     self->create_ui = create_ui;
     priv_AppDialog__create_ui(self);
 }
 
-AppDialog * AppDialog__create(char * title, char * submit_label, GtkWidget * (*create_ui)(AppDialogEvent *)){
+AppDialog * AppDialog__create(GtkWidget * (*create_ui)(AppDialogEvent *)){
     AppDialog* dialog = (AppDialog*) malloc(sizeof(AppDialog));
-    AppDialog__init(dialog,title,submit_label, create_ui);
+    AppDialog__init(dialog, create_ui);
     return dialog;
 }
 
@@ -93,9 +106,12 @@ void AppDialog__show(AppDialog* dialog, void (*submit_callback)(AppDialogEvent *
     GtkWidget *parent = gtk_widget_get_parent(dialog->root);
     gtk_container_foreach (GTK_CONTAINER (parent), (GtkCallback)priv_AppDialog__set_onlyfocus, dialog->root);
 
+    priv_AppDialog__update_title(dialog);
+
     priv_AppDialog_show_event(dialog);
 
     gtk_widget_set_visible(dialog->root,TRUE);
+    gtk_widget_hide(elements->dummy);
 }
 
 void AppDialog__hide(AppDialog* dialog){
@@ -143,12 +159,41 @@ void priv_AppDialog__set_onlyfocus (GtkWidget *widget, GtkWidget * dialog_root){
     }
 }
 
+int AppDialog__has_focus(AppDialog* dialog){
+    return priv_AppDialog__has_focus(dialog->root);
+}
+
+int priv_AppDialog__has_focus(GtkWidget * widget){
+    if(gtk_widget_has_focus(widget)){
+        return 1;
+    }
+
+    if (!GTK_IS_CONTAINER(widget)){
+        return 0;
+    }
+
+    GList * children = gtk_container_get_children(GTK_CONTAINER(widget));
+    while (children != NULL){
+        GtkWidget * child = children->data;
+        if(priv_AppDialog__has_focus(child)){
+            return 1;
+        }
+        children = children->next;
+    }
+    return 0;
+}
+
 gboolean priv_AppDialog__keypress_function (GtkWidget *widget, GdkEventKey *event, AppDialog * dialog) {
     AppDialogElements * elements = (AppDialogElements*) dialog->private;
+    if(!AppDialog__has_focus(dialog)){
+        return FALSE;
+    }
+
     if (event->keyval == GDK_KEY_Escape){
         priv_AppDialog_cancel_event(widget,dialog);
         return TRUE;
-    } else if ((event->keyval == GDK_KEY_KP_Enter || event->keyval == GDK_KEY_Return) 
+    } else if (dialog->action_visible &&
+        (event->keyval == GDK_KEY_KP_Enter || event->keyval == GDK_KEY_Return) 
         && !gtk_widget_has_focus(elements->cancel_btn)
         && !gtk_widget_has_focus(elements->submit_btn)){
         priv_AppDialog_submit_event(widget,dialog);
@@ -172,6 +217,7 @@ void priv_AppDialog__create_ui(AppDialog * self){
     empty = gtk_label_new("");
     gtk_widget_set_vexpand (empty, TRUE);
     gtk_widget_set_hexpand (empty, TRUE);
+    gtk_widget_set_size_request (empty, 20,-1);
     gtk_grid_attach (GTK_GRID (self->root), empty, 0, 0, 1, 3);
     context = gtk_widget_get_style_context(empty);
     gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
@@ -180,6 +226,7 @@ void priv_AppDialog__create_ui(AppDialog * self){
     empty = gtk_label_new("");
     gtk_widget_set_vexpand (empty, TRUE);
     gtk_widget_set_hexpand (empty, TRUE);
+    gtk_widget_set_size_request (empty, 20,-1);
     gtk_grid_attach (GTK_GRID (self->root), empty, 2, 0, 1, 3);
     context = gtk_widget_get_style_context(empty);
     gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
@@ -188,6 +235,7 @@ void priv_AppDialog__create_ui(AppDialog * self){
     empty = gtk_label_new("");
     gtk_widget_set_vexpand (empty, TRUE);
     gtk_widget_set_hexpand (empty, TRUE);
+    gtk_widget_set_size_request (empty, -1,20);
     gtk_grid_attach (GTK_GRID (self->root), empty, 1, 0, 1, 1);
     context = gtk_widget_get_style_context(empty);
     gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
@@ -196,6 +244,7 @@ void priv_AppDialog__create_ui(AppDialog * self){
     empty = gtk_label_new("");
     gtk_widget_set_vexpand (empty, TRUE);
     gtk_widget_set_hexpand (empty, TRUE);
+    gtk_widget_set_size_request (empty, -1,20);
     gtk_grid_attach (GTK_GRID (self->root), empty, 1, 2, 1, 1);
     context = gtk_widget_get_style_context(empty);
     gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
@@ -215,19 +264,19 @@ GtkWidget * priv_AppDialog__create_panel(AppDialog * dialog){
     GtkCssProvider * cssProvider;
     GtkStyleContext * context;
 
-    //Add title strip
-    widget = gtk_label_new("");
-    char * new_title = malloc(strlen(APPDIALOG_TITLE_PREFIX) + strlen(dialog->title) + strlen(APPDIALOG_TITLE_SUFFIX) +1);
-    strcpy(new_title,APPDIALOG_TITLE_PREFIX);
-    strcat(new_title,dialog->title);
-    strcat(new_title,APPDIALOG_TITLE_SUFFIX);
+    AppDialogElements * elements = (AppDialogElements *) dialog->private; 
 
-    gtk_label_set_markup (GTK_LABEL (widget), new_title);
-    g_object_set (widget, "margin", 10, NULL);
-    gtk_widget_set_hexpand (widget, TRUE);
-    gtk_grid_attach (GTK_GRID (grid), widget, 0, 0, 1, 1);
-    free(new_title);
-    
+    //Add title strip
+    elements->title_lbl = gtk_label_new("");
+    g_object_set (elements->title_lbl, "margin", 10, NULL);
+    gtk_widget_set_hexpand (elements->title_lbl, TRUE);
+    gtk_grid_attach (GTK_GRID (grid), elements->title_lbl, 0, 0, 1, 1);
+
+    elements->dummy = gtk_entry_new();
+    g_object_set (elements->dummy, "margin-right", 10, NULL);
+    gtk_widget_set_hexpand (elements->dummy, TRUE);
+    gtk_grid_attach (GTK_GRID (grid), elements->dummy, 1, 0, 1, 1);
+
     //Lightgrey background for the title strip
     cssProvider = gtk_css_provider_new();
     gtk_css_provider_load_from_data(cssProvider, "* { background-image:none; border-radius: 10px; background: linear-gradient(to top, @theme_bg_color, @theme_bg_color);}",-1,NULL); 
@@ -239,8 +288,8 @@ GtkWidget * priv_AppDialog__create_panel(AppDialog * dialog){
         gtk_grid_attach (GTK_GRID (grid), widget, 0, 1, 1, 1);
     }
 
-    widget = priv_AppDialog__create_buttons(dialog);
-    gtk_grid_attach (GTK_GRID (grid), widget, 0, 2, 1, 1);
+    elements->action_panel = priv_AppDialog__create_buttons(dialog);
+    gtk_grid_attach (GTK_GRID (grid), elements->action_panel, 0, 2, 1, 1);
 
     g_object_unref (cssProvider);  
 
@@ -295,13 +344,16 @@ void priv_AppDialog_submit_event (GtkWidget *widget, AppDialog * dialog) {
         evt->dialog = dialog;
         evt->type = APP_DIALOG_SUBMIT_EVENT;
         evt->user_data = dialog->user_data;
-
+        
         (*(dialog->submit_callback))(evt);
         free(evt);
     }
 }
 
 void priv_AppDialog_cancel_event (GtkWidget *widget, AppDialog * dialog) {
+    if(!dialog->closable){
+        return;
+    }
     if(dialog->cancel_callback){
         AppDialogEvent * evt = malloc(sizeof(AppDialogEvent));
         evt->dialog = dialog;
@@ -315,6 +367,8 @@ void priv_AppDialog_cancel_event (GtkWidget *widget, AppDialog * dialog) {
 }
 
 void priv_AppDialog_show_event (AppDialog * dialog) {
+    AppDialogElements * elements = (AppDialogElements*)dialog->private;
+    gtk_widget_grab_focus(elements->dummy);
     if(dialog->show_callback){
         AppDialogEvent * evt = malloc(sizeof(AppDialogEvent));
         evt->dialog = dialog;
@@ -338,4 +392,77 @@ GtkWidget * priv_AppDialog_create_parent_ui (AppDialog * dialog) {
     }
 
     return widget;
+}
+
+void priv_AppDialog__update_title(AppDialog * dialog){
+    AppDialogElements * elements = (AppDialogElements *) dialog->private;
+    if(elements && GTK_IS_WIDGET(elements->title_lbl)){
+        char * new_title = malloc(strlen(APPDIALOG_TITLE_PREFIX) + strlen(dialog->title) + strlen(APPDIALOG_TITLE_SUFFIX) +1);
+        strcpy(new_title,APPDIALOG_TITLE_PREFIX);
+        strcat(new_title,dialog->title);
+        strcat(new_title,APPDIALOG_TITLE_SUFFIX);
+
+        gtk_label_set_markup (GTK_LABEL (elements->title_lbl), new_title);
+        free(new_title);
+    }
+}
+
+void priv_AppDialog__update_submit_label(AppDialog * dialog){
+    AppDialogElements * elements = (AppDialogElements *) dialog->private;
+    if(elements && GTK_IS_WIDGET(elements->submit_btn)){
+        gtk_button_set_label(GTK_BUTTON(elements->submit_btn), dialog->submit_label);
+    }
+}
+
+void AppDialog__set_title(AppDialog * self, char * title){
+    if(!title){
+        if(self->title){
+            free(self->title);
+        }
+        return;
+    }
+    if(!self->title){
+        self->title = malloc(strlen(title)+1);
+    } else {
+        self->title = realloc(self->title,strlen(title)+1);
+    }
+    strcpy(self->title,title);
+    priv_AppDialog__update_title(self);
+}
+
+void priv_AppDialog__toggle_actions_visibility(AppDialog * self){
+    AppDialogElements * elements = (AppDialogElements *) self->private;
+    if(elements && GTK_IS_WIDGET(elements->action_panel)){
+        gtk_widget_set_visible(elements->action_panel,self->action_visible);
+    }
+}
+
+void AppDialog__set_closable(AppDialog * self, int closable){
+    self->closable = closable;
+}
+
+void AppDialog__hide_actions(AppDialog * self){
+    self->action_visible = 0;
+    priv_AppDialog__toggle_actions_visibility(self);
+}
+
+void AppDialog__show_actions(AppDialog * self){
+    self->action_visible = 1;
+    priv_AppDialog__toggle_actions_visibility(self);
+}
+
+void AppDialog__set_submit_label(AppDialog* self, char * label){
+    if(!label){
+        if(self->submit_label){
+            free(self->submit_label);
+        }
+        return;
+    }
+    if(!self->submit_label){
+        self->submit_label = malloc(strlen(label)+1);
+    } else {
+        self->submit_label = realloc(self->submit_label,strlen(label)+1);
+    }
+    strcpy(self->submit_label,label);
+    priv_AppDialog__update_submit_label(self);
 }

@@ -2,7 +2,7 @@
 #define ADD_DEV_H_
 
 #include <gtk/gtk.h>
-#include "dialog/app_dialog.h"
+#include "app_dialog.h"
 
 typedef struct _AddDeviceDialog AddDeviceDialog;
 
