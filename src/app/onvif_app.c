@@ -430,6 +430,12 @@ void gui_process_device_scopes(void * user_data){
     free(input);
 }
 
+gboolean * gui_hide_dialog (void * user_data){
+    AppDialog * dialog = (AppDialog *) user_data;
+    AppDialog__hide(dialog);
+    return FALSE;
+}
+
 void _onvif_authentication_add(void * user_data){
     AppDialogEvent * event = (AppDialogEvent *) user_data;
     OnvifDeviceInput * input = (OnvifDeviceInput *) event->user_data;
@@ -450,8 +456,8 @@ void _onvif_authentication_add(void * user_data){
     gdk_threads_add_idle((void *)gui_process_device_scopes,guiscope);
 
     //Hide both dialogs
-    AppDialog__hide((AppDialog *)input->app->cred_dialog);
-    AppDialog__hide((AppDialog *)input->app->add_dialog);
+    gdk_threads_add_idle((void *)gui_hide_dialog,input->app->cred_dialog);
+    gdk_threads_add_idle((void *)gui_hide_dialog,input->app->add_dialog);
 
     //Input was used to dispatch credential dialog user_data.
     free(input);
@@ -476,12 +482,6 @@ void dialog_cancel_add_cb(AppDialogEvent * event){
 gboolean * gui_show_credentialsdialog_add (void * user_data){
     OnvifDeviceInput * input = (OnvifDeviceInput *) user_data;
     AppDialog__show((AppDialog*)input->app->cred_dialog,dialog_login_add_cb, dialog_cancel_add_cb,input);
-    return FALSE;
-}
-
-gboolean * gui_hide_dialog (void * user_data){
-    AppDialog * dialog = (AppDialog *) user_data;
-    AppDialog__hide(dialog);
     return FALSE;
 }
 
