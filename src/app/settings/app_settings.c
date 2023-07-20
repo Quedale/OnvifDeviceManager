@@ -2,31 +2,9 @@
 
 #define CONFIG_FILE_PATH "onvifmgr_settings.ini"
 
-typedef struct _AppSettings {
-    //Generic settings widgets
-    GtkWidget * widget;
-    GtkWidget * loading_handle;
-    GtkWidget * notice;
-    GtkWidget * apply_button;
-    GtkWidget * reset_btn;
-
-    //Stream overscaling specific properties
-    GtkWidget * overscale_chk;
-    int allow_overscale;
-    void (*overscale_callback)(AppSettings *, int, void *);
-    void * overscale_userdata;
-
-    EventQueue * queue;
-} AppSettings;
-
-typedef struct {
-    AppSettings * settings;
-    int allow_overscale_changed;
-    //More settings flags here
-} AppSettingChanges;
 
 void set_settings_state(AppSettings * settings, int state){
-    gtk_widget_set_sensitive(settings->overscale_chk,state);
+    AppSettingsStream__set_state(settings->stream, state);
     //More settings to add here
 }
 
@@ -36,55 +14,43 @@ void set_button_state(AppSettings * settings, int state){
     gtk_widget_set_sensitive(settings->reset_btn,state);
 }
 
-void check_button_state (AppSettings * settings){
-    int scale_val = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON(settings->overscale_chk));
-    if(scale_val != settings->allow_overscale){
-        set_button_state(settings,TRUE);
+void priv_AppSettings_state_changed(void * data){
+    AppSettings * self = (AppSettings*) data;
+    //More settings to add here
+    if(AppSettingsStream__get_state(self->stream)){
+        set_button_state(self,TRUE);
     } else {
-        set_button_state(settings,FALSE);
+        set_button_state(self,FALSE);
     }
-    //More settings widgets here
-}
-
-//Generic value callback for togglebuttons
-void value_toggled (GtkToggleButton* self, AppSettings * settings){
-    check_button_state(settings);
 }
 
 //GUI callback when apply finished
 void save_done(void * user_data){
     AppSettings * settings = (AppSettings *) user_data;
-    check_button_state(settings);
+    priv_AppSettings_state_changed(settings);
     set_settings_state(settings,TRUE);
     gtk_spinner_stop (GTK_SPINNER (settings->loading_handle));
 }
 
 //Background task to save settings (invokes internal callbacks)
 void _save_settings(void * user_data){
-    AppSettingChanges * changes = (AppSettingChanges *) user_data;
+    AppSettings * self = (AppSettings *) user_data;
 
-    if(changes->allow_overscale_changed && changes->settings->overscale_callback){
-        changes->settings->overscale_callback(changes->settings, changes->settings->allow_overscale, changes->settings->overscale_userdata);
-    }
-    //More settings callbacks to add here
+    char * stream_settings_txt = AppSettingsStream__save(self->stream);
+    //More settings to add here
 
     FILE * fptr = fopen(CONFIG_FILE_PATH,"w");
     if(fptr != NULL){
-        if(changes->settings->allow_overscale){
-            fprintf(fptr,"allow_overscaling=true");
-        } else {
-            fprintf(fptr,"allow_overscaling=false");
-        }
-        //More settings to save here
+        fprintf(fptr,"%s",stream_settings_txt);
+        //More settings to add here
         
         fclose(fptr);
     } else {
         printf("ERROR wrtting to settings file!\n");
     }
 
-    gdk_threads_add_idle((void *)save_done,changes->settings);
+    gdk_threads_add_idle((void *)save_done,self);
 
-    free(changes);
 }
 
 // Apply button GUI callback
@@ -92,52 +58,42 @@ void apply_settings (GtkWidget *widget, AppSettings * settings) {
     set_settings_state(settings,FALSE);
     set_button_state(settings,FALSE);
     gtk_spinner_start (GTK_SPINNER (settings->loading_handle));
-    AppSettingChanges * changes = malloc(sizeof(AppSettingChanges));
-    changes->settings = settings;
 
-    int new_overscale = gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON(settings->overscale_chk));
-    changes->allow_overscale_changed = new_overscale != changes->settings->allow_overscale;
-    changes->settings->allow_overscale = new_overscale;
-
-    EventQueue__insert(settings->queue,_save_settings,changes);
+    EventQueue__insert(settings->queue,_save_settings,settings);
 }
 
 void AppSettings__reset_settings(AppSettings * settings){
-    if(settings->allow_overscale){
-        gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (settings->overscale_chk),TRUE);
-    } else {
-        gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (settings->overscale_chk),FALSE);
-    }
+    AppSettingsStream__reset(settings->stream);
+    //More settings to add here
 }
 
 void reset_settings (GtkWidget *widget, AppSettings * settings) {
     AppSettings__reset_settings(settings);
-}
-
-void AppSettings__set_overscale_callback(AppSettings * self, void (*overscale_callback)(AppSettings *, int, void * ), void * overscale_userdata){
-    self->overscale_callback = overscale_callback;
-    self->overscale_userdata = overscale_userdata;
+    //More settings to add here
 }
 
 void AppSettings__create_ui(AppSettings * self){
     GtkWidget * widget;
+    GtkWidget * notebook;
     GtkWidget * label;
 
     GtkCssProvider * cssProvider;
     GtkStyleContext * context;
 
-    self->widget = gtk_grid_new();
-    g_object_set (self->widget, "margin", 10, NULL);
-    gtk_widget_set_hexpand (self->widget, TRUE);
+    self->widget = gtk_grid_new(); //Create root setting container
 
-    self->overscale_chk = gtk_check_button_new_with_label("Allow stream overscale.");
+    notebook = gtk_notebook_new(); //Create note containing setting pages
+    gtk_widget_set_vexpand (notebook, TRUE);
+    gtk_notebook_set_tab_pos (GTK_NOTEBOOK (notebook), GTK_POS_LEFT);
+    gtk_grid_attach (GTK_GRID (self->widget), notebook, 0, 0, 1, 1);
 
-    gtk_grid_attach (GTK_GRID (self->widget), self->overscale_chk, 0, 1, 1, 1);
 
-    //Add spacer to align button bar at the button
-    widget = gtk_label_new("");
-    gtk_widget_set_vexpand (widget, TRUE);
-    gtk_grid_attach (GTK_GRID (self->widget), widget, 0, 2, 1, 1);
+    widget = AppSettingsStream__get_widget(self->stream);
+    //Add stream page to notebook
+    label = gtk_label_new ("Stream");
+    gtk_notebook_append_page (GTK_NOTEBOOK (notebook), widget, label);
+
+    //More settings to add here
 
     //Create button bar
     GtkWidget * button_bar = gtk_grid_new();
@@ -201,15 +157,15 @@ void AppSettings__create_ui(AppSettings * self){
     // g_signal_connect (widget, "clicked", G_CALLBACK (apply_settings), self);
     // gtk_grid_attach (GTK_GRID (button_bar), widget, 2, 1, 1, 1);
 
-    gtk_grid_attach (GTK_GRID (self->widget), button_bar, 0, 3, 1, 1);
-
-    g_signal_connect (G_OBJECT (self->overscale_chk), "toggled", G_CALLBACK (value_toggled), self);
+    gtk_grid_attach (GTK_GRID (self->widget), button_bar, 0, 2, 1, 1);
 }
 
 #define MAX_LEN 256
 
 void AppSettings__load_settings(AppSettings * self){
     FILE *fptr = NULL;
+    
+    AppSettingsType category = -1;
     
     printf("Reading Settings file %s\n",CONFIG_FILE_PATH);
     if (access(CONFIG_FILE_PATH, F_OK) == 0) {
@@ -220,15 +176,35 @@ void AppSettings__load_settings(AppSettings * self){
                 // Remove trailing newline
                 buffer[strcspn(buffer, "\n")] = 0;
 
-                char * buff_ptr = (char*)buffer;
-                char * key = strtok_r (buff_ptr, "=", &buff_ptr);
-                char * val = strtok_r (buff_ptr, "\n", &buff_ptr); //Get reminder of line
-                printf("\t'%s' = '%s'\n",key,val);
+                if(buffer[0] == '['){
+                    printf("Parsing category %s\n",buffer);
+                    int newlen = strlen(buffer)-2;
+                    char cat[newlen];
+                    strncpy(cat,buffer + 1,newlen);
+                    if(AppSettingsStream__is_category(self->stream,cat)){
+                        category = APPSETTING_STREAM_TYPE;
+                    }//More settings to add here
 
-                if(!strcmp(key,"allow_overscaling")){
-                    if(!strcmp(val,"false")){
-                        self->allow_overscale = 0;
+                    continue;
+                } else if(category != -1){
+                    char * buff_ptr = (char*)buffer;
+                    char * key = strtok_r (buff_ptr, "=", &buff_ptr);
+                    char * val = strtok_r (buff_ptr, "\n", &buff_ptr); //Get reminder of line
+                    printf("\t Property : '%s' = '%s'\n",key,val);
+
+                    switch(category){
+                        case APPSETTING_STREAM_TYPE:
+                            if(!AppSettingsStream__set_property(self->stream,key,val)){
+                                printf("WARNING: Unknown stream property %s=%s\n",key,val);
+                            }//More settings to add here
+                            break;
+                        default:
+                            //TODO Warning
+                            break;
                     }
+                    continue;
+                } else {
+                    printf("WARNING Setting without category\n");
                 }
             }
         } else {
@@ -238,11 +214,6 @@ void AppSettings__load_settings(AppSettings * self){
         printf("WARNING no config file found. Using default configs. 1\n");
     }
 
-    //Force defaults
-    if(self->allow_overscale == -1){
-        self->allow_overscale = 1;
-    }
-
     if(fptr)
         fclose(fptr);
 }
@@ -250,16 +221,18 @@ void AppSettings__load_settings(AppSettings * self){
 AppSettings * AppSettings__create(EventQueue * queue){
     AppSettings * self = malloc(sizeof(AppSettings));
     self->queue = queue;
-    self->allow_overscale = -1;
+    self->stream = AppSettingsStream__create(priv_AppSettings_state_changed,self);
     AppSettings__load_settings(self);
     AppSettings__create_ui(self);
     AppSettings__reset_settings(self);
-    check_button_state(self);
+    priv_AppSettings_state_changed(self);
     return self;
 }
 
 void AppSettings__destroy(AppSettings* self){
     if(self){
+        //TODO Clean up more panels here
+        AppSettingsStream__destroy(self->stream);
         free(self);
     }
 }
@@ -270,8 +243,4 @@ void AppSettings__set_details_loading_handle(AppSettings * self, GtkWidget * wid
 
 GtkWidget * AppSettings__get_widget(AppSettings * self){
     return self->widget;
-}
-
-int AppSettings__get_allow_overscale(AppSettings * self){
-    return self->allow_overscale;
 }

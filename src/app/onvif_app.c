@@ -1,15 +1,12 @@
 #include "onvif_app.h"
 #include "dialog/credentials_input.h"
 #include "dialog/add_device.h"
-#include "dialog/msg_dialog.h"
-#include "../animations/dotted_slider.h"
 #include "onvif_details.h"
 #include "onvif_nvt.h"
 #include "device.h"
 #include "gui_utils.h"
 #include "settings/app_settings.h"
 #include "../queue/event_queue.h"
-#include "../gst/player.h"
 #include "discoverer.h"
 #include "task_manager.h"
 #include "../oo/clist_ts.h"
@@ -75,43 +72,15 @@ struct DeviceInput * DeviceInput__copy(struct DeviceInput * self){
  *
  */
 
-gboolean * gui_destruction (void * user_data){
-    OnvifApp *data = (OnvifApp *) user_data;
-    
-    OnvifApp__destroy(data);
-    gtk_main_quit();
-
-    return FALSE;
-}
-
 /* This function is called when the STOP button is clicked */
 static void quit_cb (GtkButton *button, OnvifApp *data) {
-    RtspPlayer__stop(data->player);
-    gtk_main_quit();
+    onvif_app_shutdown(data);
 
-    /*
-    * Before thread cleanup can be done, gui showin the progress should be created
-    * This is to prevent hidden dangling process
-    */
-
-    //wIP GUI
-    // GtkWidget * image = create_dotted_slider_animation(10,1);
-    // MsgDialog__set_icon(data->msg_dialog, image);
-    // AppDialog__set_closable((AppDialog*)data->msg_dialog, 0);
-    // AppDialog__hide_actions((AppDialog*)data->msg_dialog);
-    // AppDialog__set_title((AppDialog*)data->msg_dialog,"ALERT!!");
-    // MsgDialog__set_message(data->msg_dialog,"Waiting for running task to finish...");
-    // AppDialog__show((AppDialog *) data->msg_dialog,NULL,NULL,data);
-
-    // gtk_widget_hide(data->window);
-    // //Dispatch a new event to allow the window to hide.
-    // gdk_threads_add_idle((void *)gui_destruction,data);
 }
 
 /* This function is called when the main window is closed */
 static void delete_event_cb (GtkWidget *widget, GdkEvent *event, OnvifApp *data) {
-    RtspPlayer__stop(data->player);
-    gtk_main_quit ();
+    onvif_app_shutdown(data);
 }
 
 static gboolean * finished_discovery (void * e) {
@@ -259,13 +228,12 @@ void _play_onvif_stream(void * user_data){
     if(odev->last_error != ONVIF_ERROR_NONE)
         OnvifDevice_authenticate(odev);
 
-        /* Set the URI to play */
-        //TODO handle profiles
     if(odev->last_error != ONVIF_ERROR_NONE && Device__is_selected(input->device)){
         stopped_onvif_stream(input->app->player,input->app);
         goto exit;
     }
 
+    /* Set the URI to play */
     char * uri = OnvifDevice__media_getStreamUri(odev,Device__get_selected_profile(input->device));
     if(!uri){
         stopped_onvif_stream(input->app->player,input->app);
@@ -375,6 +343,8 @@ void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
     memset(&input, 0, sizeof(input));
     input.app = app;
 
+    printf("OnvifApp__select_device\n");
+    
     //Stop previous stream
     EventQueue__insert(app->queue,_stop_onvif_stream,app);
 
@@ -725,7 +695,7 @@ void create_ui (OnvifApp * app) {
 
 }
 
-void _overscale_cb(AppSettings * settings, int allow_overscale, void * user_data){
+void _overscale_cb(AppSettingsStream * settings, int allow_overscale, void * user_data){
     OnvifApp * app = (OnvifApp *) user_data;
     RtspPlayer__allow_overscale(app->player,allow_overscale);
 }
@@ -778,10 +748,10 @@ OnvifApp * OnvifApp__create(){
     app->settings = AppSettings__create(app->queue);
     app->taskmgr = TaskMgr__create();
 
-    AppSettings__set_overscale_callback(app->settings,_overscale_cb,app);
+    AppSettingsStream__set_overscale_callback(app->settings->stream,_overscale_cb,app);
     app->current_page = 0;
     app->player = RtspPlayer__create();
-    RtspPlayer__allow_overscale(app->player,AppSettings__get_allow_overscale(app->settings));
+    RtspPlayer__allow_overscale(app->player,AppSettingsStream__get_allow_overscale(app->settings->stream));
 
     //Defaults 8 paralell event threads.
     //TODO support configuration to modify this
@@ -812,10 +782,12 @@ void OnvifApp__destroy(OnvifApp* self){
         CObject__destroy((CObject*)self->add_dialog);
         CObject__destroy((CObject*)self->cred_dialog);
         CObject__destroy((CObject*)self->msg_dialog);
+        //Destroying the player will cause it to hang until its state changed to NULL
         RtspPlayer__destroy(self->player);
+        //Destroying the queue will hang until all threads are stopped
         CObject__destroy((CObject*)self->queue);
         CObject__destroy((CObject *)self->device_list);
-        gtk_widget_destroy(self->window);
+        safely_destroy_widget(self->window);
         free(self);
     }
 }
@@ -847,4 +819,12 @@ void add_device(OnvifApp * self, OnvifDevice * onvif_dev, char* name, char * har
     gtk_widget_show_all (row);
 
     onvif_display_device_row(self,device, 0);
+}
+
+RtspPlayer * OnvifApp__get_player(OnvifApp* self){
+    return self->player;
+}
+
+MsgDialog * OnvifApp__get_msg_dialog(OnvifApp * self){
+    return self->msg_dialog;
 }

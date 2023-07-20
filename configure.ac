@@ -74,6 +74,56 @@ AC_DEFUN([SET_GST_PKG_PATH],[
     ')) 
 ])
 
+AC_ARG_ENABLE(libav,
+    [AS_HELP_STRING([--enable-libav],[Enable libav gstreamer plugin. @<:@default=no@:>@.])],
+    [case "${enableval}" in
+        yes) targetlibav=yes ;;
+        no)  targetlibav=no ;;
+        true) targetlibav=yes ;;
+        false)  targetlibav=no ;;
+        *) AC_MSG_ERROR([bad value ${enableval} for --enable-libav]) ;;
+        esac],
+    [targetlibav="no"])
+AM_CONDITIONAL([LIBAVCOND], [test x$targetlibav = xyes])
+AM_COND_IF([LIBAVCOND],[
+    AC_SUBST(EXT_PLGS_LIBAV, gstlibav)
+    AC_SUBST(EXT_PKG_LIBAV, "gstlibav >= 1.14.4")
+    AC_SUBST(EXT_CFLAGS_LIBAV, -DENABLELIBAV)
+    AC_MSG_RESULT([configure: checking libav enabled... yes]) 
+],[
+    AC_MSG_RESULT([configure: checking libav enabled... no]) 
+])
+
+AC_ARG_ENABLE(nvcodec,
+    [AS_HELP_STRING([--enable-nvcodec],[Enable Nvidia codec gstreamer plugin. @<:@default=no@:>@.])],
+    [case "${enableval}" in
+        yes) targetnvcodec=yes ;;
+        no)  targetnvcodec=no ;;
+        true) targetnvcodec=yes ;;
+        false)  targetnvcodec=no ;;
+        *) AC_MSG_ERROR([bad value ${enableval} for --enable-nvcodec]) ;;
+        esac],
+        [targetnvcodec="no"])
+AM_CONDITIONAL([NVCODECCOND], [test x$targetnvcodec = xyes])
+AM_COND_IF([NVCODECCOND],[
+    AC_SUBST(EXT_PLGS_NV, "gstnvcodec")
+    AC_SUBST(EXT_PKG_NV, "gstnvcodec >= 1.14.4")
+    AC_SUBST(EXT_CFLAGS_NV, -DENABLENVCODEC)
+    AC_MSG_RESULT([configure: checking NVIDIA codec enabled... yes]) 
+],[
+    AC_MSG_RESULT([configure: checking NVIDIA codec enabled... no])
+])
+
+AC_SUBST(GST_PKG_CORE,m4_normalize(
+    "gstreamer-1.0 >= 1.14.4 
+    gstreamer-plugins-base-1.0 >= 1.14.4 
+    gstreamer-plugins-good-1.0 >= 1.14.4 
+    gstreamer-plugins-bad-1.0 >= 1.14.4"
+))
+
+#Combine packages into one list for pkgconfig
+AC_SUBST(GST_MODULES,"${GST_PKG_CORE} ${EXT_PKG_NV} ${EXT_PKG_LIBAV}")
+
 #Check if gstreamer is installed
 AC_ARG_ENABLE(latest,
     [AS_HELP_STRING([--enable-latest],[Force the usage or build gstreamer 1.21.90. @<:@default=no@:>@.])],
@@ -90,12 +140,7 @@ AM_COND_IF([GSTBUILDCOND],[
     AC_MSG_NOTICE([gstreamer forced - Using latest static libraries])
     SET_GST_PKG_PATH
 ], [
-    PKG_CHECK_MODULES(gstreamer, [
-        gstreamer-1.0 >= 1.14.4
-        gstreamer-plugins-base-1.0 >= 1.14.4
-        gstreamer-plugins-good-1.0 >= 1.14.4
-        gstreamer-plugins-bad-1.0 >= 1.14.4
-    ], [
+    PKG_CHECK_MODULES(gstreamer,[${GST_MODULES}], [
         AC_MSG_NOTICE([gstreamer >= 1.14.4 found - Using shared libraries])
         AC_SUBST(GST_LINK_TYPE, [-Wl,-Bdynamic])
     ], [
@@ -104,23 +149,8 @@ AM_COND_IF([GSTBUILDCOND],[
     ])
 ])
 
-AC_ARG_ENABLE(libav,
-    [AS_HELP_STRING([--enable-rpi],[Enable libav gstreamer plugin. @<:@default=no@:>@.])],
-    [case "${enableval}" in
-        yes) targetlibav=yes ;;
-        no)  targetlibav=no ;;
-        true) targetlibav=yes ;;
-        false)  targetlibav=no ;;
-        *) AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
-        esac],
-    [targetlibav="no"])
-AM_CONDITIONAL([LIBAVCOND], [test x$targetlibav = xyes])
-AM_COND_IF([LIBAVCOND],[
-    AM_COND_IF([GSTBUILDCOND],[
-        AC_SUBST(EXT_PLGS, gstlibav)
-    ])
-    AC_SUBST(EXT_CFLAGS, -DENABLELIBAV)
-])
+AC_SUBST(EXT_CFLAGS, '$(EXT_CFLAGS_LIBAV) $(EXT_CFLAGS_NV)')
+AC_SUBST(EXT_PLGS, '$(EXT_PLGS_LIBAV) $(EXT_PLGS_NV)')
 
 #Declare all path for pkg-config to search
 AC_SUBST(PKG_FULL_PATH, '$(PKG_PATH):$(PKG_GST_PATH):$(PKG_FFMPEG_PATH):$(PKG_PULSE_PATH):$(PKG_ALSA_PATH):$(PKG_GUDEV_PATH):$(PKG_UDEV_PATH):$(PKG_GLIB_PATH):$(PKG_V4L2_PATH):$(PKG_ONVIF_DISCO_PATH):$(PKG_ONVIF_SOAP_PATH):$(PKG_OPENSSL_PATH)')

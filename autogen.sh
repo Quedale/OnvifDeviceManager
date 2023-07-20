@@ -18,16 +18,21 @@ FAILED=0
 
 ENABLE_LATEST=0
 ENABLE_LIBAV=0
+ENABLE_NVCODEC=0
+
 i=1;
 
 for arg in "$@" 
 do
     shift
-    if [ "$arg" == "--enable-libav" ]; then
+    if [ "$arg" == "--enable-libav=yes" ] || [ "$arg" == "--enable-libav=true" ]; then
         ENABLE_LIBAV=1
         set -- "$@" "$arg"
     elif [ "$arg" == "--enable-latest" ]; then
         ENABLE_LATEST=1
+        set -- "$@" "$arg"
+    elif [ "$arg" == "--enable-nvcodec=yes" ] || [ "$arg" == "--enable-nvcodec=true" ]; then
+        ENABLE_NVCODEC=1
         set -- "$@" "$arg"
     else
         set -- "$@" "$arg"
@@ -959,32 +964,33 @@ FFMPEG_PKG=$SUBPROJECT_DIR/FFmpeg/dist/lib/pkgconfig
 GST_OMX_PKG_PATH=$SUBPROJECT_DIR/gstreamer/build_omx/dist/lib/gstreamer-1.0/pkgconfig
 GST_PKG_PATH=:$SUBPROJECT_DIR/gstreamer/build/dist/lib/pkgconfig:$SUBPROJECT_DIR/gstreamer/build/dist/lib/gstreamer-1.0/pkgconfig
 gst_ret=0
+gst_nv_ret=0
 gst_libav_ret=0
 gst_plg_base=0
 gst_plg_good=0
 gst_plg_bad=0
 GSTREAMER_LATEST=1.22.4
 
-PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB \
 pkg-config --exists --print-errors "gstreamer-1.0 >= 1.14.4"
 gst_ret=$?
-PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB \
 pkg-config --exists --print-errors "gstreamer-plugins-base-1.0 >= 1.14.4"
 gst_plg_base=$?
-PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB \
 pkg-config --exists --print-errors "gstreamer-plugins-good-1.0 >= 1.14.4"
 gst_plg_good=$?
-PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB \
 pkg-config --exists --print-errors "gstreamer-plugins-bad-1.0 >= 1.14.4"
 gst_plg_bad=$?
 if [ $ENABLE_LIBAV -eq 1 ]; then
-  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB:$FFMPEG_PKG \
   pkg-config --exists --print-errors "gstlibav >= 1.14.4"
   gst_libav_ret=$?
 fi
 
+if [ $ENABLE_NVCODEC -eq 1 ]; then
+  pkg-config --exists --print-errors "gstnvcodec >= 1.14.4"
+  gst_nv_ret=$?
+fi
+
 #Check to see if gstreamer exist on the system
-if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $ENABLE_LATEST != 0 ] || [ $gst_plg_base != 0 ] || [ $gst_plg_good != 0 ] || [ $gst_plg_bad != 0 ]; then
+if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $gst_nv_ret != 0 ] || [ $ENABLE_LATEST != 0 ] || [ $gst_plg_base != 0 ] || [ $gst_plg_good != 0 ] || [ $gst_plg_bad != 0 ]; then
 
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB \
   pkg-config --exists --print-errors "gstreamer-1.0 >= $GSTREAMER_LATEST"
@@ -995,8 +1001,14 @@ if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $ENABLE_LATEST != 0 ] || [ 
     gst_libav_ret=$?
   fi
 
+  if [ $ENABLE_NVCODEC -eq 1 ]; then
+    PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB \
+    pkg-config --exists --print-errors "gstnvcodec >= $GSTREAMER_LATEST"
+    gst_nv_ret=$?
+  fi
+
   #Global check if gstreamer is already built
-  if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ]; then
+  if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $gst_nv_ret != 0 ]; then
     ################################################################
     # 
     #    Build gettext and libgettext dependency
@@ -1300,8 +1312,8 @@ if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $ENABLE_LATEST != 0 ] || [ 
         echo "nasm already installed."
     fi
 
-    echo "gst_ret : $gst_ret | gst_libav_ret : $gst_libav_ret"
-    if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ]; then
+    echo "gst_ret : $gst_ret | gst_libav_ret : $gst_libav_ret | gst_nv_ret : $gst_nv_ret"
+    if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $gst_nv_ret != 0 ]; then
         MESON_PARAMS=""
         if [ $ENABLE_LIBAV -eq 1 ]; then
             echo "LIBAV Feature enabled..."
@@ -1399,7 +1411,9 @@ if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $ENABLE_LATEST != 0 ] || [ 
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:audioparsers=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:udp=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:openh264=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:nvcodec=enabled"
+        if [ $ENABLE_NVCODEC != 0 ]; then
+          MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:nvcodec=enabled"
+        fi
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:v4l2codecs=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:fdkaac=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:videoparsers=enabled"

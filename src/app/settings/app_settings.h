@@ -4,13 +4,30 @@
 #include <gtk/gtk.h>
 #include "../../queue/event_queue.h"
 
+#include "app_settings_stream.h"
+
 typedef struct _AppSettings AppSettings;
+typedef enum _AppSettingsType {
+    APPSETTING_STREAM_TYPE = 0,
+} AppSettingsType;
+
+struct _AppSettings {
+    //Generic settings widgets
+    GtkWidget * notebook;
+    GtkWidget * widget;
+    GtkWidget * loading_handle;
+    GtkWidget * notice;
+    GtkWidget * apply_button;
+    GtkWidget * reset_btn;
+
+    AppSettingsStream * stream;
+
+    EventQueue * queue;
+};
 
 AppSettings * AppSettings__create(EventQueue * queue);
 void AppSettings__destroy(AppSettings* dialog);
 void AppSettings__set_details_loading_handle(AppSettings * self, GtkWidget * widget);
-void AppSettings__set_overscale_callback(AppSettings * self, void (*overscale_callback)(AppSettings *, int value, void *), void * overscale_userdata);
 GtkWidget * AppSettings__get_widget(AppSettings * self);
-int AppSettings__get_allow_overscale(AppSettings * self);
 
 #endif

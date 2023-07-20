@@ -90,10 +90,8 @@ void _priv_Device__load_thumbnail(void * user_data){
     }
     
     if(device->onvif_device->last_error == ONVIF_ERROR_NONE){
-        //TODO handle profiles
         struct chunk * imgchunk = OnvifDevice__media_getSnapshot(device->onvif_device,device->profile_index);
         if(!imgchunk){
-            //TODO Set error image
             printf("Error retrieve snapshot.");
             goto warning;
         }

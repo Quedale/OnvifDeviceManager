@@ -518,17 +518,15 @@ static void on_pad_added (GstElement *element, GstPad *new_pad, gpointer data){
 
 static GstElement * create_audio_bin(RtspPlayer * self){
   GstPad *pad, *ghostpad;
-  GstElement *aqueue, *decoder, *convert, *level, *sink;
+  GstElement *decoder, *convert, *level, *sink;
 
-  self->audio_bin = gst_bin_new("audiobin");
-  aqueue = gst_element_factory_make ("queue", NULL);
-  decoder = gst_element_factory_make ("decodebin", NULL);
+  self->audio_bin = gst_bin_new("audiobin");\
+  decoder = gst_element_factory_make ("decodebin3", NULL);
   convert = gst_element_factory_make ("audioconvert", NULL);
   level = gst_element_factory_make("level",NULL);
   sink = gst_element_factory_make ("autoaudiosink", NULL);
 
   if (!self->audio_bin ||
-      !aqueue ||
       !decoder ||
       !convert ||
       !level ||
@@ -537,23 +535,13 @@ static GstElement * create_audio_bin(RtspPlayer * self){
       return NULL;
   }
 
-  g_object_set (G_OBJECT (aqueue), "flush-on-eos", TRUE, NULL);
-  g_object_set (G_OBJECT (aqueue), "max-size-buffers", 1, NULL);
-
   // Add Elements to the Bin
   gst_bin_add_many (GST_BIN (self->audio_bin),
-    aqueue,
     decoder,
     convert,
     level,
     sink, NULL);
 
-  // Link confirmation
-  if (!gst_element_link_many (aqueue,
-    decoder, NULL)){
-      g_warning ("Linking audio part (A)-1 Fail...");
-      return NULL;
-  }
 
   // Link confirmation
   if (!gst_element_link_many (convert,
@@ -569,7 +557,7 @@ static GstElement * create_audio_bin(RtspPlayer * self){
       g_warning ("Linking (A)-1 part (2) with part (A)-2 Fail...");
   }
 
-  pad = gst_element_get_static_pad (aqueue, "sink");
+  pad = gst_element_get_static_pad (decoder, "sink");
   if (!pad) {
       // TODO gst_object_unref 
       GST_ERROR("unable to get decoder static sink pad");
@@ -584,20 +572,17 @@ static GstElement * create_audio_bin(RtspPlayer * self){
 }
 
 static GstElement * create_video_bin(RtspPlayer * self){
-  GstElement *vqueue, *vdecoder, *videoconvert, *overlay_comp;
+  GstElement *vdecoder, *videoconvert, *overlay_comp;
   GstPad *pad, *ghostpad;
 
   self->video_bin = gst_bin_new("video_bin");
-  vqueue = gst_element_factory_make ("queue", NULL);
-  vdecoder = gst_element_factory_make ("decodebin", NULL);
+  vdecoder = gst_element_factory_make ("decodebin3", NULL);
   videoconvert = gst_element_factory_make ("videoconvert", NULL);
   overlay_comp = gst_element_factory_make ("overlaycomposition", NULL);
   self->sink = gst_element_factory_make ("gtkcustomsink", NULL);
   gst_gtk_base_custom_sink_set_expand(GST_GTK_BASE_CUSTOM_SINK(self->sink),self->allow_overscale);
 
   if (!self->video_bin ||
-      // !capsfilter ||
-      !vqueue ||
       !vdecoder ||
       !videoconvert ||
       !overlay_comp ||
@@ -606,24 +591,12 @@ static GstElement * create_video_bin(RtspPlayer * self){
       return NULL;
   }
 
-
-  g_object_set (G_OBJECT (vqueue), "flush-on-eos", TRUE, NULL);
-  g_object_set (G_OBJECT (vqueue), "max-size-buffers", 1, NULL);
-
   // Add Elements to the Bin
   gst_bin_add_many (GST_BIN (self->video_bin),
-    vqueue,
     vdecoder,
     videoconvert,
     overlay_comp,
     self->sink, NULL);
-
-  // Link confirmation
-  if (!gst_element_link_many (vqueue,
-    vdecoder, NULL)){
-      g_warning ("Linking video part (A)-1 Fail...");
-      return NULL;
-  }
 
   // Link confirmation
   if (!gst_element_link_many (videoconvert,
@@ -639,7 +612,7 @@ static GstElement * create_video_bin(RtspPlayer * self){
       g_warning ("Linking (A)-1 part with part (A)-2 Fail...");
   }
 
-  pad = gst_element_get_static_pad (vqueue, "sink");
+  pad = gst_element_get_static_pad (vdecoder, "sink");
   if (!pad) {
       // TODO gst_object_unref 
       GST_ERROR("unable to get decoder static sink pad");
@@ -862,6 +835,26 @@ RtspPlayer * RtspPlayer__create() {
 
 void RtspPlayer__destroy(RtspPlayer* self) {
   if (self) {
+    //Making sure stream is stopped
+    RtspPlayer__stop(self);
+
+    //Waiting for the state to finish changing
+    GstState current_state_pipe;
+    GstState current_state_back;
+    int ret_1 = gst_element_get_state (self->pipeline,&current_state_pipe, NULL, GST_CLOCK_TIME_NONE);
+    int ret_2 = gst_element_get_state (self->backpipe, &current_state_back, NULL, GST_CLOCK_TIME_NONE);
+    while( (ret_1 && current_state_pipe != GST_STATE_NULL) || ( ret_2 && current_state_pipe != GST_STATE_NULL)){
+      printf("Waiting for player to stop...\n");
+      sleep(0.25);
+    }
+
+    if(GST_IS_ELEMENT(self->pipeline)){
+      gst_object_unref (self->pipeline);
+    }
+    if(GST_IS_ELEMENT(self->backpipe)){
+      gst_object_unref (self->backpipe);
+    }
+
     if(self->mic_element){
       free(self->mic_element);
     }
@@ -930,7 +923,7 @@ void RtspPlayer__stop(RtspPlayer* self){
 
     //Pause backchannel
     if(GST_IS_ELEMENT(self->backpipe)){
-      ret = gst_element_set_state (self->backpipe, GST_STATE_READY);
+      ret = gst_element_set_state (self->backpipe, GST_STATE_NULL);
       if (ret == GST_STATE_CHANGE_FAILURE) {
           GST_ERROR ("Unable to set the backpipe to the ready state.\n");
           goto stop_out;

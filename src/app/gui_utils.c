@@ -26,6 +26,17 @@ void gui_update_widget_image(GtkWidget * image, GtkWidget * handle){
     gdk_threads_add_idle((void *)gui_update_widget_image_priv,iguiu);
 }
 
+
+gboolean * gui_widget_destroy (void * user_data){
+    GtkWidget * widget = (GtkWidget *) user_data;
+    gtk_widget_destroy(widget);
+    return FALSE;
+}
+
+void safely_destroy_widget(GtkWidget * widget){
+    gdk_threads_add_idle((void *)gui_widget_destroy,widget);
+}
+
 GtkWidget * add_label_entry(GtkWidget * grid, int row, char* lbl){
     GtkWidget * widget;
 

@@ -47,7 +47,7 @@ void CListTS__init(CListTS* self){
     CObject__set_destroy_callback((CObject*)self,priv_CListTS__destroy);
 
     pthread_mutex_init(&self->lock, NULL);
-
+    self->destroy_callback = NULL;
     self->count = 0;
     self->data = malloc(0);
 }
