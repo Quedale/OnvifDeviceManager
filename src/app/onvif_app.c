@@ -144,7 +144,7 @@ void onvif_scan (GtkWidget *widget, OnvifApp * app) {
     disco_in->app = app;
     disco_in->widget = widget;
     //TODO Support retry_count by settings
-    UdpDiscoverer__start(&discoverer, disco_in, 2);
+    UdpDiscoverer__start(&discoverer, disco_in, AppSettingsDiscovery__get_repeat(app->settings->discovery), AppSettingsDiscovery__get_timeout(app->settings->discovery));
 }
 
 void error_onvif_stream(RtspPlayer * player, void * user_data){

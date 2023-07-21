@@ -1,10 +1,12 @@
 #include "app_settings.h"
+#include "app_settings_discovery.h"
 
 #define CONFIG_FILE_PATH "onvifmgr_settings.ini"
 
 
 void set_settings_state(AppSettings * settings, int state){
     AppSettingsStream__set_state(settings->stream, state);
+    AppSettingsDiscovery__set_state(settings->discovery, state);
     //More settings to add here
 }
 
@@ -17,7 +19,8 @@ void set_button_state(AppSettings * settings, int state){
 void priv_AppSettings_state_changed(void * data){
     AppSettings * self = (AppSettings*) data;
     //More settings to add here
-    if(AppSettingsStream__get_state(self->stream)){
+    if(AppSettingsStream__get_state(self->stream) ||
+        AppSettingsDiscovery__get_state(self->discovery)){
         set_button_state(self,TRUE);
     } else {
         set_button_state(self,FALSE);
@@ -36,12 +39,12 @@ void save_done(void * user_data){
 void _save_settings(void * user_data){
     AppSettings * self = (AppSettings *) user_data;
 
-    char * stream_settings_txt = AppSettingsStream__save(self->stream);
     //More settings to add here
 
     FILE * fptr = fopen(CONFIG_FILE_PATH,"w");
     if(fptr != NULL){
-        fprintf(fptr,"%s",stream_settings_txt);
+        fprintf(fptr,"%s\n\n",AppSettingsStream__save(self->stream));
+        fprintf(fptr,"%s\n\n",AppSettingsDiscovery__save(self->discovery));
         //More settings to add here
         
         fclose(fptr);
@@ -62,8 +65,9 @@ void apply_settings (GtkWidget *widget, AppSettings * settings) {
     EventQueue__insert(settings->queue,_save_settings,settings);
 }
 
-void AppSettings__reset_settings(AppSettings * settings){
-    AppSettingsStream__reset(settings->stream);
+void AppSettings__reset_settings(AppSettings * self){
+    AppSettingsStream__reset(self->stream);
+    AppSettingsDiscovery__reset(self->discovery);
     //More settings to add here
 }
 
@@ -72,11 +76,24 @@ void reset_settings (GtkWidget *widget, AppSettings * settings) {
     //More settings to add here
 }
 
+void add_panel (GtkWidget * notebook, char * title,  GtkWidget * widget){
+    GtkWidget * label, * scroll;
+
+    //Add stream page to notebook
+    label = gtk_label_new (title);
+
+    scroll = gtk_scrolled_window_new (NULL, NULL);
+    gtk_widget_set_hexpand (scroll, TRUE);
+    gtk_widget_set_vexpand (scroll, TRUE);
+    gtk_container_add(GTK_CONTAINER(scroll),widget);
+    gtk_notebook_append_page (GTK_NOTEBOOK (notebook), scroll, label);
+}
+
 void AppSettings__create_ui(AppSettings * self){
     GtkWidget * widget;
     GtkWidget * notebook;
     GtkWidget * label;
-
+    
     GtkCssProvider * cssProvider;
     GtkStyleContext * context;
 
@@ -87,11 +104,8 @@ void AppSettings__create_ui(AppSettings * self){
     gtk_notebook_set_tab_pos (GTK_NOTEBOOK (notebook), GTK_POS_LEFT);
     gtk_grid_attach (GTK_GRID (self->widget), notebook, 0, 0, 1, 1);
 
-
-    widget = AppSettingsStream__get_widget(self->stream);
-    //Add stream page to notebook
-    label = gtk_label_new ("Stream");
-    gtk_notebook_append_page (GTK_NOTEBOOK (notebook), widget, label);
+    add_panel(notebook, "Discovery", AppSettingsDiscovery__get_widget(self->discovery));
+    add_panel(notebook, "Stream", AppSettingsDiscovery__get_widget(self->stream));
 
     //More settings to add here
 
@@ -177,18 +191,26 @@ void AppSettings__load_settings(AppSettings * self){
                 buffer[strcspn(buffer, "\n")] = 0;
 
                 if(buffer[0] == '['){
-                    printf("Parsing category %s\n",buffer);
                     int newlen = strlen(buffer)-2;
                     char cat[newlen];
                     strncpy(cat,buffer + 1,newlen);
-                    if(AppSettingsStream__is_category(self->stream,cat)){
+                    cat[newlen] = '\0'; //Mark end of string
+
+                    if(strcmp(AppSettingsStream__get_category(self->stream),cat) == 0){
                         category = APPSETTING_STREAM_TYPE;
+                        printf("[%s]\n",AppSettingsStream__get_category(self->stream));
+                    } else if(strcmp(AppSettingsDiscovery__get_category(self->discovery),cat) == 0){
+                        category = APPSETTING_DISCOVERY_TYPE;
+                        printf("[%s]\n",AppSettingsDiscovery__get_category(self->discovery));
                     }//More settings to add here
 
                     continue;
                 } else if(category != -1){
                     char * buff_ptr = (char*)buffer;
                     char * key = strtok_r (buff_ptr, "=", &buff_ptr);
+                    if(key == NULL){ //Handles empty lines
+                        continue;
+                    }
                     char * val = strtok_r (buff_ptr, "\n", &buff_ptr); //Get reminder of line
                     printf("\t Property : '%s' = '%s'\n",key,val);
 
@@ -196,6 +218,11 @@ void AppSettings__load_settings(AppSettings * self){
                         case APPSETTING_STREAM_TYPE:
                             if(!AppSettingsStream__set_property(self->stream,key,val)){
                                 printf("WARNING: Unknown stream property %s=%s\n",key,val);
+                            }//More settings to add here
+                            break;
+                        case APPSETTING_DISCOVERY_TYPE:
+                            if(!AppSettingsDiscovery__set_property(self->discovery,key,val)){
+                                printf("WARNING: Unknown discovery property %s=%s\n",key,val);
                             }//More settings to add here
                             break;
                         default:
@@ -222,6 +249,7 @@ AppSettings * AppSettings__create(EventQueue * queue){
     AppSettings * self = malloc(sizeof(AppSettings));
     self->queue = queue;
     self->stream = AppSettingsStream__create(priv_AppSettings_state_changed,self);
+    self->discovery = AppSettingsDiscovery__create(priv_AppSettings_state_changed,self);
     AppSettings__load_settings(self);
     AppSettings__create_ui(self);
     AppSettings__reset_settings(self);
@@ -233,6 +261,7 @@ void AppSettings__destroy(AppSettings* self){
     if(self){
         //TODO Clean up more panels here
         AppSettingsStream__destroy(self->stream);
+        AppSettingsDiscovery__destroy(self->discovery);
         free(self);
     }
 }

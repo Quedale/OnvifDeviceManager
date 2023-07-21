@@ -178,7 +178,6 @@ GST_PLUGIN_STATIC_DECLARE(videoparsersbad);
 // GST_PLUGIN_STATIC_DECLARE(fbdevsink); gstfbdevsink
 GST_PLUGIN_STATIC_DECLARE(ipcpipeline);
 #ifdef ENABLENVCODEC
-printf("Using Nvida Codec...\n");
 GST_PLUGIN_STATIC_DECLARE(nvcodec);
 #endif
 // GST_PLUGIN_STATIC_DECLARE(shm); gstshm
@@ -395,6 +394,7 @@ onvif_init_static_plugins (void)
     // GST_PLUGIN_STATIC_REGISTER(fbdevsink); gstfbdevsink
     // GST_PLUGIN_STATIC_REGISTER(ipcpipeline); gstipcpipeline
 #ifdef ENABLENVCODEC
+    printf("Using Nvida Codec...\n");
     GST_PLUGIN_STATIC_REGISTER(nvcodec);
 #endif
     // GST_PLUGIN_STATIC_REGISTER(shm); gstshm

@@ -520,7 +520,7 @@ static GstElement * create_audio_bin(RtspPlayer * self){
   GstPad *pad, *ghostpad;
   GstElement *decoder, *convert, *level, *sink;
 
-  self->audio_bin = gst_bin_new("audiobin");\
+  self->audio_bin = gst_bin_new("audiobin");
   decoder = gst_element_factory_make ("decodebin3", NULL);
   convert = gst_element_factory_make ("audioconvert", NULL);
   level = gst_element_factory_make("level",NULL);

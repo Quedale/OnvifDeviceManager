@@ -5,10 +5,12 @@
 #include "../../queue/event_queue.h"
 
 #include "app_settings_stream.h"
+#include "app_settings_discovery.h"
 
 typedef struct _AppSettings AppSettings;
 typedef enum _AppSettingsType {
     APPSETTING_STREAM_TYPE = 0,
+    APPSETTING_DISCOVERY_TYPE = 1,
 } AppSettingsType;
 
 struct _AppSettings {
@@ -21,6 +23,7 @@ struct _AppSettings {
     GtkWidget * reset_btn;
 
     AppSettingsStream * stream;
+    AppSettingsDiscovery * discovery;
 
     EventQueue * queue;
 };

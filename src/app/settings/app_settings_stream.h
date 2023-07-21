@@ -24,7 +24,7 @@ int AppSettingsStream__get_state(AppSettingsStream * settings);
 void AppSettingsStream__set_state(AppSettingsStream * self,int state);
 char * AppSettingsStream__save(AppSettingsStream *self);
 void AppSettingsStream__reset(AppSettingsStream * settings);
-int AppSettingsStream__is_category(AppSettingsStream * self, char * cat);
+char * AppSettingsStream__get_category(AppSettingsStream * self);
 int AppSettingsStream__set_property(AppSettingsStream * self, char * key, char * value);
 GtkWidget * AppSettingsStream__get_widget(AppSettingsStream * dialog);
 void AppSettingsStream__destroy(AppSettingsStream * self);

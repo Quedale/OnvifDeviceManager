@@ -27,7 +27,7 @@ GtkWidget * AppSettingsStream__create_ui(AppSettingsStream * self){
     GtkWidget * widget = gtk_grid_new(); //Widget filling up streaming page
 
     //Add stream page properties
-    g_object_set (widget, "margin", 10, NULL);
+    g_object_set (widget, "margin", 20, NULL);
     gtk_widget_set_hexpand (widget, TRUE);
     self->overscale_chk = gtk_check_button_new_with_label("Allow overscaling");
     gtk_grid_attach (GTK_GRID (widget), self->overscale_chk, 0, 1, 1, 1);
@@ -91,8 +91,8 @@ void AppSettingsStream__reset(AppSettingsStream * self){
     }
 }
 
-int AppSettingsStream__is_category(AppSettingsStream * self, char * cat){
-    return strcmp(APPSETTINGS_STREAM_CAT,cat) == 0;
+char * AppSettingsStream__get_category(AppSettingsStream * self){
+    return APPSETTINGS_STREAM_CAT;
 }
 
 int AppSettingsStream__set_property(AppSettingsStream * self, char * key, char * value){
