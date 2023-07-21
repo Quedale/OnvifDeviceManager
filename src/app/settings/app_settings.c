@@ -93,7 +93,7 @@ void AppSettings__create_ui(AppSettings * self){
     GtkWidget * widget;
     GtkWidget * notebook;
     GtkWidget * label;
-    
+
     GtkCssProvider * cssProvider;
     GtkStyleContext * context;
 
@@ -105,7 +105,7 @@ void AppSettings__create_ui(AppSettings * self){
     gtk_grid_attach (GTK_GRID (self->widget), notebook, 0, 0, 1, 1);
 
     add_panel(notebook, "Discovery", AppSettingsDiscovery__get_widget(self->discovery));
-    add_panel(notebook, "Stream", AppSettingsDiscovery__get_widget(self->stream));
+    add_panel(notebook, "Stream", AppSettingsStream__get_widget(self->stream));
 
     //More settings to add here
 
