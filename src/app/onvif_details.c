@@ -103,6 +103,7 @@ void OnvifDetails__set_details_loading_handle(OnvifDetails * self, GtkWidget * w
 }
 
 void OnvifDetails__clear_details(OnvifDetails * self){
+    printf("OnvifDetails__clear_details\n");
     if(self->current_page == 0){
         OnvifInfo_clear_details(self->info);
     } else if(self->current_page == 1){

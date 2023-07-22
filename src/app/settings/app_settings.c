@@ -11,9 +11,12 @@ void set_settings_state(AppSettings * settings, int state){
 }
 
 void set_button_state(AppSettings * settings, int state){
-    gtk_widget_set_visible(settings->notice,state);
-    gtk_widget_set_sensitive(settings->apply_button,state);
-    gtk_widget_set_sensitive(settings->reset_btn,state);
+    if(GTK_IS_WIDGET(settings->notice))
+        gtk_widget_set_visible(settings->notice,state);
+    if(GTK_IS_WIDGET(settings->apply_button))
+        gtk_widget_set_sensitive(settings->apply_button,state);
+    if(GTK_IS_WIDGET(settings->reset_btn))
+        gtk_widget_set_sensitive(settings->reset_btn,state);
 }
 
 void priv_AppSettings_state_changed(void * data){

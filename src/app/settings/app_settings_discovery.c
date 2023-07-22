@@ -45,8 +45,10 @@ int AppSettingsDiscovery__get_state (AppSettingsDiscovery * self){
 }
 
 void AppSettingsDiscovery__set_state(AppSettingsDiscovery * self,int state){
-    gtk_widget_set_sensitive(self->timeout_scale,state);
-    gtk_widget_set_sensitive(self->repeat_scale,state);
+    if(GTK_IS_WIDGET(self->timeout_scale))
+        gtk_widget_set_sensitive(self->timeout_scale,state);
+    if(GTK_IS_WIDGET(self->repeat_scale))
+        gtk_widget_set_sensitive(self->repeat_scale,state);
 }
 
 GtkWidget * AppSettingsDiscovery__create_ui(AppSettingsDiscovery * self){

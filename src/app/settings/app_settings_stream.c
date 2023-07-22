@@ -20,7 +20,8 @@ int AppSettingsStream__get_state (AppSettingsStream * settings){
 }
 
 void AppSettingsStream__set_state(AppSettingsStream * self,int state){
-    gtk_widget_set_sensitive(self->overscale_chk,state);
+    if(GTK_IS_WIDGET(self->overscale_chk))
+        gtk_widget_set_sensitive(self->overscale_chk,state);
 }
 
 GtkWidget * AppSettingsStream__create_ui(AppSettingsStream * self){

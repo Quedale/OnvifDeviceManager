@@ -15,14 +15,7 @@ static void error_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
   g_clear_error (&err);
   g_free (debug_info);
 
-  pthread_mutex_lock(data->player_lock);
-  if(GST_IS_ELEMENT(msg->src)){
-    if(GST_IS_ELEMENT(data->backpipe)){
-      gst_element_set_state (data->backpipe, GST_STATE_NULL);
-    }
-    gst_element_set_state (data->pipeline, GST_STATE_NULL);
-  }
-  pthread_mutex_unlock(data->player_lock);
+  RtspPlayer__stop(data);
 
   if(data->retry < 3 && data->playing == 1 && data->retry_callback){
     data->retry++;
