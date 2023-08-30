@@ -25,6 +25,8 @@ struct _Device {
   OnvifDevice * onvif_device;
   GtkWidget * image_handle;
   GtkWidget * profile_dropdown;
+
+  pthread_mutex_t * ref_lock;
   int profile_index;
   int selected;
 
@@ -46,9 +48,10 @@ void priv_Device__destroy(CObject * self){
 void _priv_Device__lookup_hostname(void * user_data){
     Device * device = (Device *) user_data;
     char * hostname;
-
+    printf("_priv_Device__lookup_hostname\n");
     if(!CObject__addref((CObject*)device)){
-        goto exit;
+        printf("WARN _priv_Device__lookup_hostname - invalid device\n");
+        return;
     }
 
     printf("NSLookup ... %s\n",device->onvif_device->ip);
@@ -69,7 +72,6 @@ void _priv_Device__lookup_hostname(void * user_data){
 
     printf("Retrieved hostname : %s\n",hostname);
 
-exit:
     CObject__unref((CObject*)device);
 }
 
@@ -86,11 +88,12 @@ void _priv_Device__load_thumbnail(void * user_data){
     Device * device = (Device *) user_data;
 
     if(!CObject__addref((CObject*)device)){
-        goto exit;
+        printf("WARN _priv_Device__load_thumbnail - invalid device #1\n");
+        return;
     }
     
     if(device->onvif_device->last_error == ONVIF_ERROR_NONE){
-        struct chunk * imgchunk = OnvifDevice__media_getSnapshot(device->onvif_device,device->profile_index);
+        struct chunk * imgchunk = OnvifDevice__media_getSnapshot(device->onvif_device,Device__get_selected_profile(device));
         if(!imgchunk){
             printf("Error retrieve snapshot.");
             goto warning;
@@ -108,6 +111,7 @@ void _priv_Device__load_thumbnail(void * user_data){
 
     //Check is device is still valid. (User performed scan before snapshot finished)
     if(!CObject__is_valid((CObject*)device)){
+        printf("WARN _priv_Device__load_thumbnail - invalid device #2\n");
         goto exit;
     }
 
@@ -125,6 +129,7 @@ void _priv_Device__load_thumbnail(void * user_data){
 warning:
     //Check is device is still valid. (User performed scan before snapshot finished)
     if(!CObject__is_valid((CObject*)device)){
+        printf("WARN _priv_Device__load_thumbnail - invalid device #3\n");
         goto exit;
     }
 
@@ -143,6 +148,7 @@ warning:
 
     //Check is device is still valid. (User performed scan before spinner showed)
     if(!CObject__is_valid((CObject*)device)){
+        printf("WARN _priv_Device__load_thumbnail - invalid device #4\n");
         goto exit;
     }
 
@@ -156,6 +162,7 @@ warning:
 
         //Check is device is still valid. (User performed scan before scale finished)
         if(!CObject__is_valid((CObject*)device)){
+            printf("WARN _priv_Device__load_thumbnail - invalid device #5\n");
             goto exit;
         }
 
@@ -179,19 +186,33 @@ exit:
 } 
 
 void priv_Device__profile_changed(GtkComboBox* self, Device * device){
+    pthread_mutex_lock(device->ref_lock);
     int new_index = gtk_combo_box_get_active(self);
+    if(new_index == -1){
+        new_index = 0; //Default to the first profile if nothing is available
+    }
+    
     if(new_index != device->profile_index){
         device->profile_index = new_index;
         if(device->profile_callback){
             device->profile_callback(device,device->profile_userdata);
         }
     }
+    pthread_mutex_unlock(device->ref_lock);
 }
 
 gboolean * gui_Device__display_profiles (void * user_data){
     Device * device = (Device *) user_data;
-    if(!CObject__addref((CObject*)device) || device->onvif_device->last_error == ONVIF_NOT_AUTHORIZED){
+    printf("gui_Device__display_profiles\n");
+
+    if(!CObject__addref((CObject*)device)){
+        printf("WARN gui_Device__display_profiles - invalid device\n");
         return FALSE;
+    }
+
+    if(device->onvif_device->last_error == ONVIF_NOT_AUTHORIZED){
+        printf("WARN gui_Device__display_profiles - unauthorized\n");
+        goto exit;
     }
     
     GtkListStore *liststore = GTK_LIST_STORE(gtk_combo_box_get_model(GTK_COMBO_BOX(device->profile_dropdown)));
@@ -207,6 +228,7 @@ gboolean * gui_Device__display_profiles (void * user_data){
     gtk_combo_box_set_active(GTK_COMBO_BOX(device->profile_dropdown),0);
     gtk_widget_set_sensitive (device->profile_dropdown, TRUE);
 
+exit:
     CObject__unref((CObject*)device);
     return FALSE;
 }
@@ -214,9 +236,16 @@ gboolean * gui_Device__display_profiles (void * user_data){
 //WIP Profile selection
 void _priv_Device__load_profiles(void * user_data){
     Device * device = (Device *) user_data;
+    printf("_priv_Device__load_profiles\n");
 
-    if(!CObject__addref((CObject*)device) || device->onvif_device->last_error == ONVIF_NOT_AUTHORIZED){
+    if(!CObject__addref((CObject*)device)){
+        printf("WARN _priv_Device__load_profiles - invalid object\n");
         return;
+    }
+
+    if(device->onvif_device->last_error == ONVIF_NOT_AUTHORIZED){
+        printf("WARN _priv_Device__load_profiles - unauthorized\n");
+        goto exit;
     }
 
     OnvifDevice_get_profiles(device->onvif_device);
@@ -224,6 +253,7 @@ void _priv_Device__load_profiles(void * user_data){
         gdk_threads_add_idle((void *)gui_Device__display_profiles,device);
     }
 
+exit:
     CObject__unref((CObject*)device);
 }
 
@@ -235,6 +265,8 @@ void Device__init(Device* self, OnvifDevice * onvif_device) {
     self->profile_index=0;
     self->profile_callback = NULL;
     self->profile_userdata = NULL;
+    self->ref_lock =malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init(self->ref_lock, NULL);
 }
 
 Device * Device__create(OnvifDevice * onvif_device){
@@ -330,7 +362,8 @@ void Device__set_profile_callback(Device * self, void (*profile_callback)(Device
 }
 
 void Device__load_profiles(Device* device, EventQueue * queue){
-    EventQueue__insert(queue,_priv_Device__load_profiles,device);
+    _priv_Device__load_profiles(device);
+    // EventQueue__insert(queue,_priv_Device__load_profiles,device);
 }
 
 OnvifDevice * Device__get_device(Device * self){
@@ -346,7 +379,11 @@ void Device__set_selected(Device * self, int selected){
 }
 
 int Device__get_selected_profile(Device * self){
-    return self->profile_index;
+    int ret = 0;
+    pthread_mutex_lock(self->ref_lock);
+    ret = self->profile_index;
+    pthread_mutex_unlock(self->ref_lock);
+    return ret;
 }
 
 void Device__set_thumbnail(Device * self, GtkWidget * image){

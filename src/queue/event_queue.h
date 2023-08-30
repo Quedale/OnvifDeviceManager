@@ -19,6 +19,7 @@ EventQueue* EventQueue__create(void (*queue_event_cb)(QueueThread * thread, Even
 
 void EventQueue__insert(EventQueue* queue, void (*callback)(), void * user_data);
 QueueEvent * EventQueue__pop(EventQueue* self);
+void EventQueue__clear(EventQueue * self);
 void EventQueue__start(EventQueue* self);
 void EventQueue__stop(EventQueue* self, int nthread);
 int EventQueue__get_running_event_count(EventQueue * self);

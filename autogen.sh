@@ -1016,7 +1016,7 @@ if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $gst_nv_ret != 0 ] || [ $EN
     # 
     ################################################################
     PATH=$PATH:$SUBPROJECT_DIR/gettext-0.21.1/dist/bin
-    if [ -z "$(checkProg name='gettextize' args='--version' path=$PATH)" ]; then
+    if [ -z "$(checkProg name='gettextize' args='--version' path=$PATH)" ] || [ -z "$(checkProg name='autopoint' args='--version' path=$PATH)" ]; then
       echo "not found gettext"
       downloadAndExtract file="gettext-0.21.1.tar.gz" path="https://ftp.gnu.org/pub/gnu/gettext/gettext-0.21.1.tar.gz"
       if [ $FAILED -eq 1 ]; then exit 1; fi
@@ -1088,10 +1088,7 @@ if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $gst_nv_ret != 0 ] || [ $EN
       python3 -c 'import jinja2'
       ret=$?
       if [ $ret != 0 ]; then
-        git -C jinja pull 2> /dev/null || git clone -b 3.1.2 https://github.com/pallets/jinja.git
-        cd jinja
-        python3 setup.py install
-        cd ..
+        python3 -m pip install jinja2
       else
         echo "python3 jinja2 already found."
       fi

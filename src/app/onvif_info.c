@@ -182,7 +182,11 @@ void _update_details_page(void * user_data){
     OnvifScopes * scopes = NULL;
 
     OnvifInfo * self = (OnvifInfo *) user_data;
-    if(!CObject__addref((CObject*)self->device) || !Device__is_selected(self->device)){
+    if(!CObject__addref((CObject*)self->device)){
+        return;
+    }
+
+    if(!Device__is_selected(self->device)){
         goto exit;
     }
 

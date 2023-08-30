@@ -134,6 +134,7 @@ void onvif_scan (GtkWidget *widget, OnvifApp * app) {
 
     //Clearing the list
     gtk_container_foreach (GTK_CONTAINER (app->listbox), (GtkCallback)gtk_widget_destroy, NULL);
+    EventQueue__clear(app->queue);
     CListTS__clear(app->device_list);
 
     //Start UDP Scan
@@ -180,11 +181,20 @@ void _stop_onvif_stream(void * user_data){
 
 void _display_onvif_device(void * user_data){
     struct DeviceInput * input = (struct DeviceInput *) user_data;
+    if(!CObject__addref((CObject*)input->device)){
+        free(input);
+        return;
+    }
+    
     OnvifDevice * odev = Device__get_device(input->device);
 
     /* Start by authenticating the device then start retrieve thumbnail */
     if(odev->last_error != ONVIF_ERROR_NONE)
         OnvifDevice_authenticate(odev);
+
+    if(!CObject__is_valid((CObject*)input->device) || odev->last_error != ONVIF_ERROR_NONE){
+        goto exit;
+    }
 
     /* Display Profile dropdown */
     if(!input->skip_profiles && odev->last_error == ONVIF_ERROR_NONE)
@@ -193,6 +203,8 @@ void _display_onvif_device(void * user_data){
     /* Display row thumbnail. Default to profile index 0 */
     Device__load_thumbnail(input->device,input->app->queue);
 
+exit:
+    CObject__unref((CObject*)input->device);
     free(input);
 }
 
@@ -213,11 +225,12 @@ void _play_onvif_stream(void * user_data){
 
     //Check if device is still valid. (User performed scan before thread started)
     if(!CObject__addref((CObject*)input->device)){
-        goto exit;
+        free(input);
+        return;
     }
 
     if(!Device__is_selected(input->device)){
-        return;
+        goto exit;
     }
 
     OnvifDevice * odev = Device__get_device(input->device);
@@ -265,12 +278,17 @@ exit:
 void update_pages(OnvifApp * self){
     //#0 NVT page already loaded
     //#2 Settings page already loaded
+    if(!CObject__addref((CObject*)self->device)){
+        return;
+    }
 
     //Details page is dynamically loaded
     if(self->current_page == 1){
         OnvifDetails__clear_details(self->details);
         OnvifDetails__update_details(self->details,self->device);
     }
+
+    CObject__unref((CObject*)self->device);
 }
 
 gboolean * gui_update_pages(void * user_data){
@@ -307,16 +325,19 @@ void _onvif_authentication_reload(void * user_data){
     AppDialogEvent * event = (AppDialogEvent *) user_data;
     struct DeviceInput * input = (struct DeviceInput *) event->user_data;
     Device * device = input->device;
+    printf("_onvif_authentication_reload\n");
     //Check device is still valid before adding ref (User performed scan before thread started)
     if(!CObject__addref((CObject*)device)){
-        goto exit;
+        printf("_onvif_authentication_reload - invalid device\n");
+        free(event);
+        return;
     }
 
     OnvifDevice_set_credentials(Device__get_device(device),CredentialsDialog__get_username((CredentialsDialog*)event->dialog),CredentialsDialog__get_password((CredentialsDialog*)event->dialog));
     if(onvif_reload_device(input)){
         free(input);//Successful login, dialog is gone, input is no longer needed.
     }
-exit:
+
     CObject__unref((CObject*)device);
     free(event);
 }

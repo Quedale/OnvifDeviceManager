@@ -8,14 +8,20 @@ typedef struct {
 
 gboolean * gui_update_widget_image_priv(void * user_data){
     ImageGUIUpdate * iguiu = (ImageGUIUpdate *) user_data;
+    printf("gui_update_widget_image_priv\n");
 
-    gtk_container_foreach (GTK_CONTAINER (iguiu->handle), (void*) gtk_widget_destroy, NULL);
-    if(iguiu->image){
-        gtk_container_add (GTK_CONTAINER (iguiu->handle), iguiu->image);
-        gtk_widget_show (iguiu->image);
+    if(GTK_IS_WIDGET(iguiu->handle)){
+        gtk_container_foreach (GTK_CONTAINER (iguiu->handle), (void*) gtk_widget_destroy, NULL);
+        if(iguiu->image){
+            gtk_container_add (GTK_CONTAINER (iguiu->handle), iguiu->image);
+            gtk_widget_show (iguiu->image);
+        }
+    } else {
+        printf("gui_update_widget_image_priv - invalid handle\n");
     }
+
     free(iguiu);
-    
+
     return FALSE;
 }
 

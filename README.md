@@ -14,10 +14,12 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - WS-Security
 - Support system and static libraries. (static recommended)
 - Support Multiple ONVIF Profiles
+- Tested H264, H265 and MJPEG stream
 
 # TODO
 - EventQueue : Interupt pending events when needed
-- Support MJPEG stream
+- Support for HTTPS cameras
+- Implement Logging framework
 - Credential Storage 
 - Edit Onvif device identification
 - Display Onvif network information

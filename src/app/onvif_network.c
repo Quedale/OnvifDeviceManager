@@ -44,7 +44,11 @@ gboolean * onvif_network_gui_update (void * user_data){
 
 void _update_network_page(void * user_data){
     OnvifNetwork * self = (OnvifNetwork *) user_data;
-    if(!CObject__addref((CObject*)self->device) || !Device__is_selected(self->device)){
+    if(!CObject__addref((CObject*)self->device)){
+        return;
+    }
+
+    if(!Device__is_selected(self->device)){
         goto exit;
     }
 

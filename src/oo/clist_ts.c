@@ -29,7 +29,7 @@ void priv_CListTS__remove(CListTS* self, int index){
     //Update counter
     self->count--;
     //Resize array memory
-    self->data = realloc (self->data,sizeof(void *)-self->count);
+    self->data = realloc (self->data,sizeof(void *)*self->count);
 }
 
 CObject * priv_CListTS__get(CListTS * self, int index){
