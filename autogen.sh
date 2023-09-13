@@ -943,7 +943,7 @@ fi
 ################################################################
 ALSA_PKG=$SUBPROJECT_DIR/alsa-lib/build/dist/lib/pkgconfig
 PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$ALSA_PKG \
-pkg-config --exists --print-errors "alsa >= 1.2.7.2"
+pkg-config --exists --print-errors "alsa >= 1.2.6.1"
 ret=$?
 if [ $ret != 0 ]; then
   echo "not found alsa"
