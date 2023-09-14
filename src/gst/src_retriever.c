@@ -4,6 +4,9 @@
 #include "src_retriever.h"
 #include "../alsa/alsa_utils.h"
 
+GST_DEBUG_CATEGORY_STATIC (ext_srcret_debug);
+#define GST_CAT_DEFAULT (ext_srcret_debug)
+
 int  
 test_audiosrc(char * srcname, char * device){
 
@@ -74,6 +77,8 @@ test_audiosrc(char * srcname, char * device){
 
 void
 retrieve_audiosrc(char * element, char * device){
+    GST_DEBUG_CATEGORY_INIT (ext_srcret_debug, "ext-srcret", 0, "Extension to support Alsa capabilities");
+
     int ret;
     ret = test_audiosrc("pulsesrc", NULL);
     if(ret){

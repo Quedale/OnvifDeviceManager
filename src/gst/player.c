@@ -794,7 +794,7 @@ void RtspPlayer__init(RtspPlayer* self) {
 
   //Automatically retrieve functional Gstreamer microphone element and alsa devie. 
   //TODO Support settings
-  char mic_element[13], mic_device[6];
+  char mic_element[13], mic_device[8];
   retrieve_audiosrc(mic_element,mic_device);
   if(strlen(mic_element) > 1){
     self->mic_element = malloc(strlen(mic_element)+1);
