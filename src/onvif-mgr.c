@@ -29,6 +29,8 @@ int main(int argc, char *argv[]) {
   gst_init (&argc, &argv);
   onvif_init_static_plugins();
 
+  gst_debug_set_threshold_for_name ("ext-gst-player", GST_LEVEL_DEBUG);
+  
   printf("Using Gstreamer Version : %i.%i.%i.%i\n",GST_PLUGINS_BASE_VERSION_MAJOR,GST_PLUGINS_BASE_VERSION_MINOR,GST_PLUGINS_BASE_VERSION_MICRO,GST_PLUGINS_BASE_VERSION_NANO);
   
   /* Initialize Application */

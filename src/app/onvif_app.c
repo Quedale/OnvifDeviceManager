@@ -192,7 +192,7 @@ void _display_onvif_device(void * user_data){
     if(odev->last_error != ONVIF_ERROR_NONE)
         OnvifDevice_authenticate(odev);
 
-    if(!CObject__is_valid((CObject*)input->device) || odev->last_error != ONVIF_ERROR_NONE){
+    if(!CObject__is_valid((CObject*)input->device)){
         goto exit;
     }
 
