@@ -3,30 +3,49 @@
 #include <math.h>
 #include "src_retriever.h"
 
+GST_DEBUG_CATEGORY_STATIC (ext_gst_player_debug);
+#define GST_CAT_DEFAULT (ext_gst_player_debug)
+
 /* This function is called when an error message is posted on the bus */
 static void error_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
   GError *err;
+  char * type;
   gchar *debug_info;
 
   /* Print error details on the screen */
-  gst_message_parse_error (msg, &err, &debug_info);
-  GST_ERROR ("Error received from element %s: %s\n", GST_OBJECT_NAME (msg->src), err->message);
-  GST_ERROR ("Debugging information: %s\n", debug_info ? debug_info : "none");
+  if (msg->type == GST_MESSAGE_ERROR){
+    gst_message_parse_error (msg, &err, &debug_info);
+    type = "Error";
+  } else {
+    gst_message_parse_warning (msg, &err, &debug_info);
+    type = "Warning";
+  }
+
+  if(err->code == GST_RESOURCE_ERROR_SETTINGS && data->enable_backchannel){
+    GST_WARNING ("Backchannel unsupported. Downgrading...");
+    data->enable_backchannel = 0;
+  }
+
+  GST_ERROR ("%s received from element %s: %s", type, GST_OBJECT_NAME (msg->src), err->message);
+  GST_ERROR ("Debugging information: %s", debug_info ? debug_info : "none");
   g_clear_error (&err);
   g_free (debug_info);
 
-  RtspPlayer__stop(data);
-
   if(data->retry < 3 && data->playing == 1 && data->retry_callback){
-    data->retry++;
-    printf("****************************************************\n");
-    printf("****************************************************\n");
-    printf("Retry attempt #%i\n",data->retry);
-    printf("****************************************************\n");
-    printf("****************************************************\n");
+    //Stopping player after if condition because "playing" gets reset
+    RtspPlayer__stop(data);
+    //Location was cleared after resetting the pipeline
+    g_object_set (G_OBJECT (data->src), "location", data->location, NULL);
+
+    data->playing = 1; //Set playing flag to allow retry
+    data->retry++; 
+    GST_WARNING("****************************************************\n");
+    GST_WARNING("Retry attempt #%i\n",data->retry);
+    GST_WARNING("****************************************************\n");
     //Retry signal
     (*(data->retry_callback))(data, data->retry_user_data);
   } else {
+    RtspPlayer__stop(data);
     //Error signal
     if(data->error_callback){
       (*(data->error_callback))(data, data->error_user_data);
@@ -169,21 +188,8 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
       eos_cb(bus,message,player);
       break;
     case GST_MESSAGE_ERROR:
-      error_cb(bus,message,player);
-      break;
     case GST_MESSAGE_WARNING:
-      printf("msg : GST_MESSAGE_WARNING\n");
-      GError *gerror;
-      gchar *debug;
-
-      if (message->type == GST_MESSAGE_ERROR)
-        gst_message_parse_error (message, &gerror, &debug);
-      else
-        gst_message_parse_warning (message, &gerror, &debug);
-
-      gst_object_default_error (GST_MESSAGE_SRC (message), gerror, debug);
-      g_error_free (gerror);
-      g_free (debug);
+      error_cb(bus,message,player);
       break;
     case GST_MESSAGE_INFO:
       printf("msg : GST_MESSAGE_INFO\n");
@@ -656,7 +662,7 @@ static void on_rtsp_pad_added (GstElement *element, GstPad *new_pad, RtspPlayer 
   // gchar * new_pad_type = gst_structure_get_name (new_pad_struct);
   // printf("caps_str : %s\n",caps_str);
 
-  if (payload_v == 96) {
+  if (payload_v == 96 || payload_v == 26) {
     data->pad_found = 1;
     data->no_video = 0;
     data->video_done = 0;
@@ -699,7 +705,7 @@ static void on_rtsp_pad_added (GstElement *element, GstPad *new_pad, RtspPlayer 
       GST_FIXME("Add support to other audio format...\n");
     }
   } else {
-    GST_FIXME("Support other payload formats\n");
+    GST_FIXME("Support other payload formats %i\n",payload_v);
   }
 
 exit:
@@ -712,7 +718,6 @@ exit:
 
 void create_pipeline(RtspPlayer *self){
 
-  self->retry = 0;
   self->playing = 0;
   self->audio_done = 0;
   self->no_audio = 1;
@@ -752,7 +757,7 @@ void create_pipeline(RtspPlayer *self){
   g_object_set (G_OBJECT (self->src), "buffer-mode", 3, NULL);
   g_object_set (G_OBJECT (self->src), "latency", 0, NULL);
   g_object_set (G_OBJECT (self->src), "teardown-timeout", 0, NULL); 
-  g_object_set (G_OBJECT (self->src), "backchannel", 1, NULL);
+  g_object_set (G_OBJECT (self->src), "backchannel", self->enable_backchannel, NULL);
   g_object_set (G_OBJECT (self->src), "user-agent", "OnvifDeviceManager-Linux-0.0", NULL);
   g_object_set (G_OBJECT (self->src), "do-retransmission", FALSE, NULL);
   g_object_set (G_OBJECT (self->src), "onvif-mode", TRUE, NULL);
@@ -767,6 +772,7 @@ void create_pipeline(RtspPlayer *self){
 
 void RtspPlayer__init(RtspPlayer* self) {
 
+  self->location = NULL;
   self->retry_user_data = NULL;
   self->retry_callback = NULL;
   self->error_user_data = NULL;
@@ -776,6 +782,7 @@ void RtspPlayer__init(RtspPlayer* self) {
   self->start_user_data = NULL;
   self->start_callback = NULL;
   self->level = 0;
+  self->enable_backchannel = 1;
   self->retry = 0;
   self->playing = 0;
   self->allow_overscale = 0;
@@ -820,10 +827,15 @@ void RtspPlayer__init(RtspPlayer* self) {
   }
 }
 
+int CLASS_INIT=0;
 RtspPlayer * RtspPlayer__create() {
-    RtspPlayer *result  =  (RtspPlayer *) malloc(sizeof(RtspPlayer));
-    RtspPlayer__init(result);
-    return result;
+  if(!CLASS_INIT){
+    CLASS_INIT =1;
+    GST_DEBUG_CATEGORY_INIT (ext_gst_player_debug, "ext-gst-player", 0, "Gstreamer Player");
+  }
+  RtspPlayer *result  =  (RtspPlayer *) malloc(sizeof(RtspPlayer));
+  RtspPlayer__init(result);
+  return result;
 }
 
 void RtspPlayer__destroy(RtspPlayer* self) {
@@ -853,6 +865,9 @@ void RtspPlayer__destroy(RtspPlayer* self) {
     }
     if(self->mic_device){
       free(self->mic_device);
+    }
+    if(self->location){
+      free(self->location);
     }
     pthread_mutex_destroy(self->player_lock);
     free(self->player_lock);
@@ -884,6 +899,14 @@ void RtspPlayer__set_retry_callback(RtspPlayer* self, void (*retry_callback)(Rts
 void RtspPlayer__set_playback_url(RtspPlayer* self, char *url) {
   pthread_mutex_lock(self->player_lock);
   printf("set location : %s\n",url);
+
+  if(!self->location){
+    self->location = malloc(strlen(url)+1);
+  } else {
+    self->location = realloc(self->location,strlen(url)+1);
+  }
+  strcpy(self->location,url);
+  
   g_object_set (G_OBJECT (self->src), "location", url, NULL);
   pthread_mutex_unlock(self->player_lock);
 }
@@ -953,7 +976,7 @@ unlock:
 
 void _RtspPlayer__play(RtspPlayer* self, int retry){
   pthread_mutex_lock(self->player_lock);
-  printf("RtspPlayer__play %i\n",retry);
+  printf("RtspPlayer__play retry[%i] - playing[%i]\n",retry,self->playing);
   if(retry && self->playing == 0){//Retry signal after stop requested
     goto exit;
   } else {
@@ -978,7 +1001,9 @@ exit:
 }
 
 void RtspPlayer__play(RtspPlayer* self){
-  _RtspPlayer__play(self,0);
+  self->retry = 0;
+  self->enable_backchannel = 1;//TODO Handle parameter input...
+  _RtspPlayer__play(self,self->retry);
 }
 
 void RtspPlayer__allow_overscale(RtspPlayer * self, int allow_overscale){
@@ -993,7 +1018,7 @@ Compared to play, retry is design to work after a stream failure.
 Stopping will essentially break the retry method and stop the loop.
 */
 void RtspPlayer__retry(RtspPlayer* self){
-  _RtspPlayer__play(self,1);
+  _RtspPlayer__play(self,self->retry);
 }
 
 GtkWidget * OnvifDevice__createCanvas(RtspPlayer *self){

@@ -19,7 +19,9 @@ typedef struct _RtspPlayer {
   int no_audio;
   int audio_done;
   
+  char * location;
   //Backpipe related properties
+  int enable_backchannel;
   GstElement *backpipe;
   GstElement *mic_volume_element;
   GstElement *appsink;

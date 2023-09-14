@@ -4,11 +4,11 @@
 #include "alsa_devices.h"
 #include <gst/gstinfo.h>
 
-GST_DEBUG_CATEGORY_STATIC (ext_alsa_debug);
-#define GST_CAT_DEFAULT (ext_alsa_debug)
+GST_DEBUG_CATEGORY_STATIC (ext_alsautils_debug);
+#define GST_CAT_DEFAULT (ext_alsautils_debug)
 
 AlsaDevices* get_alsa_device_list(snd_pcm_stream_t stream){
-    GST_DEBUG_CATEGORY_INIT (ext_alsa_debug, "ext-alsa", 0, "Extension to support Alsa capabilities");
+    GST_DEBUG_CATEGORY_INIT (ext_alsautils_debug, "ext-alsa-utils", 0, "Extension to support Alsa capabilities");
 
     AlsaDevices* list = AlsaDevices__create(); 
 
