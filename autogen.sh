@@ -755,6 +755,20 @@ fi
 
 ################################################################
 # 
+#    Build unzip for gsoap
+#       
+################################################################
+PATH=$SUBPROJECT_DIR/unzip60/build/dist/bin:$PATH
+if [ -z "$(checkProg name='unzip' args='-v' path=$PATH)" ]; then
+  # pullOrClone path="https://git.launchpad.net/ubuntu/+source/unzip" tag="applied/6.0-28"
+  downloadAndExtract file="unzip60.tar.gz" path="https://sourceforge.net/projects/infozip/files/UnZip%206.x%20%28latest%29/UnZip%206.0/unzip60.tar.gz/download"
+  if [ $FAILED -eq 1 ]; then exit 1; fi
+  buildMakeProject srcdir="unzip60" make="-f unix/Makefile generic" installargs="prefix=$SUBPROJECT_DIR/unzip60/build/dist MANDIR=$SUBPROJECT_DIR/unzip60/build/dist/share/man/man1 -f unix/Makefile"
+  if [ $FAILED -eq 1 ]; then exit 1; fi
+fi
+
+################################################################
+# 
 #    Build Openssl for gsoap, onvifdisco and onvifsoap
 #       
 ################################################################
