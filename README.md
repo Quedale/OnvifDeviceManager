@@ -17,6 +17,7 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Tested H264, H265 and MJPEG stream
 
 # TODO
+- Logging Framework
 - EventQueue : Interupt pending events when needed
 - Support for HTTPS cameras
 - Implement Logging framework

@@ -34,6 +34,11 @@ struct _Device {
   void * profile_userdata;
 };
 
+typedef struct {
+    Device * device;
+    OnvifProfiles * profiles;
+} GUIProfileEvent;
+
 void priv_Device__destroy(CObject * self);
 void priv_Device__profile_changed(GtkComboBox* self, Device * device);
 void _priv_Device__lookup_hostname(void * user_data);
@@ -44,20 +49,13 @@ gboolean * gui_Device__display_profiles (void * user_data);
 void priv_Device__destroy(CObject * self){
     OnvifDevice__destroy(((Device*)self)->onvif_device);
 }
-
-void _priv_Device__lookup_hostname(void * user_data){
-    Device * device = (Device *) user_data;
-    char * hostname;
-    printf("_priv_Device__lookup_hostname\n");
-    if(!CObject__addref((CObject*)device)){
-        printf("WARN _priv_Device__lookup_hostname - invalid device\n");
-        return;
-    }
-
-    printf("NSLookup ... %s\n",device->onvif_device->ip);
+int _priv_Device__lookup_hostname_netbios(Device * device, char * hostname){
+    char * dev_ip = OnvifDevice__get_ip(device->onvif_device);
+    printf("NetBIOS Lookup ... %s\n",dev_ip);
+    int ret;
     //Lookup hostname
     struct in_addr in_a;
-    inet_pton(AF_INET, device->onvif_device->ip, &in_a);
+    inet_pton(AF_INET, dev_ip, &in_a);
     struct hostent* host;
     host = gethostbyaddr( (const void*)&in_a, 
                         sizeof(struct in_addr), 
@@ -65,17 +63,64 @@ void _priv_Device__lookup_hostname(void * user_data){
     if(host){
         printf("Found hostname : %s\n",host->h_name);
         hostname = host->h_name;
+        ret = 1;
     } else {
         printf("Failed to get hostname ...\n");
         hostname = NULL;
     }
 
     printf("Retrieved hostname : %s\n",hostname);
+    free(dev_ip);
+    return ret;
+}
 
+int _priv_Device__lookup_hostname_dns(Device * device, char * hostname){
+    int ret = 0;
+    char servInfo[NI_MAXSERV];
+    memset(&servInfo,0,sizeof(servInfo));
+
+    char * dev_ip = OnvifDevice__get_ip(device->onvif_device);
+    printf("DNS Lookup ... %s\n",dev_ip);
+
+    struct sockaddr_in sa_in;
+    sa_in.sin_family = AF_INET;
+    sa_in.sin_addr.s_addr = inet_addr(dev_ip);
+    sa_in.sin_port = htons(25);
+
+    if (getnameinfo((struct sockaddr*) &sa_in, sizeof(struct sockaddr), hostname, sizeof(hostname),
+                servInfo, NI_MAXSERV, NI_NAMEREQD)){
+        printf("Failed to get hostname ...\n");
+    } else {
+        printf("Retrieved host=%s, serv=%s\n", hostname, servInfo);
+        ret = 1;
+    }
+
+
+    free(dev_ip);
+    return ret;
+}
+
+void _priv_Device__lookup_hostname(void * user_data){
+    Device * device = (Device *) user_data;
+    char hostname[NI_MAXHOST];
+    memset(&hostname,0,sizeof(hostname));
+    
+    printf("_priv_Device__lookup_hostname\n");
+    if(!CObject__addref((CObject*)device)){
+        printf("WARN _priv_Device__lookup_hostname - invalid device\n");
+        return;
+    }
+
+    if(!_priv_Device__lookup_hostname_dns(device,hostname)){
+        _priv_Device__lookup_hostname_netbios(device,hostname);
+    }
+
+    printf("_priv_Device__lookup_hostname - done\n");
     CObject__unref((CObject*)device);
 }
 
 void _priv_Device__load_thumbnail(void * user_data){
+    printf("_priv_Device__load_thumbnail\n");
     GtkWidget *image;
     GError *error = NULL;
     GdkPixbuf *pixbuf = NULL;
@@ -92,17 +137,18 @@ void _priv_Device__load_thumbnail(void * user_data){
         return;
     }
     
-    if(device->onvif_device->last_error == ONVIF_ERROR_NONE){
-        struct chunk * imgchunk = OnvifDevice__media_getSnapshot(device->onvif_device,Device__get_selected_profile(device));
+    OnvifErrorTypes oerror = OnvifDevice__get_last_error(device->onvif_device);
+    if(oerror == ONVIF_ERROR_NONE){
+        OnvifSnapshot * imgchunk = OnvifDevice__media_getSnapshot(device->onvif_device,Device__get_selected_profile(device));
         if(!imgchunk){
-            printf("Error retrieve snapshot.");
+            printf("_priv_Device__load_thumbnail- Error retrieve snapshot.");
             goto warning;
         }
-        imgdata = imgchunk->buffer;
-        size = imgchunk->size;
+        imgdata = OnvifSnapshot__get_buffer(imgchunk);
+        size = OnvifSnapshot__get_size(imgchunk);
         freeimgdata = 1;
         free(imgchunk);
-    } else if(device->onvif_device->last_error == ONVIF_NOT_AUTHORIZED){
+    } else if(oerror == ONVIF_NOT_AUTHORIZED){
         imgdata = _binary_locked_icon_png_start;
         size = _binary_locked_icon_png_end - _binary_locked_icon_png_start;
     } else {
@@ -182,6 +228,8 @@ exit:
     if(freeimgdata){
         free(imgdata);
     }
+
+    printf("_priv_Device__load_thumbnail done.\n");
     CObject__unref((CObject*)device);
 } 
 
@@ -202,34 +250,39 @@ void priv_Device__profile_changed(GtkComboBox* self, Device * device){
 }
 
 gboolean * gui_Device__display_profiles (void * user_data){
-    Device * device = (Device *) user_data;
+    GUIProfileEvent * evt = (GUIProfileEvent *) user_data;
     printf("gui_Device__display_profiles\n");
 
-    if(!CObject__addref((CObject*)device)){
+    if(!CObject__addref((CObject*)evt->device)){
         printf("WARN gui_Device__display_profiles - invalid device\n");
         return FALSE;
     }
 
-    if(device->onvif_device->last_error == ONVIF_NOT_AUTHORIZED){
+    if(OnvifDevice__get_last_error(evt->device->onvif_device) == ONVIF_NOT_AUTHORIZED){
         printf("WARN gui_Device__display_profiles - unauthorized\n");
         goto exit;
     }
     
-    GtkListStore *liststore = GTK_LIST_STORE(gtk_combo_box_get_model(GTK_COMBO_BOX(device->profile_dropdown)));
-    for (int i = 0; i < device->onvif_device->sizeSrofiles; i++){
-        printf("Profile name: %s\n", device->onvif_device->profiles[i].name);
-        printf("Profile token: %s\n", device->onvif_device->profiles[i].token);
+    GtkListStore *liststore = GTK_LIST_STORE(gtk_combo_box_get_model(GTK_COMBO_BOX(evt->device->profile_dropdown)));
+    for (int i = 0; i < OnvifProfiles__get_size(evt->profiles); i++){
+        OnvifProfile * profile = OnvifProfiles__get_profile(evt->profiles,i);
+        char * name = OnvifProfile__get_name(profile);
+        char * token = OnvifProfile__get_token(profile);
+        printf("Profile name: %s\n", name);
+        printf("Profile token: %s\n", token);
 
         gtk_list_store_insert_with_values(liststore, NULL, -1,
                                         // 0, "red",
-                                        1, device->onvif_device->profiles[i].name,
+                                        1, name,
                                         -1);
     }
-    gtk_combo_box_set_active(GTK_COMBO_BOX(device->profile_dropdown),0);
-    gtk_widget_set_sensitive (device->profile_dropdown, TRUE);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(evt->device->profile_dropdown),0);
+    gtk_widget_set_sensitive (evt->device->profile_dropdown, TRUE);
 
 exit:
-    CObject__unref((CObject*)device);
+    OnvifProfiles__destroy(evt->profiles);
+    CObject__unref((CObject*)evt->device);
+    free(evt);
     return FALSE;
 }
 
@@ -243,17 +296,23 @@ void _priv_Device__load_profiles(void * user_data){
         return;
     }
 
-    if(device->onvif_device->last_error == ONVIF_NOT_AUTHORIZED){
+    if(OnvifDevice__get_last_error(device->onvif_device) == ONVIF_NOT_AUTHORIZED){
         printf("WARN _priv_Device__load_profiles - unauthorized\n");
         goto exit;
     }
 
-    OnvifDevice_get_profiles(device->onvif_device);
-    if(CObject__is_valid((CObject*)device) && device->onvif_device->last_error == ONVIF_ERROR_NONE){
-        gdk_threads_add_idle((void *)gui_Device__display_profiles,device);
+    OnvifProfiles * profiles = OnvifDevice__get_profiles(device->onvif_device);
+    if(CObject__is_valid((CObject*)device) && OnvifDevice__get_last_error(device->onvif_device) == ONVIF_ERROR_NONE){
+        GUIProfileEvent * evt = malloc(sizeof(GUIProfileEvent));
+        evt->device = device;
+        evt->profiles = profiles;
+        gdk_threads_add_idle((void *)gui_Device__display_profiles,evt);
+    } else {
+        OnvifProfiles__destroy(profiles);
     }
 
 exit:
+    printf("_priv_Device__load_profiles - Done\n");
     CObject__unref((CObject*)device);
 }
 
@@ -276,10 +335,12 @@ Device * Device__create(OnvifDevice * onvif_device){
 }
 
 void Device__lookup_hostname(Device* device, EventQueue * queue){
+    printf("Device__lookup_hostname\n");
     EventQueue__insert(queue,_priv_Device__lookup_hostname,device);
 }
 
 void Device__load_thumbnail(Device* device, EventQueue * queue){
+    printf("Device__load_thumbnail\n");
     EventQueue__insert(queue,_priv_Device__load_thumbnail,device);
 }
 
@@ -303,7 +364,7 @@ GtkWidget * Device__create_row (Device * device, char * uri, char* name, char * 
     g_object_set (thumbnail_handle, "margin-end", 10, NULL);
     gtk_grid_attach (GTK_GRID (grid), thumbnail_handle, 0, 1, 1, 3);
 
-    char* markup_name = malloc(strlen(name)+1+7);
+    char* markup_name = malloc(strlen("<b>") + strlen(name) + strlen("</b>") +1);
     strcpy(markup_name, "<b>");
     strcat(markup_name, name);
     strcat(markup_name, "</b>");
@@ -313,10 +374,12 @@ GtkWidget * Device__create_row (Device * device, char * uri, char* name, char * 
     gtk_widget_set_hexpand (label, TRUE);
     gtk_grid_attach (GTK_GRID (grid), label, 0, 0, 2, 1);
 
-    label = gtk_label_new (device->onvif_device->ip);
+    char * dev_ip = OnvifDevice__get_ip(device->onvif_device);
+    label = gtk_label_new (dev_ip);
     g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
     gtk_widget_set_hexpand (label, TRUE);
     gtk_grid_attach (GTK_GRID (grid), label, 1, 1, 1, 1);
+    free(dev_ip);
 
     label = gtk_label_new (hardware);
     g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
@@ -362,8 +425,8 @@ void Device__set_profile_callback(Device * self, void (*profile_callback)(Device
 }
 
 void Device__load_profiles(Device* device, EventQueue * queue){
-    _priv_Device__load_profiles(device);
-    // EventQueue__insert(queue,_priv_Device__load_profiles,device);
+    printf("Device__load_profiles\n");
+    EventQueue__insert(queue,_priv_Device__load_profiles,device);
 }
 
 OnvifDevice * Device__get_device(Device * self){

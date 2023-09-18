@@ -50,14 +50,14 @@ void AlsaDevices__remove_element(AlsaDevices * self, int index){
     AlsaDevices__remove_element_and_shift(self, index);  /* First shift the elements, then reallocate */
 
     //Resize array memory
-    self->devices = realloc (self->devices,sizeof(AlsaDevice) * self->count);
+    self->devices = realloc (self->devices,sizeof(AlsaDevice *) * self->count);
 }
 
 void AlsaDevices__insert_element(AlsaDevices* self, AlsaDevice * record, int index)
 {   
     int i;
     self->count++;
-    self->devices = realloc (self->devices,sizeof (AlsaDevice) * (self->count));
+    self->devices = realloc (self->devices,sizeof (AlsaDevice *) * (self->count));
     for(i=self->count; i> index; i--){
         self->devices[i] = self->devices[i-1];
     }

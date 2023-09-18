@@ -237,7 +237,7 @@ main (int argc, char *argv[])
     gst_rtsp_media_factory_set_media_gtype (factory, GST_TYPE_RTSP_ONVIF_MEDIA);
 
 
-    char * mount = malloc(strlen(arguments.mount)+2);
+    char * mount = malloc(strlen(arguments.mount) + strlen("/") + +1);
     strcpy(mount,"/");
     strcat(mount,arguments.mount);
     /* attach the test factory to the /test url */

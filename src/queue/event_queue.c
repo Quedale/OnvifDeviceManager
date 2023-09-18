@@ -127,6 +127,7 @@ void EventQueue__clear(EventQueue* self){
 }
 
 void EventQueue__insert(EventQueue* queue, void (*callback)(), void * user_data){
+    printf("EventQueue__insert\n");
     if(!CObject__is_valid((CObject*)queue)){
         return;//Stop accepting events
     }
@@ -134,9 +135,12 @@ void EventQueue__insert(EventQueue* queue, void (*callback)(), void * user_data)
     QueueEvent * record = QueueEvent__create(callback,user_data);
     CListTS__add(&queue->events,(CObject*)record);
     pthread_cond_signal(&queue->sleep_cond);
+
+    printf("EventQueue__insert - done\n");
 };
 
 QueueEvent * EventQueue__pop(EventQueue* self){
+    printf("EventQueue__pop\n");
     return (QueueEvent*) CListTS__pop(&self->events);
 };
 
@@ -158,6 +162,7 @@ void EventQueue__wait_condition(EventQueue * self, pthread_mutex_t * lock){
 }
 
 void EventQueue_notify_dispatching(EventQueue * self, QueueThread * thread){
+    printf("Dispatching event...\n");
     priv_EventQueue__running_event_change(self,1);
     if(self->queue_event_cb){
         self->queue_event_cb(thread,EVENTQUEUE_DISPATCHING,self->user_data);
@@ -165,6 +170,7 @@ void EventQueue_notify_dispatching(EventQueue * self, QueueThread * thread){
 }
 
 void EventQueue_notify_dispatched(EventQueue * self,  QueueThread * thread){
+    printf("Dispatched event...\n");
     priv_EventQueue__running_event_change(self,0);
     if(self->queue_event_cb){
         self->queue_event_cb(thread,EVENTQUEUE_DISPATCHED,self->user_data);

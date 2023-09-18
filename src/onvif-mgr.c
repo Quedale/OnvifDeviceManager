@@ -20,7 +20,11 @@ void handler(int sig) {
 }
 
 int main(int argc, char *argv[]) {
-  signal(SIGSEGV, handler);   // install our handler
+  // signal(SIGSEGV, handler);   // install our handler
+
+  // make OpenSSL MT-safe with mutex
+  // CRYPTO_thread_setup();
+  
 
   /* Initialize GTK */
   gtk_init (&argc, &argv);
