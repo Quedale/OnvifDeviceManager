@@ -63,6 +63,7 @@ void RtspPlayer__set_stopped_callback(RtspPlayer* self, void (*stopped_callback)
 void RtspPlayer__set_start_callback(RtspPlayer* self, void (*start_callback)(RtspPlayer *, void *), void * user_data);
 void RtspPlayer__allow_overscale(RtspPlayer * self, int allow_overscale);
 void RtspPlayer__set_playback_url(RtspPlayer* self, char *url);
+void RtspPlayer__set_credentials(RtspPlayer * self, char * user, char * name);
 void RtspPlayer__stop(RtspPlayer* self);
 void RtspPlayer__play(RtspPlayer* self);
 

@@ -24,6 +24,10 @@ static void error_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
   if(err->code == GST_RESOURCE_ERROR_SETTINGS && data->enable_backchannel){
     GST_WARNING ("Backchannel unsupported. Downgrading...");
     data->enable_backchannel = 0;
+  } else if(err->code == GST_RESOURCE_ERROR_NOT_AUTHORIZED ||
+      err->code == GST_RESOURCE_ERROR_NOT_FOUND){
+    GST_ERROR("Non-recoverable error encountered.");
+    RtspPlayer__stop(data);
   }
 
   GST_ERROR ("%s received from element %s: %s", type, GST_OBJECT_NAME (msg->src), err->message);
@@ -796,6 +800,7 @@ void RtspPlayer__init(RtspPlayer* self) {
   self->audio_bin = NULL;
   self->sink = NULL;
   self->appsink = NULL;
+  self->src = NULL;
 
   pthread_mutex_init(self->player_lock, NULL);
 
@@ -909,6 +914,13 @@ void RtspPlayer__set_playback_url(RtspPlayer* self, char *url) {
   
   g_object_set (G_OBJECT (self->src), "location", url, NULL);
   pthread_mutex_unlock(self->player_lock);
+}
+
+void RtspPlayer__set_credentials(RtspPlayer * self, char * user, char * pass){
+  if(self && self->src){
+    g_object_set (G_OBJECT (self->src), "user-id", user, NULL);
+    g_object_set (G_OBJECT (self->src), "user-pw", pass, NULL);
+  }
 }
 
 void RtspPlayer__stop(RtspPlayer* self){

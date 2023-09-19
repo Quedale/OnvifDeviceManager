@@ -260,6 +260,8 @@ void _play_onvif_stream(void * user_data){
 
     if(CObject__is_valid((CObject*)input->device) && OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NONE){
         RtspPlayer__set_playback_url(input->app->player,uri);
+        OnvifCredentials * ocreds = OnvifDevice__get_credentials(odev);
+        RtspPlayer__set_credentials(input->app->player, OnvifCredentials__get_username(ocreds), OnvifCredentials__get_password(ocreds));
     }
     free(uri);
 

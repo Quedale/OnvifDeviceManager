@@ -217,7 +217,7 @@ pullOrClone (){
 #
 ############################################
 buildMakeProject(){
-  local srcdir prefix autogen autoreconf configure make cmakedir cmakeargs installargs bootstrap configcustom
+  local srcdir prefix autogen autoreconf configure make cmakedir cmakeargs installargs bootstrap configcustom outoftree
   local "${@}"
 
   build_start=$SECONDS
@@ -237,15 +237,23 @@ buildMakeProject(){
   curr_dir=$(pwd)
   cd ${srcdir}
 
-  if [ -f "./bootstrap" ]; then
+  rel_path="."
+  if [ "${outoftree}" == "true" ] 
+  then
+    mkdir -p build
+    cd build
+    rel_path=".."
+  fi
+
+  if [ -f "$rel_path/bootstrap" ]; then
     printf "${ORANGE}*****************************\n${NC}"
     printf "${ORANGE}*** bootstrap ${srcdir} ***\n${NC}"
     printf "${ORANGE}*****************************\n${NC}"
-    ./bootstrap ${bootstrap}
+    $rel_path/bootstrap ${bootstrap}
     status=$?
     if [ $status -ne 0 ]; then
         printf "${RED}*****************************\n${NC}"
-        printf "${RED}*** ./bootstrap failed ${srcdir} ***\n${NC}"
+        printf "${RED}*** $rel_path/bootstrap failed ${srcdir} ***\n${NC}"
         printf "${RED}*****************************\n${NC}"
         FAILED=1
         cd $curr_dir
@@ -253,26 +261,26 @@ buildMakeProject(){
     fi
   fi
 
-  if [ -f "./bootstrap.sh" ]; then
+  if [ -f "$rel_path/bootstrap.sh" ]; then
     printf "${ORANGE}*****************************\n${NC}"
     printf "${ORANGE}*** bootstrap.sh ${srcdir} ***\n${NC}"
     printf "${ORANGE}*****************************\n${NC}"
-    ./bootstrap.sh ${bootstrap}
+    $rel_path/bootstrap.sh ${bootstrap}
     status=$?
     if [ $status -ne 0 ]; then
         printf "${RED}*****************************\n${NC}"
-        printf "${RED}*** ./bootstrap.sh failed ${srcdir} ***\n${NC}"
+        printf "${RED}*** $rel_path/bootstrap.sh failed ${srcdir} ***\n${NC}"
         printf "${RED}*****************************\n${NC}"
         FAILED=1
         cd $curr_dir
         return
     fi
   fi
-  if [ -f "./autogen.sh" ] && [ "${autogen}" != "skip" ]; then
+  if [ -f "$rel_path/autogen.sh" ] && [ "${autogen}" != "skip" ]; then
     printf "${ORANGE}*****************************\n${NC}"
     printf "${ORANGE}*** autogen ${srcdir} ***\n${NC}"
     printf "${ORANGE}*****************************\n${NC}"
-    ./autogen.sh ${autogen}
+    $rel_path/autogen.sh ${autogen}
     status=$?
     if [ $status -ne 0 ]; then
         printf "${RED}*****************************\n${NC}"
@@ -338,17 +346,17 @@ buildMakeProject(){
     fi
   fi
 
-  if [ -f "./configure" ]; then
+  if [ -f "$rel_path/configure" ]; then
     printf "${ORANGE}*****************************\n${NC}"
     printf "${ORANGE}*** configure ${srcdir} ***\n${NC}"
     printf "${ORANGE}*****************************\n${NC}"
-    ./configure \
+    $rel_path/configure \
         --prefix=${prefix} \
         ${configure}
     status=$?
     if [ $status -ne 0 ]; then
       printf "${RED}*****************************\n${NC}"
-      printf "${RED}*** ./configure failed ${srcdir} ***\n${NC}"
+      printf "${RED}*** $rel_path/configure failed ${srcdir} ***\n${NC}"
       printf "${RED}*****************************\n${NC}"
       FAILED=1
       cd $curr_dir
@@ -895,7 +903,7 @@ if [ $ret != 0 ]; then
   GSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8 \
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG \
   C_INCLUDE_PATH="$(pkg-config --variable=includedir openssl):$(pkg-config --variable=includedir zlib):$C_INCLUDE_PATH" \
-  buildMakeProject srcdir="OnvifDiscoveryLib" prefix="$SUBPROJECT_DIR/OnvifDiscoveryLib/build/dist" bootstrap="--skip-gsoap $skipwsdl"
+  buildMakeProject srcdir="OnvifDiscoveryLib" prefix="$SUBPROJECT_DIR/OnvifDiscoveryLib/build/dist" bootstrap="--skip-gsoap $skipwsdl" outoftree=true
   if [ $FAILED -eq 1 ]; then exit 1; fi
 else
   echo "onvifdisco already found."
@@ -943,7 +951,7 @@ if [ $ret != 0 ]; then
   GSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8 \
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG \
   C_INCLUDE_PATH="$(pkg-config --variable=includedir openssl):$(pkg-config --variable=includedir zlib):$C_INCLUDE_PATH" \
-  buildMakeProject srcdir="OnvifSoapLib" prefix="$SUBPROJECT_DIR/OnvifSoapLib/build/dist" bootstrap="--skip-gsoap $skipwsdl"
+  buildMakeProject srcdir="OnvifSoapLib" prefix="$SUBPROJECT_DIR/OnvifSoapLib/build/dist" bootstrap="--skip-gsoap $skipwsdl" outoftree=true
   if [ $FAILED -eq 1 ]; then exit 1; fi
 else
   echo "onvifsoaplib already found."
