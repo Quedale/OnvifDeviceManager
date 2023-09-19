@@ -195,23 +195,24 @@ void _update_details_page(void * user_data){
     int gnetwork_success = 0;
     int gscopes_success = 0;
     OnvifDevice * onvif_device = Device__get_device(self->device);
+    OnvifDeviceService * devserv = OnvifDevice__get_device_service(onvif_device);
 
-    hostname = OnvifDevice__device_getHostname(onvif_device);
+    hostname = OnvifDeviceService__getHostname(devserv);
     if(OnvifDevice__get_last_error(onvif_device) == ONVIF_ERROR_NONE) ghostname_success = 1;
     if(!CObject__is_valid((CObject*)self->device) || !Device__is_selected(self->device))
         goto exit;
 
-    dev_info = OnvifDevice__device_getDeviceInformation(onvif_device);
+    dev_info = OnvifDeviceService__getDeviceInformation(devserv);
     if(OnvifDevice__get_last_error(onvif_device) == ONVIF_ERROR_NONE) ginfo_success = 1;
     if(!CObject__is_valid((CObject*)self->device) || !Device__is_selected(self->device))
         goto exit;
 
-    interfaces = OnvifDevice__device_getNetworkInterfaces(onvif_device);
+    interfaces = OnvifDeviceService__getNetworkInterfaces(devserv);
     if(OnvifDevice__get_last_error(onvif_device) == ONVIF_ERROR_NONE) gnetwork_success = 1;
     if(!CObject__is_valid((CObject*)self->device) || !Device__is_selected(self->device))
         goto exit;
 
-    scopes = OnvifDevice__device_getScopes(onvif_device);
+    scopes = OnvifDeviceService__getScopes(devserv);
     if(OnvifDevice__get_last_error(onvif_device) == ONVIF_ERROR_NONE) gscopes_success = 1;
     if(!CObject__is_valid((CObject*)self->device) || !Device__is_selected(self->device))
         goto exit;
@@ -293,7 +294,7 @@ void _update_details_page(void * user_data){
     gui_update->version = malloc(strlen("SomeName")+1);
     strcpy(gui_update->version,"SomeName");
 
-    gui_update->uri = OnvifDevice__get_device_endpoint(onvif_device);
+    gui_update->uri = OnvifDeviceService__get_endpoint(devserv);
 
     gdk_threads_add_idle((void *)onvif_info_gui_update,gui_update);
 exit:

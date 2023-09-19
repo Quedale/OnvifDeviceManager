@@ -962,7 +962,7 @@ ret=$?
 if [ $ret != 0 ]; then
   echo "not found alsa"
   pullOrClone path=git://git.alsa-project.org/alsa-lib.git tag=v1.2.8
-  # buildMakeProject srcdir="alsa-lib" prefix="$SUBPROJECT_DIR/alsa-lib/build/dist" configure="--enable-pic --enable-static=yes --enable-shared=no" autoreconf="-vif"
+  if [ $FAILED -eq 1 ]; then exit 1; fi
   buildMakeProject srcdir="alsa-lib" prefix="$SUBPROJECT_DIR/alsa-lib/build/dist" configure="--enable-static=no --enable-shared=yes" autoreconf="-vif"
   if [ $FAILED -eq 1 ]; then exit 1; fi
 else
@@ -983,7 +983,7 @@ gst_libav_ret=0
 gst_plg_base=0
 gst_plg_good=0
 gst_plg_bad=0
-GSTREAMER_LATEST=1.22.4
+GSTREAMER_LATEST=1.22.5
 
 pkg-config --exists --print-errors "gstreamer-1.0 >= 1.14.4"
 gst_ret=$?

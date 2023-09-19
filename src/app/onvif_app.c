@@ -100,7 +100,8 @@ static int device_already_found(OnvifApp * app, char * xaddr){
     for (b=0;b<app->device_list->count;b++){
         Device * dev = (Device *) app->device_list->data[b];
         OnvifDevice * odev = Device__get_device(dev);
-        char * endpoint = OnvifDevice__get_device_endpoint(odev);
+        OnvifDeviceService * devserv = OnvifDevice__get_device_service(odev);
+        char * endpoint = OnvifDeviceService__get_endpoint(devserv);
         if(!strcmp(xaddr,endpoint)){
             printf("Record already part of list [%s]\n",endpoint);
             ret = 1;
@@ -250,7 +251,8 @@ void _play_onvif_stream(void * user_data){
     }
 
     /* Set the URI to play */
-    char * uri = OnvifDevice__media_getStreamUri(odev,Device__get_selected_profile(input->device));
+    OnvifMediaService * media_service = OnvifDevice__get_media_service(odev);
+    char * uri = OnvifMediaService__getStreamUri(media_service,Device__get_selected_profile(input->device));
     if(!uri){
         stopped_onvif_stream(input->app->player,input->app);
         goto exit;
@@ -439,7 +441,8 @@ void _onvif_authentication_add(void * user_data){
         goto exit;
     }
 
-    OnvifScopes * scopes = OnvifDevice__device_getScopes(input->device);
+    OnvifDeviceService * devserv = OnvifDevice__get_device_service(input->device);
+    OnvifScopes * scopes = OnvifDeviceService__getScopes(devserv);
 
     GUIScopeInput * guiscope = malloc(sizeof(GUIScopeInput));
     guiscope->app = input->app;
@@ -501,7 +504,8 @@ void _onvif_device_add(void * user_data){
         goto exit;
     } else if(oerror == ONVIF_ERROR_NONE) {
         //Extract scope
-        OnvifScopes * scopes = OnvifDevice__device_getScopes(onvif_dev);
+        OnvifDeviceService * devserv = OnvifDevice__get_device_service(onvif_dev);
+        OnvifScopes * scopes = OnvifDeviceService__getScopes(devserv);
         GUIScopeInput * guiscope = malloc(sizeof(GUIScopeInput));
         guiscope->app = (OnvifApp *) event->user_data;
         guiscope->device = onvif_dev;
@@ -841,7 +845,9 @@ void add_device(OnvifApp * self, OnvifDevice * onvif_dev, char* name, char * har
         free(dev_port);
     }
 
-    char * endpoint = OnvifDevice__get_device_endpoint(onvif_dev);
+    OnvifDeviceService * devserv = OnvifDevice__get_device_service(onvif_dev);
+    char * endpoint = OnvifDeviceService__get_endpoint(devserv);
+
     GtkWidget * row = Device__create_row(device, endpoint, name, hardware, location);
     free(endpoint);
 

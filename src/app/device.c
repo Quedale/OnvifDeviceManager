@@ -1,7 +1,6 @@
 
 #include <stddef.h>
 #include <stdio.h>
-#include "client.h"
 #include "device.h"
 #include "gui_utils.h"
 #include <netdb.h>
@@ -127,7 +126,7 @@ void _priv_Device__load_thumbnail(void * user_data){
     GdkPixbuf *scaled_pixbuf = NULL;
     double size = -1;
     char * imgdata = NULL;
-    int freeimgdata = 0;
+    OnvifSnapshot * snapshot = NULL;
     GdkPixbufLoader *loader = gdk_pixbuf_loader_new ();
 
     Device * device = (Device *) user_data;
@@ -139,15 +138,14 @@ void _priv_Device__load_thumbnail(void * user_data){
     
     OnvifErrorTypes oerror = OnvifDevice__get_last_error(device->onvif_device);
     if(oerror == ONVIF_ERROR_NONE){
-        OnvifSnapshot * imgchunk = OnvifDevice__media_getSnapshot(device->onvif_device,Device__get_selected_profile(device));
-        if(!imgchunk){
+        OnvifMediaService * media_service = OnvifDevice__get_media_service(device->onvif_device);
+        snapshot = OnvifMediaService__getSnapshot(media_service,Device__get_selected_profile(device));
+        if(!snapshot){
             printf("_priv_Device__load_thumbnail- Error retrieve snapshot.");
             goto warning;
         }
-        imgdata = OnvifSnapshot__get_buffer(imgchunk);
-        size = OnvifSnapshot__get_size(imgchunk);
-        freeimgdata = 1;
-        free(imgchunk);
+        imgdata = OnvifSnapshot__get_buffer(snapshot);
+        size = OnvifSnapshot__get_size(snapshot);
     } else if(oerror == ONVIF_NOT_AUTHORIZED){
         imgdata = _binary_locked_icon_png_start;
         size = _binary_locked_icon_png_end - _binary_locked_icon_png_start;
@@ -225,9 +223,7 @@ exit:
     if(scaled_pixbuf){
         g_object_unref(scaled_pixbuf);
     }
-    if(freeimgdata){
-        free(imgdata);
-    }
+    OnvifSnapshot__destroy(snapshot);
 
     printf("_priv_Device__load_thumbnail done.\n");
     CObject__unref((CObject*)device);
@@ -301,7 +297,8 @@ void _priv_Device__load_profiles(void * user_data){
         goto exit;
     }
 
-    OnvifProfiles * profiles = OnvifDevice__get_profiles(device->onvif_device);
+    OnvifMediaService * media_service = OnvifDevice__get_media_service(device->onvif_device);
+    OnvifProfiles * profiles = OnvifMediaService__get_profiles(media_service);
     if(CObject__is_valid((CObject*)device) && OnvifDevice__get_last_error(device->onvif_device) == ONVIF_ERROR_NONE){
         GUIProfileEvent * evt = malloc(sizeof(GUIProfileEvent));
         evt->device = device;
