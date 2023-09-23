@@ -326,6 +326,9 @@ buildMakeProject(){
       printf "${RED}*****************************\n${NC}"
       printf "${RED}*** CMake failed ${srcdir} ***\n${NC}"
       printf "${RED}*****************************\n${NC}"
+      FAILED=1
+      cd $curr_dir
+      return
     fi
   fi
 
@@ -346,7 +349,7 @@ buildMakeProject(){
     fi
   fi
 
-  if [ -f "$rel_path/configure" ]; then
+  if [ -f "$rel_path/configure" ] && [ -z "${cmakedir}" ]; then
     printf "${ORANGE}*****************************\n${NC}"
     printf "${ORANGE}*** configure ${srcdir} ***\n${NC}"
     printf "${ORANGE}*****************************\n${NC}"
@@ -899,6 +902,7 @@ fi
 if [ $ret != 0 ]; then
   echo "-- Bootrap OnvifDiscoveryLib  --"
   pullOrClone path=https://github.com/Quedale/OnvifDiscoveryLib.git ignorecache="true"
+  if [ $FAILED -eq 1 ]; then exit 1; fi
   PATH=$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin:$PATH \
   GSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8 \
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG \
@@ -947,11 +951,12 @@ fi
 if [ $ret != 0 ]; then
   echo "-- Bootstrap OnvifSoapLib  --"
   pullOrClone path=https://github.com/Quedale/OnvifSoapLib.git ignorecache="true"
+  if [ $FAILED -eq 1 ]; then exit 1; fi
   PATH=$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin:$PATH \
   GSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8 \
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG \
   C_INCLUDE_PATH="$(pkg-config --variable=includedir openssl):$(pkg-config --variable=includedir zlib):$C_INCLUDE_PATH" \
-  buildMakeProject srcdir="OnvifSoapLib" prefix="$SUBPROJECT_DIR/OnvifSoapLib/build/dist" bootstrap="--skip-gsoap $skipwsdl" outoftree=true
+  buildMakeProject srcdir="OnvifSoapLib" prefix="$SUBPROJECT_DIR/OnvifSoapLib/build/dist" cmakedir=".." bootstrap="--skip-gsoap $skipwsdl" outoftree=true
   if [ $FAILED -eq 1 ]; then exit 1; fi
 else
   echo "onvifsoaplib already found."

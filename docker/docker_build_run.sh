@@ -1,3 +1,5 @@
+#!/bin/bash
+
 #Build Dockerfile
 docker build -t onvifmgr_container "$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)"
 

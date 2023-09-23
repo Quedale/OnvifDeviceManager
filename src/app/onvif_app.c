@@ -133,7 +133,7 @@ static gboolean * found_server (void * e) {
 }
 
 void onvif_scan (GtkWidget *widget, OnvifApp * app) {
-
+    printf("Starting ONVIF Devices Network Discovery...\n");
     gtk_widget_set_sensitive(widget,FALSE);
 
     //Clearing the list
@@ -194,7 +194,7 @@ void _display_onvif_device(void * user_data){
 
     /* Start by authenticating the device then start retrieve thumbnail */
     if(OnvifDevice__get_last_error(odev) != ONVIF_ERROR_NONE)
-        OnvifDevice_authenticate(odev);
+        OnvifDevice__authenticate(odev);
 
     if(!CObject__is_valid((CObject*)input->device)){
         goto exit;
@@ -243,7 +243,7 @@ void _play_onvif_stream(void * user_data){
     start_onvif_stream(input->app->player,input->app);
 
     if(OnvifDevice__get_last_error(odev) != ONVIF_ERROR_NONE)
-        OnvifDevice_authenticate(odev);
+        OnvifDevice__authenticate(odev);
 
     if(OnvifDevice__get_last_error(odev) != ONVIF_ERROR_NONE && Device__is_selected(input->device)){
         stopped_onvif_stream(input->app->player,input->app);
@@ -310,7 +310,7 @@ int onvif_reload_device(struct DeviceInput * input){
     OnvifDevice * odev = Device__get_device(input->device);
 
     if(OnvifDevice__get_last_error(odev) != ONVIF_ERROR_NONE)
-        OnvifDevice_authenticate(odev);
+        OnvifDevice__authenticate(odev);
     //Check if device is valid and authorized (User performed scan before auth finished)
     if(!CObject__is_valid((CObject*)input->device) || OnvifDevice__get_last_error(odev) == ONVIF_NOT_AUTHORIZED){
         return 0;
@@ -351,7 +351,7 @@ void _onvif_authentication_reload(void * user_data){
 void dialog_login_cb(AppDialogEvent * event){
     printf("OnvifAuthentication attempt...\n");
     struct DeviceInput * input = (struct DeviceInput *) event->user_data;
-    OnvifDevice_set_credentials(Device__get_device(input->device),CredentialsDialog__get_username((CredentialsDialog*)event->dialog),CredentialsDialog__get_password((CredentialsDialog*)event->dialog));
+    OnvifDevice__set_credentials(Device__get_device(input->device),CredentialsDialog__get_username((CredentialsDialog*)event->dialog),CredentialsDialog__get_password((CredentialsDialog*)event->dialog));
     EventQueue__insert(input->app->queue,_onvif_authentication_reload,AppDialogEvent_copy(event));
 }
 
@@ -436,8 +436,8 @@ void _onvif_authentication_add(void * user_data){
     AppDialogEvent * event = (AppDialogEvent *) user_data;
     OnvifDeviceInput * input = (OnvifDeviceInput *) event->user_data;
 
-    OnvifDevice_set_credentials(input->device,CredentialsDialog__get_username((CredentialsDialog*)event->dialog),CredentialsDialog__get_password((CredentialsDialog*)event->dialog));
-    OnvifDevice_authenticate(input->device);
+    OnvifDevice__set_credentials(input->device,CredentialsDialog__get_username((CredentialsDialog*)event->dialog),CredentialsDialog__get_password((CredentialsDialog*)event->dialog));
+    OnvifDevice__authenticate(input->device);
     if(OnvifDevice__get_last_error(input->device) == ONVIF_NOT_AUTHORIZED){
         printf("Authentication failed\n");
         goto exit;
@@ -496,7 +496,7 @@ void _onvif_device_add(void * user_data){
         printf("Valid device added [%s]\n",device_uri);
     }
 
-    OnvifDevice_authenticate(onvif_dev);
+    OnvifDevice__authenticate(onvif_dev);
     OnvifErrorTypes oerror = OnvifDevice__get_last_error(onvif_dev);
     if(oerror == ONVIF_NOT_AUTHORIZED){
         OnvifDeviceInput * input = malloc(sizeof(OnvifDeviceInput));
