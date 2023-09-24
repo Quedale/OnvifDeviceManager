@@ -956,7 +956,7 @@ if [ $ret != 0 ]; then
   GSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8 \
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG \
   C_INCLUDE_PATH="$(pkg-config --variable=includedir openssl):$(pkg-config --variable=includedir zlib):$C_INCLUDE_PATH" \
-  buildMakeProject srcdir="OnvifSoapLib" prefix="$SUBPROJECT_DIR/OnvifSoapLib/build/dist" cmakedir=".." bootstrap="--skip-gsoap $skipwsdl" outoftree=true
+  buildMakeProject srcdir="OnvifSoapLib" prefix="$SUBPROJECT_DIR/OnvifSoapLib/build/dist" cmakedir=".." cmakeargs="-DGSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8" bootstrap="--skip-gsoap $skipwsdl" outoftree=true
   if [ $FAILED -eq 1 ]; then exit 1; fi
 else
   echo "onvifsoaplib already found."
