@@ -21,7 +21,42 @@ onvifserver_SOURCES = $(top_srcdir)/src/onvif-server.c $(top_srcdir)/src/gst/onv
 onvifserver_CFLAGS = -Wall $(GST_STATIC_FLAG) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS)` $(EXT_CFLAGS)
 onvifserver_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS)` -Wl,-Bdynamic -lstdc++
 
-onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c $(top_srcdir)/src/alsa/alsa_devices.c $(top_srcdir)/src/alsa/alsa_utils.c $(top_srcdir)/src/animations/dotted_slider.c $(top_srcdir)/src/app/device.c $(top_srcdir)/src/app/gui_utils.c $(top_srcdir)/src/app/onvif_app_shutdown.c $(top_srcdir)/src/app/onvif_app.c $(top_srcdir)/src/app/onvif_details.c $(top_srcdir)/src/app/onvif_info.c $(top_srcdir)/src/app/onvif_network.c $(top_srcdir)/src/app/onvif_nvt.c $(top_srcdir)/src/app/task_manager.c $(top_srcdir)/src/app/dialog/add_device.c $(top_srcdir)/src/app/dialog/app_dialog.c $(top_srcdir)/src/app/dialog/credentials_input.c $(top_srcdir)/src/app/dialog/msg_dialog.c $(top_srcdir)/src/app/settings/app_settings_discovery.c $(top_srcdir)/src/app/settings/app_settings_stream.c $(top_srcdir)/src/app/settings/app_settings.c $(top_srcdir)/src/gst/onvifinitstaticplugins.c $(top_srcdir)/src/gst/overlay.c $(top_srcdir)/src/gst/player.c $(top_srcdir)/src/gst/src_retriever.c  $(top_srcdir)/src/gst/gtk/gstplugin.c $(top_srcdir)/src/gst/gtk/gstgtkbasesink.c $(top_srcdir)/src/gst/gtk/gstgtksink.c $(top_srcdir)/src/gst/gtk/gstgtkutils.c $(top_srcdir)/src/gst/gtk/gtkgstbasewidget.c $(top_srcdir)/src/gst/gtk/gtkgstwidget.c $(top_srcdir)/src/oo/cobject.c $(top_srcdir)/src/oo/clist_ts.c $(top_srcdir)/src/queue/event_queue.c $(top_srcdir)/src/queue/queue_event.c $(top_srcdir)/src/queue/queue_thread.c
+onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c \
+					$(top_srcdir)/src/alsa/alsa_devices.c \
+					$(top_srcdir)/src/alsa/alsa_utils.c \
+					$(top_srcdir)/src/animations/dotted_slider.c \
+					$(top_srcdir)/src/app/device.c \
+					$(top_srcdir)/src/app/gui_utils.c \
+					$(top_srcdir)/src/app/onvif_app_shutdown.c \
+					$(top_srcdir)/src/app/onvif_app.c \
+					$(top_srcdir)/src/app/onvif_details.c \
+					$(top_srcdir)/src/app/onvif_info.c \
+					$(top_srcdir)/src/app/onvif_network.c \
+					$(top_srcdir)/src/app/onvif_nvt.c \
+					$(top_srcdir)/src/app/task_manager.c \
+					$(top_srcdir)/src/app/dialog/add_device.c \
+					$(top_srcdir)/src/app/dialog/app_dialog.c \
+					$(top_srcdir)/src/app/dialog/credentials_input.c \
+					$(top_srcdir)/src/app/dialog/msg_dialog.c \
+					$(top_srcdir)/src/app/settings/app_settings_discovery.c \
+					$(top_srcdir)/src/app/settings/app_settings_stream.c \
+					$(top_srcdir)/src/app/settings/app_settings.c \
+					$(top_srcdir)/src/gst/onvifinitstaticplugins.c \
+					$(top_srcdir)/src/gst/overlay.c \
+					$(top_srcdir)/src/gst/player.c \
+					$(top_srcdir)/src/gst/src_retriever.c \
+					$(top_srcdir)/src/gst/gtk/gstplugin.c \
+					$(top_srcdir)/src/gst/gtk/gstgtkbasesink.c \
+					$(top_srcdir)/src/gst/gtk/gstgtksink.c \
+					$(top_srcdir)/src/gst/gtk/gstgtkutils.c \
+					$(top_srcdir)/src/gst/gtk/gtkgstbasewidget.c \
+					$(top_srcdir)/src/gst/gtk/gtkgstwidget.c \
+					$(top_srcdir)/src/gst/backchannel.c \
+					$(top_srcdir)/src/oo/cobject.c \
+					$(top_srcdir)/src/oo/clist_ts.c \
+					$(top_srcdir)/src/queue/event_queue.c \
+					$(top_srcdir)/src/queue/queue_event.c \
+					$(top_srcdir)/src/queue/queue_thread.c
 onvifmgr_CFLAGS = -DHAVE_CONFIG_H -Wall $(GST_STATIC_FLAG) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0 onvifsoap onvifdisco` $(EXT_CFLAGS) -I$(top_srcdir)/build/dist/include
 onvifmgr_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0 onvifsoap onvifdisco` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
 onvifmgr_LDADD = locked-icon.o microphone.o warning.o

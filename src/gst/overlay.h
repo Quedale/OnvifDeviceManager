@@ -3,14 +3,14 @@
 
 #include <gst/video/video.h>
 
-typedef struct
-{
-  gboolean valid;
-  GstVideoInfo info;
-} OverlayState;
+typedef struct _OverlayState OverlayState;
 
-void prepare_overlay (GstElement * overlay, GstCaps * caps, gint window_width, gint window_height, gpointer user_data);
+OverlayState * OverlayState__create();
+void OverlayState__init(OverlayState * self);
+void OverlayState__destroy(OverlayState * self);
 
-GstVideoOverlayComposition * draw_overlay (GstElement * overlay, GstSample * sample, gpointer user_data);
+void OverlayState__prepare_overlay (GstElement * overlay, GstCaps * caps, gint window_width, gint window_height, gpointer user_data);
+GstVideoOverlayComposition * OverlayState__draw_overlay (GstElement * overlay, GstSample * sample, gpointer user_data);
+void OverlayState__level_handler(GstBus * bus, GstMessage * message, OverlayState *self, const GstStructure *s);
 
 #endif

@@ -1,10 +1,58 @@
 #include "player.h"
 #include "gtk/gstgtkbasesink.h"
-#include <math.h>
-#include "src_retriever.h"
 
 GST_DEBUG_CATEGORY_STATIC (ext_gst_player_debug);
 #define GST_CAT_DEFAULT (ext_gst_player_debug)
+
+typedef struct _RtspPlayer {
+  GstElement *pipeline;
+  GstElement *src;  /* RtspSrc to support backchannel */
+  GstElement *sink;  /* Video Sink */
+  int pad_found;
+  GstElement * video_bin;
+  int no_video;
+  int video_done;
+  GstElement * audio_bin;
+  int no_audio;
+  int audio_done;
+  
+  //Backpipe related properties
+  int enable_backchannel;
+  RtspBackchannel * backchannel;
+  GstVideoOverlay *overlay; //Overlay rendered on the canvas widget
+  OverlayState *overlay_state;
+
+  //Keep location to used on retry
+  char * location;
+  //Retry count
+  int retry;
+  //Playing or trying to play
+  int playing;
+
+  void (*retry_callback)(RtspPlayer *, void * user_data);
+  void * retry_user_data;
+
+  void (*error_callback)(RtspPlayer *, void * user_data);
+  void * error_user_data;
+
+  void (*stopped_callback)(RtspPlayer *, void * user_data);
+  void * stopped_user_data;
+
+  void (*start_callback)(RtspPlayer *, void * user_data);
+  void * start_user_data;
+
+  //Grid holding the canvas
+  GtkWidget *canvas_handle;
+  //Canvas used to draw stream
+  GtkWidget *canvas;
+  //Set if the drawing area should over stretch
+  int allow_overscale;
+  
+  P_MUTEX_TYPE prop_lock;
+  P_MUTEX_TYPE player_lock;
+} RtspPlayer;
+
+void _RtspPlayer__stop(RtspPlayer* self, int notify);
 
 /* This function is called when an error message is posted on the bus */
 static void error_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
@@ -37,9 +85,11 @@ static void error_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
 
   if(data->retry < 3 && data->playing == 1 && data->retry_callback){
     //Stopping player after if condition because "playing" gets reset
-    RtspPlayer__stop(data);
+    _RtspPlayer__stop(data,0);
     //Location was cleared after resetting the pipeline
-    g_object_set (G_OBJECT (data->src), "location", data->location, NULL);
+    char * location = RtspPlayer__get_playback_url(data);
+    g_object_set (G_OBJECT (data->src), "location", location, NULL);
+    free(location);
 
     data->playing = 1; //Set playing flag to allow retry
     data->retry++; 
@@ -61,68 +111,66 @@ static void error_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
  * We just set the pipeline to READY (which stops playback) */
 static void eos_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
   GST_ERROR ("End-Of-Stream reached.\n");
-  if(GST_IS_ELEMENT(data->backpipe)){
-    gst_element_set_state (data->backpipe, GST_STATE_NULL);
-  }
+  RtspBackchannel__stop(data->backchannel);
   gst_element_set_state (data->pipeline, GST_STATE_NULL);
 }
 
-void level_handler(GstBus * bus, GstMessage * message, RtspPlayer *player, const GstStructure *s){
+// void level_handler(GstBus * bus, GstMessage * message, RtspPlayer *player, const GstStructure *s){
 
-  gint channels;
-  GstClockTime endtime;
-  gdouble peak_dB;
-  gdouble peak;
-  const gdouble max_variance = 15;
-  const GValue *list;
-  const GValue *value;
-  GValueArray *peak_arr;
-  gdouble output = 0;
-  gint i;
+//   gint channels;
+//   GstClockTime endtime;
+//   gdouble peak_dB;
+//   gdouble peak;
+//   const gdouble max_variance = 15;
+//   const GValue *list;
+//   const GValue *value;
+//   GValueArray *peak_arr;
+//   gdouble output = 0;
+//   gint i;
 
-  if (!gst_structure_get_clock_time (s, "endtime", &endtime))
-    g_warning ("Could not parse endtime");
+//   if (!gst_structure_get_clock_time (s, "endtime", &endtime))
+//     g_warning ("Could not parse endtime");
 
-  list = gst_structure_get_value (s, "peak");
-  peak_arr = (GValueArray *) g_value_get_boxed (list);
-  channels = peak_arr->n_values;
+//   list = gst_structure_get_value (s, "peak");
+//   peak_arr = (GValueArray *) g_value_get_boxed (list);
+//   channels = peak_arr->n_values;
 
-  for (i = 0; i < channels; ++i) {
-    // FIXME 'g_value_array_get_nth' is deprecated: Use 'GArray' instead
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-    value = g_value_array_get_nth (peak_arr, i);
-    peak_dB = g_value_get_double (value);
-    #pragma GCC diagnostic pop
+//   for (i = 0; i < channels; ++i) {
+//     // FIXME 'g_value_array_get_nth' is deprecated: Use 'GArray' instead
+//     #pragma GCC diagnostic push
+//     #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+//     value = g_value_array_get_nth (peak_arr, i);
+//     peak_dB = g_value_get_double (value);
+//     #pragma GCC diagnostic pop
 
-    /* converting from dB to normal gives us a value between 0.0 and 1.0 */
-    peak = pow (10, peak_dB / 20);
+//     /* converting from dB to normal gives us a value between 0.0 and 1.0 */
+//     peak = pow (10, peak_dB / 20);
 
-    //Add up all channels peaks
-    output = output + peak * 100; 
-  }
+//     //Add up all channels peaks
+//     output = output + peak * 100; 
+//   }
 
-  //Optionally only get the highest peak instead of calculating average.
-  //Average output of all channels
-  output = output / channels;
+//   //Optionally only get the highest peak instead of calculating average.
+//   //Average output of all channels
+//   output = output / channels;
 
-  //Set Output value on player
-  if(output == player->level){
-    //Ignore
-  } else if( output > player->level){
-    //Set new peak
-    player->level = output;
-  } else {
-    //Lower to a maximum drop of 15 for a graphical decay
-    gdouble variance = player->level-output;
-    if(variance > max_variance){
-      player->level=player->level-max_variance; //The decay value has to match the interval set. We are dealing with 2x faster interval therefor 15/2=7.5
-    } else {
-      player->level = output;
-    }
-  }
+//   //Set Output value on player
+//   if(output == player->level){
+//     //Ignore
+//   } else if( output > player->level){
+//     //Set new peak
+//     player->level = output;
+//   } else {
+//     //Lower to a maximum drop of 15 for a graphical decay
+//     gdouble variance = player->level-output;
+//     if(variance > max_variance){
+//       player->level=player->level-max_variance; //The decay value has to match the interval set. We are dealing with 2x faster interval therefor 15/2=7.5
+//     } else {
+//       player->level = output;
+//     }
+//   }
 
-}
+// }
 
 /* This function is called when the pipeline changes states. We use it to
  * keep track of the current state. */
@@ -131,7 +179,6 @@ state_changed_cb (GstBus * bus, GstMessage * msg, RtspPlayer * data)
 {
   GstState old_state, new_state, pending_state;
 
-  pthread_mutex_lock(data->player_lock);
   gst_message_parse_state_changed (msg, &old_state, &new_state, &pending_state);
   /* Using video_bin for state change since the pipeline is PLAYING before the videosink */
   
@@ -174,8 +221,6 @@ state_changed_cb (GstBus * bus, GstMessage * msg, RtspPlayer * data)
     printf ("State set to %s for %s\n", gst_element_state_get_name (new_state), GST_OBJECT_NAME (msg->src));
     // printf("[no_audio:%i][no_video:%i][audio_done:%i][video_done:%i][pad_found:%i][pipe:%i]\n",data->no_audio,data->no_video,data->audio_done,data->video_done,data->pad_found,GST_MESSAGE_SRC(msg) == GST_OBJECT(data->pipeline));
   }
-
-  pthread_mutex_unlock(data->player_lock);
 }
 
 static void 
@@ -233,7 +278,7 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
       s = gst_message_get_structure (message);
       name = gst_structure_get_name (s);
       if (strcmp (name, "level") == 0) {
-        level_handler(bus,message,player,s);
+        OverlayState__level_handler(bus,message,player->overlay_state,s);
       } else if (strcmp (name, "GstNavigationMessage") == 0 || 
                 strcmp (name, "application/x-rtp-source-sdes") == 0){
         //Ignore intentionally left unhandled for now
@@ -317,185 +362,12 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
   }
 }
 
-
-gboolean
-remove_extra_fields (GQuark field_id, GValue * value G_GNUC_UNUSED,
-    gpointer user_data G_GNUC_UNUSED)
-{
-  return !g_str_has_prefix (g_quark_to_string (field_id), "a-");
-}
-
-GstFlowReturn
-new_sample (GstElement * appsink, RtspPlayer * player)
-{
-  GstSample *sample;
-  GstFlowReturn ret = GST_FLOW_OK;
-
-  g_assert (player->back_stream_id != -1);
-
-  g_signal_emit_by_name (appsink, "pull-sample", &sample);
-
-  if (!sample)
-    goto out;
-
-#if (GST_PLUGINS_BASE_VERSION_MAJOR >= 1) && (GST_PLUGINS_BASE_VERSION_MINOR >= 21) //GST_PLUGINS_BASE_VERSION_MICRO
-  g_signal_emit_by_name (player->src, "push-backchannel-sample", player->back_stream_id, sample, &ret);
-#else
-  g_signal_emit_by_name (player->src, "push-backchannel-buffer", player->back_stream_id, sample, &ret);
-#endif
-  //I know this was added in version 1.21, but it generates //gst_mini_object_unlock: assertion 'state >= SHARE_ONE' failed
-  /* Action signal callbacks don't take ownership of the arguments passed, so we must unref the sample here.
-   * (The "push-backchannel-buffer" callback unrefs the sample, which is wrong and doesn't work with bindings
-   * but could not be changed, hence the new "push-backchannel-sample" callback that behaves correctly.)  */
-  // gst_sample_unref (sample);
-  
-out:
-  return ret;
-}
-
-static void 
-back_message_handler (GstBus * bus, GstMessage * message, gpointer p)
-{ 
-  GError *err;
-  gchar *debug_info;
-  GstState old_state, new_state, pending_state;
-  
-  switch(GST_MESSAGE_TYPE(message)){
-    case GST_MESSAGE_UNKNOWN:
-      printf("backpipe msg : GST_MESSAGE_UNKNOWN\n");
-      break;
-    case GST_MESSAGE_EOS:
-      printf ("backpipe msg : End-Of-Stream reached.\n");
-      break;
-    case GST_MESSAGE_ERROR:
-      gst_message_parse_error (message, &err, &debug_info);
-      printf ("backpipe - Error received from element %s: %s\n", GST_OBJECT_NAME (message->src), err->message);
-      printf ("backpipe - Debugging information: %s\n", debug_info ? debug_info : "none");
-      g_clear_error (&err);
-      g_free (debug_info);
-      break;
-    case GST_MESSAGE_STATE_CHANGED:
-      gst_message_parse_state_changed (message, &old_state, &new_state, &pending_state);
-      printf ("backpipe - State set to %s for %s\n", gst_element_state_get_name (new_state), GST_OBJECT_NAME (message->src));
-      break;
-    case GST_MESSAGE_WARNING:
-    default:
-      break;
-  }
-}
-
-void
-setup_backchannel (RtspPlayer * player)
-{
-  GstElement *src;
-  GstElement *enc;
-  GstElement *pay;
-
-  //self->mic_element
-  player->backpipe = gst_pipeline_new ("backpipe");
-
-  /* Create the elements */
-  if(!player->mic_element){
-    printf("No microphone detected. Skipping backchannel setup!\n");
-    return;
-  }
-
-  printf("Creating backchannel using source element %s\n",player->mic_element);
-
-  src = gst_element_factory_make (player->mic_element, NULL);
-  player->mic_volume_element = gst_element_factory_make ("volume", NULL);
-  enc = gst_element_factory_make ("mulawenc", NULL);
-  pay = gst_element_factory_make ("rtppcmupay", NULL);
-  player->appsink = gst_element_factory_make ("appsink", NULL);
-
-  if(!src || !player->mic_volume_element || !enc || !pay || !player->appsink){
-    printf("Failed to created backchannel element(s). Check your gstreamer installation...\n");
-    return;
-  }
-
-  // Add Elements to the Bin
-  gst_bin_add_many (GST_BIN (player->backpipe), src, player->mic_volume_element, enc, pay, player->appsink, NULL);
-
-  // Link confirmation
-  if (!gst_element_link_many (src,
-    player->mic_volume_element,
-    enc, pay, player->appsink, NULL)){
-      g_warning ("Failed to link backpipe element...");
-      return;
-  }
-
-  if(player->mic_device 
-      && !strcmp(player->mic_element,"alsasrc") 
-      && strlen(player->mic_device) > 1){
-      printf("Setting alsa mic to '%s'\n",player->mic_device);
-      g_object_set(G_OBJECT(src), "device", player->mic_device,NULL);
-  }
-
-  // g_object_set (G_OBJECT (src), "sync", FALSE, NULL);
-  g_object_set (G_OBJECT (player->mic_volume_element), "mute", TRUE, NULL);
-  g_object_set (G_OBJECT (player->appsink), "emit-signals", TRUE, NULL);
-  if(!g_signal_connect (player->appsink, "new-sample", G_CALLBACK (new_sample), player)){
-    printf("Failed to add new-sample signal to appsink. Check your gstreamer installation...\n");
-    return;
-  }
-
-  /* set up backpipe bus */
-  GstBus *bus = gst_element_get_bus (player->backpipe);
-  gst_bus_add_signal_watch (bus);
-  g_signal_connect (bus, "message", G_CALLBACK (back_message_handler), player);
-  gst_object_unref (bus);
-
-}
-
 gboolean RtspPlayer__is_mic_mute(RtspPlayer* self) {
-  if(GST_IS_ELEMENT(self->mic_volume_element)){
-    gboolean v;
-    g_object_get (G_OBJECT (self->mic_volume_element), "mute", &v, NULL);
-    return v;
-  } else {
-    return TRUE;
-  }
+  return RtspBackchannel__is_mute(self->backchannel);
 }
 
 void RtspPlayer__mic_mute(RtspPlayer* self, gboolean mute) {
-  if(GST_IS_ELEMENT(self->mic_volume_element)){
-    g_object_set (G_OBJECT (self->mic_volume_element), "mute", mute, NULL);
-  }
-}
-
-gboolean
-find_backchannel (GstElement * rtspsrc, guint idx, GstCaps * caps,
-    RtspPlayer *player G_GNUC_UNUSED)
-{
-  GstStructure *s;
-  
-  pthread_mutex_lock(player->player_lock);
-  if(!player->backpipe){
-    printf("Backchannel not setup\n");
-    goto exit;
-  }
-
-  gchar *caps_str = gst_caps_to_string (caps);
-  g_free (caps_str);
-  printf("RtspPlayer__find_backchannel\n");
-  s = gst_caps_get_structure (caps, 0);
-  if (gst_structure_has_field (s, "a-sendonly")) {
-    player->back_stream_id = idx;
-    caps = gst_caps_new_empty ();
-    s = gst_structure_copy (s);
-    gst_structure_set_name (s, "application/x-rtp");
-    gst_structure_filter_and_map_in_place (s, remove_extra_fields, NULL);
-    gst_caps_append_structure (caps, s);
-
-    //Update appsink caps compatible with recipient
-    g_object_set (G_OBJECT (player->appsink), "caps", caps, NULL);
-    g_print ("Playing backchannel shoveler\n");
-    gst_element_set_state (player->backpipe, GST_STATE_PLAYING);
-  }
-
-exit:
-  pthread_mutex_unlock(player->player_lock);
-  return TRUE;
+  RtspBackchannel__mute(self->backchannel, mute);
 }
 
 /* Dynamically link */
@@ -622,11 +494,11 @@ static GstElement * create_video_bin(RtspPlayer * self){
       return NULL;
   }
 
-  if(! g_signal_connect (overlay_comp, "draw", G_CALLBACK (draw_overlay), self)){
+  if(! g_signal_connect (overlay_comp, "draw", G_CALLBACK (OverlayState__draw_overlay), self->overlay_state)){
     GST_ERROR ("overlay draw callback Fail...");
   }
 
-  if(! g_signal_connect (overlay_comp, "caps-changed",G_CALLBACK (prepare_overlay), self->overlay_state)){
+  if(! g_signal_connect (overlay_comp, "caps-changed",G_CALLBACK (OverlayState__prepare_overlay), self->overlay_state)){
     GST_ERROR ("overlay caps-changed callback Fail...");
     return NULL;
   }
@@ -753,7 +625,7 @@ void create_pipeline(RtspPlayer *self){
       g_warning ("Linking part (1) with part (A)-1 Fail...");
   }
 
-  if(!g_signal_connect (self->src, "select-stream", G_CALLBACK (find_backchannel),self))
+  if(!g_signal_connect (self->src, "select-stream", G_CALLBACK (RtspBackchannel__find),self->backchannel))
   {
       GST_WARNING ("Fail to connect select-stream signal...");
   }
@@ -785,45 +657,22 @@ void RtspPlayer__init(RtspPlayer* self) {
   self->stopped_callback = NULL;
   self->start_user_data = NULL;
   self->start_callback = NULL;
-  self->level = 0;
   self->enable_backchannel = 1;
   self->retry = 0;
   self->playing = 0;
   self->allow_overscale = 0;
-  self->mic_volume_element = NULL;
-  self->player_lock =malloc(sizeof(pthread_mutex_t));
-  self->overlay_state = malloc(sizeof(OverlayState));
-  self->overlay_state->valid = 0;
+  self->overlay_state = OverlayState__create();
   self->canvas_handle = NULL;
   self->canvas = NULL;
   self->video_bin = NULL;
   self->audio_bin = NULL;
   self->sink = NULL;
-  self->appsink = NULL;
   self->src = NULL;
 
-  pthread_mutex_init(self->player_lock, NULL);
+  P_MUTEX_SETUP(self->prop_lock);
+  P_MUTEX_SETUP(self->player_lock);
 
-  //Automatically retrieve functional Gstreamer microphone element and alsa devie. 
-  //TODO Support settings
-  char mic_element[13], mic_device[8];
-  retrieve_audiosrc(mic_element,mic_device);
-  if(strlen(mic_element) > 1){
-    self->mic_element = malloc(strlen(mic_element)+1);
-    strcpy(self->mic_element,mic_element);
-  } else {
-    self->mic_element = NULL;
-  }
-
-  if(strlen(mic_device) > 1){
-    self->mic_device = malloc(strlen(mic_device)+1);
-    strcpy(self->mic_device,mic_device);
-  } else {
-    self->mic_device = NULL;
-  }
-
-  //Create only one reusable microphone backpipe
-  setup_backchannel(self);
+  self->backchannel = RtspBackchannel__create();
 
   create_pipeline(self);
   if (!self->pipeline){
@@ -832,7 +681,7 @@ void RtspPlayer__init(RtspPlayer* self) {
   }
 }
 
-int CLASS_INIT=0;
+static int CLASS_INIT=0;
 RtspPlayer * RtspPlayer__create() {
   if(!CLASS_INIT){
     CLASS_INIT =1;
@@ -852,7 +701,7 @@ void RtspPlayer__destroy(RtspPlayer* self) {
     GstState current_state_pipe;
     GstState current_state_back;
     int ret_1 = gst_element_get_state (self->pipeline,&current_state_pipe, NULL, GST_CLOCK_TIME_NONE);
-    int ret_2 = gst_element_get_state (self->backpipe, &current_state_back, NULL, GST_CLOCK_TIME_NONE);
+    int ret_2 = RtspBackchannel__get_state(self->backchannel, &current_state_back, NULL, GST_CLOCK_TIME_NONE);
     while( (ret_1 && current_state_pipe != GST_STATE_NULL) || ( ret_2 && current_state_pipe != GST_STATE_NULL)){
       printf("Waiting for player to stop...\n");
       sleep(0.25);
@@ -861,22 +710,16 @@ void RtspPlayer__destroy(RtspPlayer* self) {
     if(GST_IS_ELEMENT(self->pipeline)){
       gst_object_unref (self->pipeline);
     }
-    if(GST_IS_ELEMENT(self->backpipe)){
-      gst_object_unref (self->backpipe);
-    }
+    
+    RtspBackchannel__destroy(self->backchannel);
+    OverlayState__destroy(self->overlay_state);
 
-    if(self->mic_element){
-      free(self->mic_element);
-    }
-    if(self->mic_device){
-      free(self->mic_device);
-    }
     if(self->location){
       free(self->location);
     }
-    pthread_mutex_destroy(self->player_lock);
-    free(self->player_lock);
-    free(self->overlay_state);
+
+    P_MUTEX_CLEANUP(self->prop_lock);
+    P_MUTEX_CLEANUP(self->player_lock);
     free(self);
   }
 }
@@ -902,7 +745,7 @@ void RtspPlayer__set_retry_callback(RtspPlayer* self, void (*retry_callback)(Rts
 }
 
 void RtspPlayer__set_playback_url(RtspPlayer* self, char *url) {
-  pthread_mutex_lock(self->player_lock);
+  P_MUTEX_LOCK(self->prop_lock);
   printf("set location : %s\n",url);
 
   if(!self->location){
@@ -913,7 +756,16 @@ void RtspPlayer__set_playback_url(RtspPlayer* self, char *url) {
   strcpy(self->location,url);
   
   g_object_set (G_OBJECT (self->src), "location", url, NULL);
-  pthread_mutex_unlock(self->player_lock);
+  P_MUTEX_UNLOCK(self->prop_lock);
+}
+
+char * RtspPlayer__get_playback_url(RtspPlayer* self){
+  char * ret;
+  P_MUTEX_LOCK(self->prop_lock);
+  ret = malloc(strlen(self->location)+1);
+  strcpy(ret,self->location);
+  P_MUTEX_UNLOCK(self->prop_lock);
+  return ret;
 }
 
 void RtspPlayer__set_credentials(RtspPlayer * self, char * user, char * pass){
@@ -923,19 +775,20 @@ void RtspPlayer__set_credentials(RtspPlayer * self, char * user, char * pass){
   }
 }
 
-void RtspPlayer__stop(RtspPlayer* self){
-  if(!self){
-    return;
-  }
+void _RtspPlayer__stop(RtspPlayer* self, int notify){
+    printf("RtspPlayer__stop\n");
+    if(!self){
+      return;
+    }
 
-    pthread_mutex_lock(self->player_lock);
+    P_MUTEX_LOCK(self->player_lock);
 
-
+    self->playing = 0;
     //Check if state is already stopped or stopping
     GstState current_state_pipe;
     GstState current_state_back;
     int ret_1 = gst_element_get_state (self->pipeline,&current_state_pipe, NULL, GST_CLOCK_TIME_NONE);
-    int ret_2 = gst_element_get_state (self->backpipe, &current_state_back, NULL, GST_CLOCK_TIME_NONE);
+    int ret_2 = RtspBackchannel__get_state (self->backchannel, &current_state_back, NULL, GST_CLOCK_TIME_NONE);
     if(ret_1 == GST_STATE_CHANGE_ASYNC){
       ret_1 = gst_element_get_state (self->pipeline, NULL, &current_state_pipe, GST_CLOCK_TIME_NONE);
     }
@@ -950,12 +803,8 @@ void RtspPlayer__stop(RtspPlayer* self){
     GstStateChangeReturn ret;
 
     //Pause backchannel
-    if(GST_IS_ELEMENT(self->backpipe)){
-      ret = gst_element_set_state (self->backpipe, GST_STATE_NULL);
-      if (ret == GST_STATE_CHANGE_FAILURE) {
-          GST_ERROR ("Unable to set the backpipe to the ready state.\n");
-          goto stop_out;
-      }
+    if(!RtspBackchannel__pause(self->backchannel)){
+      goto stop_out;
     }
 
     //Set NULL state to clear buffers
@@ -979,15 +828,19 @@ stop_out:
   if(GTK_IS_WIDGET (self->canvas))
     gtk_widget_set_visible(self->canvas, FALSE);
   //Send stopped signal
-  if(self->stopped_callback){
+  if(notify && self->stopped_callback){
     (*(self->stopped_callback))(self, self->stopped_user_data);
   }
 unlock:
-  pthread_mutex_unlock(self->player_lock);
+  P_MUTEX_UNLOCK(self->player_lock);
+}
+
+void RtspPlayer__stop(RtspPlayer* self){
+  _RtspPlayer__stop(self,1);
 }
 
 void _RtspPlayer__play(RtspPlayer* self, int retry){
-  pthread_mutex_lock(self->player_lock);
+  P_MUTEX_LOCK(self->player_lock);
   printf("RtspPlayer__play retry[%i] - playing[%i]\n",retry,self->playing);
   if(retry && self->playing == 0){//Retry signal after stop requested
     goto exit;
@@ -1009,7 +862,7 @@ void _RtspPlayer__play(RtspPlayer* self, int retry){
   }
 
 exit:
-  pthread_mutex_unlock(self->player_lock);
+  P_MUTEX_UNLOCK(self->player_lock);
 }
 
 void RtspPlayer__play(RtspPlayer* self){

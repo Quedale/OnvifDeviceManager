@@ -1,9 +1,32 @@
 #include "overlay.h"
-#include "player.h"
+#include <math.h>
+#include <gtk/gtk.h>
 
-void prepare_overlay (GstElement * overlay, GstCaps * caps, gint window_width,
-    gint window_height, gpointer user_data)
-{
+typedef struct _OverlayState {
+  gboolean valid;
+  GstVideoInfo info;
+  //Used to calculate level decay
+  gdouble level;
+} OverlayState;
+
+OverlayState * OverlayState__create(){
+  OverlayState * self = malloc(sizeof(OverlayState));
+  OverlayState__init(self);
+  return self;
+}
+
+void OverlayState__init(OverlayState * self){
+  self->level = 0;
+  self->valid = 0;
+}
+
+void OverlayState__destroy(OverlayState * self){
+  if(self){
+    free(self);
+  }
+}
+
+void OverlayState__prepare_overlay (GstElement * overlay, GstCaps * caps, gint window_width, gint window_height, gpointer user_data){
 
   OverlayState *s = (OverlayState *) user_data;
 
@@ -40,11 +63,9 @@ GstBuffer * create_bar_buffer(double width, double height){
   return buff;
 }
 
-GstVideoOverlayComposition *
-draw_overlay (GstElement * overlay, GstSample * sample, gpointer user_data)
-{
+GstVideoOverlayComposition * OverlayState__draw_overlay (GstElement * overlay, GstSample * sample, gpointer user_data){
 
-  RtspPlayer *player = (RtspPlayer *)user_data;
+  OverlayState *self = (OverlayState *)user_data;
   GstVideoOverlayRectangle *rect;
   GstVideoOverlayComposition *comp;
   GstVideoMeta *vmeta;
@@ -54,24 +75,24 @@ draw_overlay (GstElement * overlay, GstSample * sample, gpointer user_data)
   //Dont bother if the overlay is not prepared
   //Dont bother if the video is not showing
   //Dont bother if no sound is detected
-  if(!player->overlay_state->valid ||
-      player->overlay_state->info.height == 0 || 
-      player->overlay_state->info.width == 0 || 
-      player->level < 1){
+  if(!self->valid ||
+      self->info.height == 0 || 
+      self->info.width == 0 || 
+      self->level < 1){
     return NULL;
   }
 
   gdouble margin = 20; //Space betweem border and bar
   gdouble bwidth = 20; //Bar width
-  gdouble pheight = player->overlay_state->info.height - margin*2; //Height available for drawing
-  gdouble bheight = player->level * pheight / 100; //Actual bar height calculated from level
+  gdouble pheight = self->info.height - margin*2; //Height available for drawing
+  gdouble bheight = self->level * pheight / 100; //Actual bar height calculated from level
 
   buff = create_bar_buffer(bwidth,bheight); //Create GstBuffer
 
   vmeta = gst_buffer_get_video_meta (buff); //Extract video metadata
 
   //Determine x position considering margin (Aligned left)
-  x= player->overlay_state->info.width-(margin+bwidth);
+  x= self->info.width-(margin+bwidth);
   //Determine y position based on bar height (Aligned bottom)
   y= margin + pheight - bheight;
 
@@ -83,4 +104,61 @@ draw_overlay (GstElement * overlay, GstSample * sample, gpointer user_data)
   
   gst_buffer_unref(buff);
   return comp;
+}
+
+void OverlayState__level_handler(GstBus * bus, GstMessage * message, OverlayState *self, const GstStructure *s){
+
+  gint channels;
+  GstClockTime endtime;
+  gdouble peak_dB;
+  gdouble peak;
+  const gdouble max_variance = 15;
+  const GValue *list;
+  const GValue *value;
+  GValueArray *peak_arr;
+  gdouble output = 0;
+  gint i;
+
+  if (!gst_structure_get_clock_time (s, "endtime", &endtime))
+    g_warning ("Could not parse endtime");
+
+  list = gst_structure_get_value (s, "peak");
+  peak_arr = (GValueArray *) g_value_get_boxed (list);
+  channels = peak_arr->n_values;
+
+  for (i = 0; i < channels; ++i) {
+    // FIXME 'g_value_array_get_nth' is deprecated: Use 'GArray' instead
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    value = g_value_array_get_nth (peak_arr, i);
+    peak_dB = g_value_get_double (value);
+    #pragma GCC diagnostic pop
+
+    /* converting from dB to normal gives us a value between 0.0 and 1.0 */
+    peak = pow (10, peak_dB / 20);
+
+    //Add up all channels peaks
+    output = output + peak * 100; 
+  }
+
+  //Optionally only get the highest peak instead of calculating average.
+  //Average output of all channels
+  output = output / channels;
+
+  //Set Output value on player
+  if(output == self->level){
+    //Ignore
+  } else if( output > self->level){
+    //Set new peak
+    self->level = output;
+  } else {
+    //Lower to a maximum drop of 15 for a graphical decay
+    gdouble variance = self->level-output;
+    if(variance > max_variance){
+      self->level=self->level-max_variance; //The decay value has to match the interval set. We are dealing with 2x faster interval therefor 15/2=7.5
+    } else {
+      self->level = output;
+    }
+  }
+
 }

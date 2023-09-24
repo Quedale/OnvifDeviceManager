@@ -57,6 +57,7 @@ typedef struct {
     OnvifDevice * device;
 } OnvifDeviceInput;
 
+void stopped_onvif_stream(RtspPlayer * player, void * user_data);
 
 struct DeviceInput * DeviceInput__copy(struct DeviceInput * self){
     struct DeviceInput * copy = malloc(sizeof(struct DeviceInput));
@@ -135,6 +136,9 @@ static gboolean * found_server (void * e) {
 void onvif_scan (GtkWidget *widget, OnvifApp * app) {
     printf("Starting ONVIF Devices Network Discovery...\n");
     gtk_widget_set_sensitive(widget,FALSE);
+    //Between retries, player may not send stopped event since the state didn't stop
+    //Forcing hiding the loading indicator
+    stopped_onvif_stream(app->player,app);
 
     //Clearing the list
     gtk_container_foreach (GTK_CONTAINER (app->listbox), (GtkCallback)gtk_widget_destroy, NULL);
