@@ -217,7 +217,7 @@ pullOrClone (){
 #
 ############################################
 buildMakeProject(){
-  local srcdir prefix autogen autoreconf configure make cmakedir cmakeargs installargs bootstrap configcustom outoftree
+  local srcdir prefix autogen autoreconf configure make cmakedir cmakeargs cmakeclean installargs bootstrap configcustom outoftree
   local "${@}"
 
   build_start=$SECONDS
@@ -313,7 +313,14 @@ buildMakeProject(){
     printf "${ORANGE}*****************************\n${NC}"
     printf "${ORANGE}*** cmake ${srcdir} ***\n${NC}"
     printf "${ORANGE}*** Args ${cmakeargs} ***\n${NC}"
+    printf "PKG_CONFIG_PATH : ${PKG_CONFIG_PATH}\n"
     printf "${ORANGE}*****************************\n${NC}"
+    if [ ! -z "${cmakeclean}" ]
+    then
+      cmake --build "${cmakedir}" --target clean
+      find . -iwholename '*cmake*' -not -name CMakeLists.txt -delete
+    fi
+
     cmake -G "Unix Makefiles" \
       ${cmakeargs} \
       -DCMAKE_BUILD_TYPE=Release \
@@ -900,7 +907,7 @@ fi
 if [ $ret != 0 ]; then
   pullOrClone path=https://github.com/Quedale/CUtils.git ignorecache="true"
   if [ $FAILED -eq 1 ]; then exit 1; fi
-  buildMakeProject srcdir="CUtils" prefix="$SUBPROJECT_DIR/CUtils/build/dist" cmakedir=".." outoftree=true
+  buildMakeProject srcdir="CUtils" prefix="$SUBPROJECT_DIR/CUtils/build/dist" cmakedir=".." outoftree=true cmakeclean=true
   if [ $FAILED -eq 1 ]; then exit 1; fi
 else
   echo "CUtils already found."
@@ -995,9 +1002,9 @@ if [ $ret != 0 ]; then
   if [ $FAILED -eq 1 ]; then exit 1; fi
   PATH=$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin:$PATH \
   GSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8 \
-  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG \
+  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG:$CUTILSLIB_PKG \
   C_INCLUDE_PATH="$(pkg-config --variable=includedir openssl):$(pkg-config --variable=includedir zlib):$C_INCLUDE_PATH" \
-  buildMakeProject srcdir="OnvifSoapLib" prefix="$SUBPROJECT_DIR/OnvifSoapLib/build/dist" cmakedir=".." cmakeargs="-DGSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8" bootstrap="--skip-gsoap $skipwsdl" outoftree=true
+  buildMakeProject srcdir="OnvifSoapLib" prefix="$SUBPROJECT_DIR/OnvifSoapLib/build/dist" cmakedir=".." cmakeargs="-DGSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8" bootstrap="--skip-gsoap $skipwsdl" outoftree=true cmakeclean=true
   if [ $FAILED -eq 1 ]; then exit 1; fi
 else
   echo "onvifsoaplib already found."
