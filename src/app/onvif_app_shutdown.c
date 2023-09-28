@@ -1,15 +1,16 @@
 #include "onvif_app_shutdown.h"
 #include "../animations/dotted_slider.h"
 #include "../gst/player.h"
+#include "clogger.h"
 
 gboolean * gui_quit_main (void * user_data){
-    printf("Stopping main thread...\n");
+    C_INFO("Stopping main thread...\n");
     gtk_main_quit();
     return FALSE;
 }
 
 void * _thread_destruction(void * event){
-    printf("Starting clean up thread...\n");
+    C_INFO("Starting clean up thread...\n");
     OnvifApp * app = (OnvifApp *) event;
 
     RtspPlayer__stop(OnvifApp__get_player(app));
@@ -43,6 +44,6 @@ gboolean * gui_destruction (void * user_data){
 
 
 void onvif_app_shutdown(OnvifApp * self){
-    printf("Calling App Shutdown...\n");
+    C_INFO("Calling App Shutdown...\n");
     gdk_threads_add_idle((void *)gui_destruction,self);
 }

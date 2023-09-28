@@ -1,5 +1,6 @@
 #include "app_dialog.h"
-#include "../../oo/clist.h"
+#include "clist.h"
+#include "clogger.h"
 
 typedef struct { 
     GtkWidget * submit_btn;
@@ -58,7 +59,7 @@ void AppDialog__set_destroy_callback(AppDialog* self, void (*destroy_callback)(A
 void AppDialog__init(AppDialog* self, GtkWidget * (*create_ui)(AppDialogEvent *)) {
     CObject__init((CObject*)self);
     CObject__set_destroy_callback((CObject*)self,priv_AppDialolg__destroy);
-    printf("AppDialog__init\n");
+    C_TRACE("init");
     self->title = NULL;
     self->submit_label = NULL;
     self->visible = 0;
@@ -85,7 +86,7 @@ void AppDialog__show(AppDialog* dialog, void (*submit_callback)(AppDialogEvent *
         return;
     }
 
-    printf("AppDialog__show\n");
+    C_DEBUG("show");
     dialog->visible = 1;
 
     //Set input userdata for current dialog session
@@ -118,7 +119,7 @@ void AppDialog__hide(AppDialog* dialog){
     if(dialog->visible == 0){
         return;
     }
-    printf("AddDeviceDialog__hide\n");
+    C_DEBUG("hide");
     dialog->visible = 0;
 
     //Disconnect keyboard handler.

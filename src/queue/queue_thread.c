@@ -4,8 +4,8 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
-#include "../oo/cobject.h"
-
+#include "cobject.h"
+#include "clogger.h"
 
 struct _QueueThread {
     CObject parent;
@@ -17,6 +17,7 @@ struct _QueueThread {
 };
 
 void * priv_QueueThread_call(void * data){
+    C_DEBUG("Started...");
     QueueThread* qt = (QueueThread*) data;
     while (1){
         if(QueueThread__is_cancelled(qt)){
@@ -48,6 +49,7 @@ void * priv_QueueThread_call(void * data){
     }
 
 exit:
+    C_INFO("Finished...");
     EventQueue__remove_thread(qt->queue,qt);
     pthread_exit(0);
 };

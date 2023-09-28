@@ -1,5 +1,6 @@
 #include "msg_dialog.h"
 #include "../../queue/event_queue.h"
+#include "clogger.h"
 #include "../gui_utils.h"
 #include "app_dialog.h"
 
@@ -56,7 +57,7 @@ void MsgDialog__reset(MsgDialog* self) {
 }
 
 MsgDialog * MsgDialog__create(){
-    printf("MsgDialog__create\n");
+    C_TRACE("create");
     MsgDialog * dialog = malloc(sizeof(MsgDialog));
     dialog->elements = malloc(sizeof(DialogElements));
     dialog->icon = NULL;

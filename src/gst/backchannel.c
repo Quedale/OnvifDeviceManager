@@ -2,6 +2,7 @@
 #include "portable_thread.h"
 #include <stdio.h>
 #include "src_retriever.h"
+#include "clogger.h"
 
 static P_MUTEX_TYPE init_lock = P_MUTEX_INITIALIZER;
 static int initialized = 0;
@@ -39,7 +40,7 @@ GstStateChangeReturn RtspBackchannel__pause(RtspBackchannel * self){
     if(self && GST_IS_ELEMENT(self->pipeline)){
       ret = gst_element_set_state (self->pipeline, GST_STATE_NULL);
       if (ret == GST_STATE_CHANGE_FAILURE) {
-            GST_ERROR ("Unable to set the pipeline to ready state.\n");
+            C_ERROR ("Unable to set the pipeline to ready state.");
       }
     }
     return ret;
@@ -50,7 +51,7 @@ GstStateChangeReturn RtspBackchannel__stop(RtspBackchannel * self){
     if(self && GST_IS_ELEMENT(self->pipeline)){
         ret = gst_element_set_state (self->pipeline, GST_STATE_NULL);
         if (ret == GST_STATE_CHANGE_FAILURE) {
-            GST_ERROR ("Unable to set the pipeline to null state.\n");
+            C_ERROR ("Unable to set the pipeline to null state.");
         }
     }
     return ret;
@@ -103,11 +104,11 @@ void RtspBackchannel__init(RtspBackchannel * self){
 
     /* Create the elements */
     if(strlen(mic_element) == 0){
-        printf("No microphone detected. Skipping backchannel setup!\n");
+        C_WARN("No microphone detected. Skipping backchannel setup!");
         return;
     }
 
-    printf("Creating backchannel using source element %s\n",mic_element);
+    C_INFO("Creating backchannel using source element %s",mic_element);
 
     src = gst_element_factory_make (mic_element, NULL);
     self->mic_volume_element = gst_element_factory_make ("volume", NULL);
@@ -116,7 +117,7 @@ void RtspBackchannel__init(RtspBackchannel * self){
     self->appsink = gst_element_factory_make ("appsink", NULL);
 
     if(!src || !self->mic_volume_element || !enc || !pay || !self->appsink){
-        printf("Failed to created backchannel element(s). Check your gstreamer installation...\n");
+        C_FATAL("Failed to created backchannel element(s). Check your gstreamer installation...");
         return;
     }
 
@@ -127,13 +128,13 @@ void RtspBackchannel__init(RtspBackchannel * self){
     if (!gst_element_link_many (src,
         self->mic_volume_element,
         enc, pay, self->appsink, NULL)){
-        g_warning ("Failed to link pipeline element...");
+        C_FATAL ("Failed to link pipeline element...");
         return;
     }
 
     if(!strcmp(mic_element,"alsasrc") 
         && strlen(mic_device) > 1){
-        printf("Setting alsa mic to '%s'\n",mic_device);
+        C_INFO("Setting alsa mic to '%s'\n",mic_device);
         g_object_set(G_OBJECT(src), "device", mic_device,NULL);
     }
 
@@ -141,7 +142,7 @@ void RtspBackchannel__init(RtspBackchannel * self){
     g_object_set (G_OBJECT (self->mic_volume_element), "mute", TRUE, NULL);
     g_object_set (G_OBJECT (self->appsink), "emit-signals", TRUE, NULL);
     if(!g_signal_connect (self->appsink, "new-sample", G_CALLBACK (RtspBackchannel__new_sample), self)){
-        printf("Failed to add new-sample signal to appsink. Check your gstreamer installation...\n");
+        C_FATAL("Failed to add new-sample signal to appsink. Check your gstreamer installation...\n");
         return;
     }
 
@@ -158,13 +159,13 @@ gboolean RtspBackchannel__find (GstElement * rtspsrc, guint idx, GstCaps * caps,
     self->rtspsrc = rtspsrc;
 
     if(!self->pipeline){
-        printf("Backchannel not setup\n");
+        C_ERROR("Backchannel not setup\n");
         goto exit;
     }
 
     gchar *caps_str = gst_caps_to_string (caps);
     g_free (caps_str);
-    printf("RtspPlayer__find_backchannel\n");
+    C_DEBUG("find\n");
     s = gst_caps_get_structure (caps, 0);
     if (gst_structure_has_field (s, "a-sendonly")) {
         self->back_stream_id = idx;
@@ -176,7 +177,7 @@ gboolean RtspBackchannel__find (GstElement * rtspsrc, guint idx, GstCaps * caps,
 
         //Update appsink caps compatible with recipient
         g_object_set (G_OBJECT (self->appsink), "caps", caps, NULL);
-        g_print ("Playing backchannel shoveler\n");
+        C_DEBUG ("Playing backchannel shoveler\n");
         gst_element_set_state (self->pipeline, GST_STATE_PLAYING);
     }
 
@@ -191,21 +192,21 @@ static void RtspBackchannel__message_handler (GstBus * bus, GstMessage * message
     
     switch(GST_MESSAGE_TYPE(message)){
         case GST_MESSAGE_UNKNOWN:
-            printf("backpipe msg : GST_MESSAGE_UNKNOWN\n");
+            C_TRACE("GST_MESSAGE_UNKNOWN");
             break;
         case GST_MESSAGE_EOS:
-            printf ("backpipe msg : End-Of-Stream reached.\n");
+            C_ERROR ("End-Of-Stream reached.");
             break;
         case GST_MESSAGE_ERROR:
             gst_message_parse_error (message, &err, &debug_info);
-            printf ("backpipe - Error received from element %s: %s\n", GST_OBJECT_NAME (message->src), err->message);
-            printf ("backpipe - Debugging information: %s\n", debug_info ? debug_info : "none");
+            C_ERROR ("Error received from element %s: %s", GST_OBJECT_NAME (message->src), err->message);
+            C_ERROR ("Debugging information: %s", debug_info ? debug_info : "none");
             g_clear_error (&err);
             g_free (debug_info);
             break;
         case GST_MESSAGE_STATE_CHANGED:
             gst_message_parse_state_changed (message, &old_state, &new_state, &pending_state);
-            printf ("backpipe - State set to %s for %s\n", gst_element_state_get_name (new_state), GST_OBJECT_NAME (message->src));
+            C_TRACE ("State set to %s for %s", gst_element_state_get_name (new_state), GST_OBJECT_NAME (message->src));
             break;
         case GST_MESSAGE_WARNING:
         default:

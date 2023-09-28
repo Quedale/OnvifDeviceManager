@@ -1,5 +1,5 @@
 #include "queue_event.h"
-#include "../oo/cobject.h"
+#include "cobject.h"
 #include <stdlib.h>
 
 struct _QueueEvent {

@@ -5,6 +5,7 @@
 #include "gui_utils.h"
 #include <netdb.h>
 #include <arpa/inet.h>
+#include "clogger.h"
 
 extern char _binary_prohibited_icon_png_size[];
 extern char _binary_prohibited_icon_png_start[];
@@ -50,7 +51,7 @@ void priv_Device__destroy(CObject * self){
 }
 int _priv_Device__lookup_hostname_netbios(Device * device, char * hostname){
     char * dev_ip = OnvifDevice__get_ip(device->onvif_device);
-    printf("NetBIOS Lookup ... %s\n",dev_ip);
+    C_INFO("NetBIOS Lookup ... %s",dev_ip);
     int ret;
     //Lookup hostname
     struct in_addr in_a;
@@ -60,15 +61,14 @@ int _priv_Device__lookup_hostname_netbios(Device * device, char * hostname){
                         sizeof(struct in_addr), 
                         AF_INET );
     if(host){
-        printf("Found hostname : %s\n",host->h_name);
         hostname = host->h_name;
         ret = 1;
     } else {
-        printf("Failed to get hostname ...\n");
+        C_WARN("Failed to get hostname ...");
         hostname = NULL;
     }
 
-    printf("Retrieved hostname : %s\n",hostname);
+    C_INFO("Retrieved hostname : %s",hostname);
     free(dev_ip);
     return ret;
 }
@@ -79,7 +79,7 @@ int _priv_Device__lookup_hostname_dns(Device * device, char * hostname){
     memset(&servInfo,0,sizeof(servInfo));
 
     char * dev_ip = OnvifDevice__get_ip(device->onvif_device);
-    printf("DNS Lookup ... %s\n",dev_ip);
+    C_INFO("DNS Lookup ... %s",dev_ip);
 
     struct sockaddr_in sa_in;
     sa_in.sin_family = AF_INET;
@@ -88,12 +88,11 @@ int _priv_Device__lookup_hostname_dns(Device * device, char * hostname){
 
     if (getnameinfo((struct sockaddr*) &sa_in, sizeof(struct sockaddr), hostname, sizeof(hostname),
                 servInfo, NI_MAXSERV, NI_NAMEREQD)){
-        printf("Failed to get hostname ...\n");
+        C_WARN("Failed to get hostname ...");
     } else {
-        printf("Retrieved host=%s, serv=%s\n", hostname, servInfo);
+        C_INFO("Retrieved host=%s, serv=%s\n", hostname, servInfo);
         ret = 1;
     }
-
 
     free(dev_ip);
     return ret;
@@ -104,9 +103,9 @@ void _priv_Device__lookup_hostname(void * user_data){
     char hostname[NI_MAXHOST];
     memset(&hostname,0,sizeof(hostname));
     
-    printf("_priv_Device__lookup_hostname\n");
+    C_DEBUG("_priv_Device__lookup_hostname\n");
     if(!CObject__addref((CObject*)device)){
-        printf("WARN _priv_Device__lookup_hostname - invalid device\n");
+        C_WARN("_priv_Device__lookup_hostname - invalid device");
         return;
     }
 
@@ -114,12 +113,12 @@ void _priv_Device__lookup_hostname(void * user_data){
         _priv_Device__lookup_hostname_netbios(device,hostname);
     }
 
-    printf("_priv_Device__lookup_hostname - done\n");
+    C_TRACE("_priv_Device__lookup_hostname - done");
     CObject__unref((CObject*)device);
 }
 
 void _priv_Device__load_thumbnail(void * user_data){
-    printf("_priv_Device__load_thumbnail\n");
+    C_DEBUG("_priv_Device__load_thumbnail");
     GtkWidget *image;
     GError *error = NULL;
     GdkPixbuf *pixbuf = NULL;
@@ -132,7 +131,7 @@ void _priv_Device__load_thumbnail(void * user_data){
     Device * device = (Device *) user_data;
 
     if(!CObject__addref((CObject*)device)){
-        printf("WARN _priv_Device__load_thumbnail - invalid device #1\n");
+        C_WARN("_priv_Device__load_thumbnail - invalid device #1");
         return;
     }
     
@@ -141,7 +140,7 @@ void _priv_Device__load_thumbnail(void * user_data){
         OnvifMediaService * media_service = OnvifDevice__get_media_service(device->onvif_device);
         snapshot = OnvifMediaService__getSnapshot(media_service,Device__get_selected_profile(device));
         if(!snapshot){
-            printf("_priv_Device__load_thumbnail- Error retrieve snapshot.");
+            C_ERROR("_priv_Device__load_thumbnail- Error retrieve snapshot.");
             goto warning;
         }
         imgdata = OnvifSnapshot__get_buffer(snapshot);
@@ -155,7 +154,7 @@ void _priv_Device__load_thumbnail(void * user_data){
 
     //Check is device is still valid. (User performed scan before snapshot finished)
     if(!CObject__is_valid((CObject*)device)){
-        printf("WARN _priv_Device__load_thumbnail - invalid device #2\n");
+        C_WARN("_priv_Device__load_thumbnail - invalid device #2");
         goto exit;
     }
 
@@ -164,16 +163,16 @@ void _priv_Device__load_thumbnail(void * user_data){
         pixbuf = gdk_pixbuf_loader_get_pixbuf (loader);
     } else {
         if(error->message){
-            printf("Error writing png to GtkPixbufLoader : %s\n",error->message);
+            C_ERROR("Error writing png to GtkPixbufLoader : %s",error->message);
         } else {
-            printf("Error writing png to GtkPixbufLoader : [null]\n");
+            C_ERROR("Error writing png to GtkPixbufLoader : [null]");
         }
     }
 
 warning:
     //Check is device is still valid. (User performed scan before snapshot finished)
     if(!CObject__is_valid((CObject*)device)){
-        printf("WARN _priv_Device__load_thumbnail - invalid device #3\n");
+        C_WARN("_priv_Device__load_thumbnail - invalid device #3");
         goto exit;
     }
 
@@ -183,16 +182,16 @@ warning:
             pixbuf = gdk_pixbuf_loader_get_pixbuf (loader);
         } else {
             if(error->message){
-                printf("Error writing warning png to GtkPixbufLoader : %s\n",error->message);
+                C_ERROR("Error writing warning png to GtkPixbufLoader : %s",error->message);
             } else {
-                printf("Error writing warning png to GtkPixbufLoader : [null]\n");
+                C_ERROR("Error writing warning png to GtkPixbufLoader : [null]");
             }
         }
     }
 
     //Check is device is still valid. (User performed scan before spinner showed)
     if(!CObject__is_valid((CObject*)device)){
-        printf("WARN _priv_Device__load_thumbnail - invalid device #4\n");
+        C_WARN("_priv_Device__load_thumbnail - invalid device #4");
         goto exit;
     }
 
@@ -206,13 +205,13 @@ warning:
 
         //Check is device is still valid. (User performed scan before scale finished)
         if(!CObject__is_valid((CObject*)device)){
-            printf("WARN _priv_Device__load_thumbnail - invalid device #5\n");
+            C_WARN("_priv_Device__load_thumbnail - invalid device #5");
             goto exit;
         }
 
         gui_update_widget_image(image,device->image_handle);
     } else {
-        printf("Failed all thumbnail creation.\n");
+        C_ERROR("Failed all thumbnail creation.");
     }
 
 exit:
@@ -225,7 +224,7 @@ exit:
     }
     OnvifSnapshot__destroy(snapshot);
 
-    printf("_priv_Device__load_thumbnail done.\n");
+    C_TRACE("_priv_Device__load_thumbnail done.");
     CObject__unref((CObject*)device);
 } 
 
@@ -247,15 +246,15 @@ void priv_Device__profile_changed(GtkComboBox* self, Device * device){
 
 gboolean * gui_Device__display_profiles (void * user_data){
     GUIProfileEvent * evt = (GUIProfileEvent *) user_data;
-    printf("gui_Device__display_profiles\n");
+    C_DEBUG("gui_Device__display_profiles");
 
     if(!CObject__addref((CObject*)evt->device)){
-        printf("WARN gui_Device__display_profiles - invalid device\n");
+        C_WARN("gui_Device__display_profiles - invalid device");
         return FALSE;
     }
 
     if(OnvifDevice__get_last_error(evt->device->onvif_device) == ONVIF_NOT_AUTHORIZED){
-        printf("WARN gui_Device__display_profiles - unauthorized\n");
+        C_WARN("gui_Device__display_profiles - unauthorized");
         goto exit;
     }
     
@@ -264,8 +263,8 @@ gboolean * gui_Device__display_profiles (void * user_data){
         OnvifProfile * profile = OnvifProfiles__get_profile(evt->profiles,i);
         char * name = OnvifProfile__get_name(profile);
         char * token = OnvifProfile__get_token(profile);
-        printf("Profile name: %s\n", name);
-        printf("Profile token: %s\n", token);
+        C_TRACE("Profile name: %s", name);
+        C_TRACE("Profile token: %s", token);
 
         gtk_list_store_insert_with_values(liststore, NULL, -1,
                                         // 0, "red",
@@ -285,15 +284,15 @@ exit:
 //WIP Profile selection
 void _priv_Device__load_profiles(void * user_data){
     Device * device = (Device *) user_data;
-    printf("_priv_Device__load_profiles\n");
+    C_DEBUG("_priv_Device__load_profiles");
 
     if(!CObject__addref((CObject*)device)){
-        printf("WARN _priv_Device__load_profiles - invalid object\n");
+        C_TRACE("_priv_Device__load_profiles - invalid object");
         return;
     }
 
     if(OnvifDevice__get_last_error(device->onvif_device) == ONVIF_NOT_AUTHORIZED){
-        printf("WARN _priv_Device__load_profiles - unauthorized\n");
+        C_TRACE("_priv_Device__load_profiles - unauthorized");
         goto exit;
     }
 
@@ -309,7 +308,7 @@ void _priv_Device__load_profiles(void * user_data){
     }
 
 exit:
-    printf("_priv_Device__load_profiles - Done\n");
+    C_TRACE("_priv_Device__load_profiles - Done");
     CObject__unref((CObject*)device);
 }
 
@@ -332,12 +331,12 @@ Device * Device__create(OnvifDevice * onvif_device){
 }
 
 void Device__lookup_hostname(Device* device, EventQueue * queue){
-    printf("Device__lookup_hostname\n");
+    C_DEBUG("Device__lookup_hostname");
     EventQueue__insert(queue,_priv_Device__lookup_hostname,device);
 }
 
 void Device__load_thumbnail(Device* device, EventQueue * queue){
-    printf("Device__load_thumbnail\n");
+    C_DEBUG("Device__load_thumbnail");
     EventQueue__insert(queue,_priv_Device__load_thumbnail,device);
 }
 
@@ -422,7 +421,7 @@ void Device__set_profile_callback(Device * self, void (*profile_callback)(Device
 }
 
 void Device__load_profiles(Device* device, EventQueue * queue){
-    printf("Device__load_profiles\n");
+    C_DEBUG("Device__load_profiles");
     EventQueue__insert(queue,_priv_Device__load_profiles,device);
 }
 

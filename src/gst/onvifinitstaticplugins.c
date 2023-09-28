@@ -1,6 +1,7 @@
 
 #include <gst/gst.h>
 #include <stdio.h>
+#include "clogger.h"
 
 GST_PLUGIN_STATIC_DECLARE(gtknew);
 
@@ -218,12 +219,12 @@ onvif_init_static_plugins (void)
   static gsize initialization_value = 0;
   if (g_once_init_enter (&initialization_value)) {
 
-    printf("Initializing Gstreamer plugins...\n");
+    C_DEBUG("Initializing Gstreamer plugins...");
     GST_PLUGIN_STATIC_REGISTER(gtknew);
 
 #ifdef STATIC_BUILD
     
-    printf("Loading static plugins...\n");
+    C_DEBUG("Loading static plugins...");
     GST_PLUGIN_STATIC_REGISTER(coreelements);
     // GST_PLUGIN_STATIC_REGISTER(coretracers);
     // GST_PLUGIN_STATIC_REGISTER(adder); gstadder
@@ -394,7 +395,7 @@ onvif_init_static_plugins (void)
     // GST_PLUGIN_STATIC_REGISTER(fbdevsink); gstfbdevsink
     // GST_PLUGIN_STATIC_REGISTER(ipcpipeline); gstipcpipeline
 #ifdef ENABLENVCODEC
-    printf("Using Nvida Codec...\n");
+    C_DEBUG("Using Nvida Codec...");
     GST_PLUGIN_STATIC_REGISTER(nvcodec);
 #endif
     // GST_PLUGIN_STATIC_REGISTER(shm); gstshm
@@ -429,6 +430,6 @@ onvif_init_static_plugins (void)
     // g_io_openssl_load (NULL);
 #endif
     g_once_init_leave (&initialization_value, 1);
-    printf("Gstreamer plugins initialized...\n");
+    C_DEBUG("Gstreamer plugins initialized...");
   }
 }

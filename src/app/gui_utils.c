@@ -1,5 +1,6 @@
 
 #include "gui_utils.h"
+#include "clogger.h"
 
 typedef struct {
     GtkWidget * image;
@@ -8,7 +9,7 @@ typedef struct {
 
 gboolean * gui_update_widget_image_priv(void * user_data){
     ImageGUIUpdate * iguiu = (ImageGUIUpdate *) user_data;
-    printf("gui_update_widget_image_priv\n");
+    C_TRACE("gui_update_widget_image_priv");
 
     if(GTK_IS_WIDGET(iguiu->handle)){
         gtk_container_foreach (GTK_CONTAINER (iguiu->handle), (void*) gtk_widget_destroy, NULL);
@@ -16,15 +17,16 @@ gboolean * gui_update_widget_image_priv(void * user_data){
             gtk_container_add (GTK_CONTAINER (iguiu->handle), iguiu->image);
             gtk_widget_show (iguiu->image);
             if(GTK_IS_SPINNER(iguiu->image)){
+                C_TRACE("gui_update_widget_image_priv - starting spinner");
                 gtk_spinner_start (GTK_SPINNER (iguiu->image));
             }
         }
     } else {
-        printf("gui_update_widget_image_priv - invalid handle\n");
+        C_WARN("gui_update_widget_image_priv - invalid handle");
     }
 
     free(iguiu);
-    printf("gui_update_widget_image_priv done\n");
+    C_TRACE("gui_update_widget_image_priv done");
     return FALSE;
 }
 

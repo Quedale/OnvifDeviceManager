@@ -867,6 +867,47 @@ fi
 
 ################################################################
 # 
+#    Build cutils
+#       
+################################################################
+#Check if new changes needs to be pulled
+git -C CUtils remote update 2> /dev/null
+LOCAL=$(git -C CUtils rev-parse @)
+REMOTE=$(git -C CUtils rev-parse @{u})
+BASE=$(git -C CUtils merge-base @ @{u})
+force_rebuild=0
+if [ $LOCAL = $REMOTE ]; then
+    echo "CUtils is already up-to-date. Do nothing..."
+elif [ $LOCAL = $BASE ]; then
+    echo "CUtils has new changes. Force rebuild..."
+    force_rebuild=1
+elif [ $REMOTE = $BASE ]; then
+    echo "CUtils has local changes. Doing nothing..."
+else
+    echo "Error CUtils is diverged."
+    exit 1
+fi
+
+if [ $force_rebuild -eq 0 ]; then
+  CUTILSLIB_PKG=$SUBPROJECT_DIR/CUtils/build/dist/lib/pkgconfig
+  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$CUTILSLIB_PKG \
+  pkg-config --exists --print-errors "cutils"
+  ret=$?
+else
+  ret=1
+fi
+
+if [ $ret != 0 ]; then
+  pullOrClone path=https://github.com/Quedale/CUtils.git ignorecache="true"
+  if [ $FAILED -eq 1 ]; then exit 1; fi
+  buildMakeProject srcdir="CUtils" prefix="$SUBPROJECT_DIR/CUtils/build/dist" cmakedir=".." outoftree=true
+  if [ $FAILED -eq 1 ]; then exit 1; fi
+else
+  echo "CUtils already found."
+fi
+
+################################################################
+# 
 #    Build OnvifDiscoveryLib
 #       
 ################################################################

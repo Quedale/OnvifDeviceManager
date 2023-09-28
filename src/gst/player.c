@@ -1,5 +1,6 @@
 #include "player.h"
 #include "gtk/gstgtkbasesink.h"
+#include "clogger.h"
 
 GST_DEBUG_CATEGORY_STATIC (ext_gst_player_debug);
 #define GST_CAT_DEFAULT (ext_gst_player_debug)
@@ -70,16 +71,16 @@ static void error_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
   }
 
   if(err->code == GST_RESOURCE_ERROR_SETTINGS && data->enable_backchannel){
-    GST_WARNING ("Backchannel unsupported. Downgrading...");
+    C_WARN ("Backchannel unsupported. Downgrading...");
     data->enable_backchannel = 0;
   } else if(err->code == GST_RESOURCE_ERROR_NOT_AUTHORIZED ||
       err->code == GST_RESOURCE_ERROR_NOT_FOUND){
-    GST_ERROR("Non-recoverable error encountered.");
+    C_ERROR("Non-recoverable error encountered.");
     RtspPlayer__stop(data);
   }
 
-  GST_ERROR ("%s received from element %s: %s", type, GST_OBJECT_NAME (msg->src), err->message);
-  GST_ERROR ("Debugging information: %s", debug_info ? debug_info : "none");
+  C_ERROR ("%s received from element %s: %s", type, GST_OBJECT_NAME (msg->src), err->message);
+  C_ERROR ("Debugging information: %s", debug_info ? debug_info : "none");
   g_clear_error (&err);
   g_free (debug_info);
 
@@ -93,9 +94,9 @@ static void error_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
 
     data->playing = 1; //Set playing flag to allow retry
     data->retry++; 
-    GST_WARNING("****************************************************\n");
-    GST_WARNING("Retry attempt #%i\n",data->retry);
-    GST_WARNING("****************************************************\n");
+    C_WARN("****************************************************");
+    C_WARN("Retry attempt #%i",data->retry);
+    C_WARN("****************************************************");
     //Retry signal
     (*(data->retry_callback))(data, data->retry_user_data);
   } else {
@@ -110,7 +111,7 @@ static void error_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
 /* This function is called when an End-Of-Stream message is posted on the bus.
  * We just set the pipeline to READY (which stops playback) */
 static void eos_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
-  GST_ERROR ("End-Of-Stream reached.\n");
+  C_ERROR ("End-Of-Stream reached.\n");
   RtspBackchannel__stop(data->backchannel);
   gst_element_set_state (data->pipeline, GST_STATE_NULL);
 }
@@ -218,7 +219,7 @@ state_changed_cb (GstBus * bus, GstMessage * msg, RtspPlayer * data)
   if((data->video_bin != NULL && GST_IS_OBJECT(data->video_bin) && GST_MESSAGE_SRC (msg) == GST_OBJECT (data->video_bin)) ||
       (data->audio_bin != NULL && GST_IS_OBJECT(data->audio_bin) && GST_MESSAGE_SRC (msg) == GST_OBJECT (data->audio_bin)) ||
       (data->pipeline != NULL && GST_IS_OBJECT(data->pipeline) && GST_MESSAGE_SRC (msg) == GST_OBJECT (data->pipeline))){
-    printf ("State set to %s for %s\n", gst_element_state_get_name (new_state), GST_OBJECT_NAME (msg->src));
+    C_TRACE ("State set to %s for %s\n", gst_element_state_get_name (new_state), GST_OBJECT_NAME (msg->src));
     // printf("[no_audio:%i][no_video:%i][audio_done:%i][video_done:%i][pad_found:%i][pipe:%i]\n",data->no_audio,data->no_video,data->audio_done,data->video_done,data->pad_found,GST_MESSAGE_SRC(msg) == GST_OBJECT(data->pipeline));
   }
 }
@@ -231,7 +232,7 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
   RtspPlayer *player = (RtspPlayer *) p;
   switch(GST_MESSAGE_TYPE(message)){
     case GST_MESSAGE_UNKNOWN:
-      printf("msg : GST_MESSAGE_UNKNOWN\n");
+      C_DEBUG("msg : GST_MESSAGE_UNKNOWN\n");
       break;
     case GST_MESSAGE_EOS:
       eos_cb(bus,message,player);
@@ -241,38 +242,38 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
       error_cb(bus,message,player);
       break;
     case GST_MESSAGE_INFO:
-      printf("msg : GST_MESSAGE_INFO\n");
+      C_DEBUG("msg : GST_MESSAGE_INFO\n");
       break;
     case GST_MESSAGE_TAG:
       // tag_cb(bus,message,player);
       break;
     case GST_MESSAGE_BUFFERING:
-      printf("msg : GST_MESSAGE_BUFFERING\n");
+      C_DEBUG("msg : GST_MESSAGE_BUFFERING\n");
       break;
     case GST_MESSAGE_STATE_CHANGED:
       state_changed_cb(bus,message,player);
       break;
     case GST_MESSAGE_STATE_DIRTY:
-      printf("msg : GST_MESSAGE_STATE_DIRTY\n");
+      C_DEBUG("msg : GST_MESSAGE_STATE_DIRTY\n");
       break;
     case GST_MESSAGE_STEP_DONE:
-      printf("msg : GST_MESSAGE_STEP_DONE\n");
+      C_DEBUG("msg : GST_MESSAGE_STEP_DONE\n");
       break;
     case GST_MESSAGE_CLOCK_PROVIDE:
-      printf("msg : GST_MESSAGE_CLOCK_PROVIDE\n");
+      C_DEBUG("msg : GST_MESSAGE_CLOCK_PROVIDE\n");
       break;
     case GST_MESSAGE_CLOCK_LOST:
-      printf("msg : GST_MESSAGE_CLOCK_LOST\n");
+      C_DEBUG("msg : GST_MESSAGE_CLOCK_LOST\n");
       break;
     case GST_MESSAGE_NEW_CLOCK:
       break;
     case GST_MESSAGE_STRUCTURE_CHANGE:
-      printf("msg : GST_MESSAGE_STRUCTURE_CHANGE\n");
+      C_DEBUG("msg : GST_MESSAGE_STRUCTURE_CHANGE\n");
       break;
     case GST_MESSAGE_STREAM_STATUS:
       break;
     case GST_MESSAGE_APPLICATION:
-      printf("msg : GST_MESSAGE_APPLICATION\n");
+      C_DEBUG("msg : GST_MESSAGE_APPLICATION\n");
       break;
     case GST_MESSAGE_ELEMENT:
       s = gst_message_get_structure (message);
@@ -283,41 +284,41 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
                 strcmp (name, "application/x-rtp-source-sdes") == 0){
         //Ignore intentionally left unhandled for now
       } else {
-        printf("TODO Unhandled element msg name : %s//%d\n",name,message->type);
+        C_ERROR("Unhandled element msg name : %s//%d\n",name,message->type);
       }
       break;
     case GST_MESSAGE_SEGMENT_START:
-      printf("msg : GST_MESSAGE_SEGMENT_START\n");
+      C_DEBUG("msg : GST_MESSAGE_SEGMENT_START\n");
       break;
     case GST_MESSAGE_SEGMENT_DONE:
-      printf("msg : GST_MESSAGE_SEGMENT_DONE\n");
+      C_DEBUG("msg : GST_MESSAGE_SEGMENT_DONE\n");
       break;
     case GST_MESSAGE_DURATION_CHANGED:
-      printf("msg : GST_MESSAGE_DURATION_CHANGED\n");
+      C_DEBUG("msg : GST_MESSAGE_DURATION_CHANGED\n");
       break;
     case GST_MESSAGE_LATENCY:
       break;
     case GST_MESSAGE_ASYNC_START:
-      printf("msg : GST_MESSAGE_ASYNC_START\n");
+      C_DEBUG("msg : GST_MESSAGE_ASYNC_START\n");
       break;
     case GST_MESSAGE_ASYNC_DONE:
       // printf("msg : GST_MESSAGE_ASYNC_DONE\n");
       break;
     case GST_MESSAGE_REQUEST_STATE:
-      printf("msg : GST_MESSAGE_REQUEST_STATE\n");
+      C_DEBUG("msg : GST_MESSAGE_REQUEST_STATE\n");
       break;
     case GST_MESSAGE_STEP_START:
-      printf("msg : GST_MESSAGE_STEP_START\n");
+      C_DEBUG("msg : GST_MESSAGE_STEP_START\n");
       break;
     case GST_MESSAGE_QOS:
       break;
     case GST_MESSAGE_PROGRESS:
       break;
     case GST_MESSAGE_TOC:
-      printf("msg : GST_MESSAGE_TOC\n");
+      C_DEBUG("msg : GST_MESSAGE_TOC\n");
       break;
     case GST_MESSAGE_RESET_TIME:
-      printf("msg : GST_MESSAGE_RESET_TIME\n");
+      C_DEBUG("msg : GST_MESSAGE_RESET_TIME\n");
       break;
     case GST_MESSAGE_STREAM_START:
       break;
@@ -326,25 +327,25 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
     case GST_MESSAGE_HAVE_CONTEXT:
       break;
     case GST_MESSAGE_EXTENDED:
-      printf("msg : GST_MESSAGE_EXTENDED\n");
+      C_DEBUG("msg : GST_MESSAGE_EXTENDED\n");
       break;
     case GST_MESSAGE_DEVICE_ADDED:
-      printf("msg : GST_MESSAGE_DEVICE_ADDED\n");
+      C_DEBUG("msg : GST_MESSAGE_DEVICE_ADDED\n");
       break;
     case GST_MESSAGE_DEVICE_REMOVED:
-      printf("msg : GST_MESSAGE_DEVICE_REMOVED\n");
+      C_DEBUG("msg : GST_MESSAGE_DEVICE_REMOVED\n");
       break;
     case GST_MESSAGE_PROPERTY_NOTIFY:
-      printf("msg : GST_MESSAGE_PROPERTY_NOTIFY\n");
+      C_DEBUG("msg : GST_MESSAGE_PROPERTY_NOTIFY\n");
       break;
     case GST_MESSAGE_STREAM_COLLECTION:
-      printf("msg : GST_MESSAGE_STREAM_COLLECTION\n");
+      C_DEBUG("msg : GST_MESSAGE_STREAM_COLLECTION\n");
       break;
     case GST_MESSAGE_STREAMS_SELECTED:
-      printf("msg : GST_MESSAGE_STREAMS_SELECTED\n");
+      C_DEBUG("msg : GST_MESSAGE_STREAMS_SELECTED\n");
       break;
     case GST_MESSAGE_REDIRECT:
-      printf("msg : GST_MESSAGE_REDIRECT\n");
+      C_DEBUG("msg : GST_MESSAGE_REDIRECT\n");
       break;
     //Doesnt exists in gstreamer 1.16
     // case GST_MESSAGE_DEVICE_CHANGED:
@@ -354,10 +355,10 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
     //  printf("msg : GST_MESSAGE_INSTANT_RATE_REQUEST\n");
       break;
     case GST_MESSAGE_ANY:
-      printf("msg : GST_MESSAGE_ANY\n");
+      C_DEBUG("msg : GST_MESSAGE_ANY\n");
       break;
     default:
-      printf("msg : default....");
+      C_DEBUG("msg : default....");
 
   }
 }
@@ -406,7 +407,7 @@ static GstElement * create_audio_bin(RtspPlayer * self){
       !convert ||
       !level ||
       !sink) {
-      GST_ERROR ("One of the video elements wasn't created... Exiting\n");
+      C_ERROR ("One of the video elements wasn't created... Exiting\n");
       return NULL;
   }
 
@@ -435,7 +436,7 @@ static GstElement * create_audio_bin(RtspPlayer * self){
   pad = gst_element_get_static_pad (decoder, "sink");
   if (!pad) {
       // TODO gst_object_unref 
-      GST_ERROR("unable to get decoder static sink pad");
+      C_ERROR("unable to get decoder static sink pad");
       return NULL;
   }
 
@@ -462,7 +463,7 @@ static GstElement * create_video_bin(RtspPlayer * self){
       !videoconvert ||
       !overlay_comp ||
       !self->sink) {
-      GST_ERROR ("One of the video elements wasn't created... Exiting\n");
+      C_ERROR ("One of the video elements wasn't created... Exiting\n");
       return NULL;
   }
 
@@ -490,16 +491,16 @@ static GstElement * create_video_bin(RtspPlayer * self){
   pad = gst_element_get_static_pad (vdecoder, "sink");
   if (!pad) {
       // TODO gst_object_unref 
-      GST_ERROR("unable to get decoder static sink pad");
+      C_ERROR("unable to get decoder static sink pad");
       return NULL;
   }
 
   if(! g_signal_connect (overlay_comp, "draw", G_CALLBACK (OverlayState__draw_overlay), self->overlay_state)){
-    GST_ERROR ("overlay draw callback Fail...");
+    C_ERROR ("overlay draw callback Fail...");
   }
 
   if(! g_signal_connect (overlay_comp, "caps-changed",G_CALLBACK (OverlayState__prepare_overlay), self->overlay_state)){
-    GST_ERROR ("overlay caps-changed callback Fail...");
+    C_ERROR ("overlay caps-changed callback Fail...");
     return NULL;
   }
 
@@ -608,11 +609,11 @@ void create_pipeline(RtspPlayer *self){
   self->src = gst_element_factory_make ("rtspsrc", "rtspsrc");
 
   if (!self->pipeline){
-    printf("Failed to created pipeline. Check your gstreamer installation...\n");
+    C_FATAL("Failed to created pipeline. Check your gstreamer installation...\n");
     return;
   }
   if (!self->src){
-    printf ("Failed to created rtspsrc. Check your gstreamer installation...\n");
+    C_FATAL ("Failed to created rtspsrc. Check your gstreamer installation...\n");
     return;
   }
 
@@ -620,14 +621,12 @@ void create_pipeline(RtspPlayer *self){
   gst_bin_add_many (GST_BIN (self->pipeline), self->src, NULL);
 
   // Dynamic Pad Creation
-  if(! g_signal_connect (self->src, "pad-added", G_CALLBACK (on_rtsp_pad_added),self))
-  {
-      g_warning ("Linking part (1) with part (A)-1 Fail...");
+  if(! g_signal_connect (self->src, "pad-added", G_CALLBACK (on_rtsp_pad_added),self)){
+      C_ERROR ("Linking part (1) with part (A)-1 Fail...");
   }
 
-  if(!g_signal_connect (self->src, "select-stream", G_CALLBACK (RtspBackchannel__find),self->backchannel))
-  {
-      GST_WARNING ("Fail to connect select-stream signal...");
+  if(!g_signal_connect (self->src, "select-stream", G_CALLBACK (RtspBackchannel__find),self->backchannel)){
+      C_ERROR ("Fail to connect select-stream signal...");
   }
 
   g_object_set (G_OBJECT (self->src), "buffer-mode", 3, NULL);
@@ -703,7 +702,7 @@ void RtspPlayer__destroy(RtspPlayer* self) {
     int ret_1 = gst_element_get_state (self->pipeline,&current_state_pipe, NULL, GST_CLOCK_TIME_NONE);
     int ret_2 = RtspBackchannel__get_state(self->backchannel, &current_state_back, NULL, GST_CLOCK_TIME_NONE);
     while( (ret_1 && current_state_pipe != GST_STATE_NULL) || ( ret_2 && current_state_pipe != GST_STATE_NULL)){
-      printf("Waiting for player to stop...\n");
+      C_DEBUG("Waiting for player to stop...\n");
       sleep(0.25);
     }
 
@@ -746,7 +745,7 @@ void RtspPlayer__set_retry_callback(RtspPlayer* self, void (*retry_callback)(Rts
 
 void RtspPlayer__set_playback_url(RtspPlayer* self, char *url) {
   P_MUTEX_LOCK(self->prop_lock);
-  printf("set location : %s\n",url);
+  C_INFO("set location : %s\n",url);
 
   if(!self->location){
     self->location = malloc(strlen(url)+1);
@@ -776,7 +775,7 @@ void RtspPlayer__set_credentials(RtspPlayer * self, char * user, char * pass){
 }
 
 void _RtspPlayer__stop(RtspPlayer* self, int notify){
-    printf("RtspPlayer__stop\n");
+    C_INFO("RtspPlayer__stop\n");
     if(!self){
       return;
     }
@@ -811,7 +810,7 @@ void _RtspPlayer__stop(RtspPlayer* self, int notify){
     if(GST_IS_ELEMENT(self->pipeline)){
       ret = gst_element_set_state (self->pipeline, GST_STATE_NULL);
       if (ret == GST_STATE_CHANGE_FAILURE) {
-          GST_ERROR ("Unable to set the pipeline to the ready state.\n");
+          C_ERROR ("Unable to set the pipeline to the ready state.\n");
           goto stop_out;
       }
     }
@@ -841,7 +840,7 @@ void RtspPlayer__stop(RtspPlayer* self){
 
 void _RtspPlayer__play(RtspPlayer* self, int retry){
   P_MUTEX_LOCK(self->player_lock);
-  printf("RtspPlayer__play retry[%i] - playing[%i]\n",retry,self->playing);
+  C_INFO("RtspPlayer__play retry[%i] - playing[%i]\n",retry,self->playing);
   if(retry && self->playing == 0){//Retry signal after stop requested
     goto exit;
   } else {
@@ -856,7 +855,7 @@ void _RtspPlayer__play(RtspPlayer* self, int retry){
   GstStateChangeReturn ret;
   ret = gst_element_set_state (self->pipeline, GST_STATE_PLAYING);
   if (ret == GST_STATE_CHANGE_FAILURE) {
-      GST_ERROR ("Unable to set the pipeline to the playing state.\n");
+      C_ERROR ("Unable to set the pipeline to the playing state.\n");
       gst_object_unref (self->pipeline);
       goto exit;
   }

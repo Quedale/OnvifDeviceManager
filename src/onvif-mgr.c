@@ -5,6 +5,7 @@
 #include <gtk/gtk.h>
 #include <execinfo.h>
 #include <signal.h>
+#include "clogger.h"
 
 void handler(int sig) {
   void *array[10];
@@ -25,6 +26,7 @@ int main(int argc, char *argv[]) {
   // make OpenSSL MT-safe with mutex
   // CRYPTO_thread_setup();
   
+  c_log_set_level(C_ALL_E);
 
   /* Initialize GTK */
   gtk_init (&argc, &argv);
@@ -35,7 +37,7 @@ int main(int argc, char *argv[]) {
 
   gst_debug_set_threshold_for_name ("ext-gst-player", GST_LEVEL_DEBUG);
   
-  printf("Using Gstreamer Version : %i.%i.%i.%i\n",GST_PLUGINS_BASE_VERSION_MAJOR,GST_PLUGINS_BASE_VERSION_MINOR,GST_PLUGINS_BASE_VERSION_MICRO,GST_PLUGINS_BASE_VERSION_NANO);
+  C_INFO("Using Gstreamer Version : %i.%i.%i.%i",GST_PLUGINS_BASE_VERSION_MAJOR,GST_PLUGINS_BASE_VERSION_MINOR,GST_PLUGINS_BASE_VERSION_MICRO,GST_PLUGINS_BASE_VERSION_NANO);
   
   /* Initialize Application */
   OnvifApp__create();

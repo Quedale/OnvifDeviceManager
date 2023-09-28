@@ -9,7 +9,8 @@
 #include "../queue/event_queue.h"
 #include "discoverer.h"
 #include "task_manager.h"
-#include "../oo/clist_ts.h"
+#include "clist_ts.h"
+#include "clogger.h"
 
 typedef struct _OnvifApp {
     Device* device; /* Currently selected device */
@@ -104,7 +105,7 @@ static int device_already_found(OnvifApp * app, char * xaddr){
         OnvifDeviceService * devserv = OnvifDevice__get_device_service(odev);
         char * endpoint = OnvifDeviceService__get_endpoint(devserv);
         if(!strcmp(xaddr,endpoint)){
-            printf("Record already part of list [%s]\n",endpoint);
+            C_DEBUG("Record already part of list [%s]\n",endpoint);
             ret = 1;
         }
         free(endpoint);
@@ -121,7 +122,7 @@ static gboolean * found_server (void * e) {
     ProbMatch * m;
     int i;
   
-    printf("Found server - Match count : %i\n",server->matches->match_count);
+    C_INFO("Found server - Match count : %i\n",server->matches->match_count);
     for (i = 0 ; i < server->matches->match_count ; ++i) {
         m = server->matches->matches[i];
         if(!device_already_found(disco_in->app,m->addrs[0])){
@@ -134,7 +135,7 @@ static gboolean * found_server (void * e) {
 }
 
 void onvif_scan (GtkWidget *widget, OnvifApp * app) {
-    printf("Starting ONVIF Devices Network Discovery...\n");
+    C_INFO("Starting ONVIF Devices Network Discovery...");
     gtk_widget_set_sensitive(widget,FALSE);
     //Between retries, player may not send stopped event since the state didn't stop
     //Forcing hiding the loading indicator
@@ -230,7 +231,7 @@ void onvif_display_device_row(OnvifApp * self, Device * device, int skip_profile
 
 void _play_onvif_stream(void * user_data){
     struct DeviceInput * input = (struct DeviceInput *) user_data;
-    printf("_play_onvif_stream\n");
+    C_DEBUG("_play_onvif_stream\n");
     //Check if device is still valid. (User performed scan before thread started)
     if(!CObject__addref((CObject*)input->device)){
         free(input);
@@ -281,7 +282,7 @@ void _play_onvif_stream(void * user_data){
     RtspPlayer__play(input->app->player);
 
 exit:
-    printf("_play_onvif_stream - done\n");
+    C_TRACE("_play_onvif_stream - done\n");
     CObject__unref((CObject*)input->device);
     free(input);
 }
@@ -336,10 +337,10 @@ void _onvif_authentication_reload(void * user_data){
     AppDialogEvent * event = (AppDialogEvent *) user_data;
     struct DeviceInput * input = (struct DeviceInput *) event->user_data;
     Device * device = input->device;
-    printf("_onvif_authentication_reload\n");
+    C_DEBUG("_onvif_authentication_reload\n");
     //Check device is still valid before adding ref (User performed scan before thread started)
     if(!CObject__addref((CObject*)device)){
-        printf("_onvif_authentication_reload - invalid device\n");
+        C_WARN("_onvif_authentication_reload - invalid device\n");
         free(event);
         return;
     }
@@ -353,14 +354,14 @@ void _onvif_authentication_reload(void * user_data){
 }
 
 void dialog_login_cb(AppDialogEvent * event){
-    printf("OnvifAuthentication attempt...\n");
+    C_INFO("OnvifAuthentication attempt...\n");
     struct DeviceInput * input = (struct DeviceInput *) event->user_data;
     OnvifDevice__set_credentials(Device__get_device(input->device),CredentialsDialog__get_username((CredentialsDialog*)event->dialog),CredentialsDialog__get_password((CredentialsDialog*)event->dialog));
     EventQueue__insert(input->app->queue,_onvif_authentication_reload,AppDialogEvent_copy(event));
 }
 
 void dialog_cancel_cb(AppDialogEvent * event){
-    printf("OnvifAuthentication cancelled...\n");
+    C_INFO("OnvifAuthentication cancelled...\n");
     free(event->user_data);
 }
 
@@ -375,7 +376,7 @@ void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
     memset(&input, 0, sizeof(input));
     input.app = app;
 
-    printf("OnvifApp__select_device\n");
+    C_INFO("OnvifApp__select_device\n");
     
     //Stop previous stream
     EventQueue__insert(app->queue,_stop_onvif_stream,app);
@@ -443,7 +444,7 @@ void _onvif_authentication_add(void * user_data){
     OnvifDevice__set_credentials(input->device,CredentialsDialog__get_username((CredentialsDialog*)event->dialog),CredentialsDialog__get_password((CredentialsDialog*)event->dialog));
     OnvifDevice__authenticate(input->device);
     if(OnvifDevice__get_last_error(input->device) == ONVIF_NOT_AUTHORIZED){
-        printf("Authentication failed\n");
+        C_WARN("Authentication failed\n");
         goto exit;
     }
 
@@ -468,7 +469,7 @@ exit:
 }
 
 void dialog_login_add_cb(AppDialogEvent * event){
-    printf("OnvifAuthentication add attempt...\n");
+    C_INFO("OnvifAuthentication add attempt...\n");
     OnvifDeviceInput * input = (OnvifDeviceInput *) event->user_data;
     EventQueue__insert(input->app->queue,_onvif_authentication_add,AppDialogEvent_copy(event));
 }
@@ -493,11 +494,11 @@ void _onvif_device_add(void * user_data){
 
     OnvifDevice * onvif_dev = OnvifDevice__create(device_uri);
     if(!OnvifDevice__is_valid(onvif_dev)){
-        printf("Invalid URL provided\n");
+        C_ERROR("Invalid URL provided\n");
         OnvifDevice__destroy(onvif_dev);
         goto exit;
     } else {
-        printf("Valid device added [%s]\n",device_uri);
+        C_INFO("Valid device added [%s]\n",device_uri);
     }
 
     OnvifDevice__authenticate(onvif_dev);
@@ -518,11 +519,11 @@ void _onvif_device_add(void * user_data){
         guiscope->scopes = scopes;
         gdk_threads_add_idle((void *)gui_process_device_scopes,guiscope);
     } else if(oerror == ONVIF_CONNECTION_ERROR) {
-        printf("An conncetion error was encountered\n");
+        C_ERROR("An conncetion error was encountered\n");
         OnvifDevice__destroy(onvif_dev);
         goto exit;
     } else if(oerror == ONVIF_SOAP_ERROR) {
-        printf("An soap error was encountered \n");
+        C_ERROR("An soap error was encountered \n");
         OnvifDevice__destroy(onvif_dev);
         goto exit;
     }
@@ -846,7 +847,7 @@ void add_device(OnvifApp * self, OnvifDevice * onvif_dev, char* name, char * har
         OnvifDevice * odev = Device__get_device(dev);
         char * dev_ip = OnvifDevice__get_ip(odev);
         char * dev_port = OnvifDevice__get_port(odev);
-        printf("DEBUG List Record :[%i] %s:%s\n",b,dev_ip,dev_port);
+        C_DEBUG("\tList Record :[%i] %s:%s\n",b,dev_ip,dev_port);
         free(dev_ip);
         free(dev_port);
     }

@@ -2,7 +2,7 @@
 #define APP_DIALOG_H_
 
 #include <gtk/gtk.h>
-#include "../../oo/cobject.h"
+#include "cobject.h"
 
 #define APPDIALOG_TITLE_PREFIX "<span size=\"x-large\">"
 #define APPDIALOG_TITLE_SUFFIX "</span>"

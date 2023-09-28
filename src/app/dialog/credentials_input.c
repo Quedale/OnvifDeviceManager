@@ -1,5 +1,6 @@
 #include "credentials_input.h"
 #include "../../queue/event_queue.h"
+#include "clogger.h"
 
 #define CREDENTIALS_DIALOG_TITLE "ONVIF Device Authentication"
 #define CREDENTIALS_DIALOG_LABEL "Login"
@@ -24,7 +25,7 @@ const char * CredentialsDialog__get_password(CredentialsDialog * self){
 }
 
 CredentialsDialog * CredentialsDialog__create(){
-    printf("CredentialsDialog__create\n");
+    C_TRACE("create");
     CredentialsDialog * dialog = malloc(sizeof(CredentialsDialog));
     dialog->elements = malloc(sizeof(DialogElements));
     AppDialog__init((AppDialog*)dialog,priv_CredentialsDialog__create_ui);

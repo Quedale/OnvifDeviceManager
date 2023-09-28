@@ -4,8 +4,8 @@
 #include "onvif_device.h"
 #include <gtk/gtk.h>
 #include "../queue/event_queue.h"
-#include "../oo/cobject.h"
-#include "../oo/clist.h"
+#include "cobject.h"
+#include "clist.h"
 
 typedef struct _Device Device;
 

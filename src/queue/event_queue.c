@@ -4,7 +4,8 @@
 #include <pthread.h>
 #include <unistd.h>
 #include "event_queue.h"
-#include "../oo/clist_ts.h"
+#include "clist_ts.h"
+#include "clogger.h"
 #include <string.h>
 
 struct _EventQueue {
@@ -76,7 +77,7 @@ void EventQueue__init(EventQueue* self) {
 }
 
 EventQueue* EventQueue__create(void (*queue_event_cb)(QueueThread * thread, EventQueueType type, void * user_data), void * user_data) {
-    printf("EventQueue__create...\n");
+    C_TRACE("create...");
     EventQueue* result = (EventQueue*) malloc(sizeof(EventQueue));
     EventQueue__init(result);
     result->queue_event_cb = queue_event_cb;
@@ -127,7 +128,7 @@ void EventQueue__clear(EventQueue* self){
 }
 
 void EventQueue__insert(EventQueue* queue, void (*callback)(), void * user_data){
-    printf("EventQueue__insert\n");
+    C_TRACE("insert");
     if(!CObject__is_valid((CObject*)queue)){
         return;//Stop accepting events
     }
@@ -136,17 +137,15 @@ void EventQueue__insert(EventQueue* queue, void (*callback)(), void * user_data)
     CListTS__add(&queue->events,(CObject*)record);
     pthread_cond_signal(&queue->sleep_cond);
 
-    printf("EventQueue__insert - done\n");
+    C_TRACE("insert - done");
 };
 
 QueueEvent * EventQueue__pop(EventQueue* self){
-    printf("EventQueue__pop\n");
+    C_TRACE("pop");
     return (QueueEvent*) CListTS__pop(&self->events);
 };
 
 void EventQueue__start(EventQueue* self){
-    printf("EventQueue__start...\n");
-    
     pthread_mutex_lock(&self->pool_lock);
     QueueThread * qt = QueueThread__create(self);
     CListTS__add(&self->threads,(CObject*)qt);
@@ -162,7 +161,7 @@ void EventQueue__wait_condition(EventQueue * self, pthread_mutex_t * lock){
 }
 
 void EventQueue_notify_dispatching(EventQueue * self, QueueThread * thread){
-    printf("Dispatching event...\n");
+    C_TRACE("notify dispatching event...");
     priv_EventQueue__running_event_change(self,1);
     if(self->queue_event_cb){
         self->queue_event_cb(thread,EVENTQUEUE_DISPATCHING,self->user_data);
@@ -170,7 +169,7 @@ void EventQueue_notify_dispatching(EventQueue * self, QueueThread * thread){
 }
 
 void EventQueue_notify_dispatched(EventQueue * self,  QueueThread * thread){
-    printf("Dispatched event...\n");
+    C_TRACE("notify dispatched event...");
     priv_EventQueue__running_event_change(self,0);
     if(self->queue_event_cb){
         self->queue_event_cb(thread,EVENTQUEUE_DISPATCHED,self->user_data);

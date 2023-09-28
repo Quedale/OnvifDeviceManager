@@ -1,5 +1,6 @@
 #include "app_settings.h"
 #include "app_settings_discovery.h"
+#include "clogger.h"
 
 #define CONFIG_FILE_PATH "onvifmgr_settings.ini"
 
@@ -52,7 +53,7 @@ void _save_settings(void * user_data){
         
         fclose(fptr);
     } else {
-        printf("ERROR wrtting to settings file!\n");
+        C_ERROR("Failed to write to settings file!\n");
     }
 
     gdk_threads_add_idle((void *)save_done,self);
@@ -184,7 +185,7 @@ void AppSettings__load_settings(AppSettings * self){
     
     AppSettingsType category = -1;
     
-    printf("Reading Settings file %s\n",CONFIG_FILE_PATH);
+    C_INFO("Reading Settings file %s",CONFIG_FILE_PATH);
     if (access(CONFIG_FILE_PATH, F_OK) == 0) {
         fptr = fopen(CONFIG_FILE_PATH,"r");
         if(fptr != NULL){
@@ -201,10 +202,10 @@ void AppSettings__load_settings(AppSettings * self){
 
                     if(strcmp(AppSettingsStream__get_category(self->stream),cat) == 0){
                         category = APPSETTING_STREAM_TYPE;
-                        printf("[%s]\n",AppSettingsStream__get_category(self->stream));
+                        C_INFO("[%s]",AppSettingsStream__get_category(self->stream));
                     } else if(strcmp(AppSettingsDiscovery__get_category(self->discovery),cat) == 0){
                         category = APPSETTING_DISCOVERY_TYPE;
-                        printf("[%s]\n",AppSettingsDiscovery__get_category(self->discovery));
+                        C_INFO("[%s]",AppSettingsDiscovery__get_category(self->discovery));
                     }//More settings to add here
 
                     continue;
@@ -215,17 +216,17 @@ void AppSettings__load_settings(AppSettings * self){
                         continue;
                     }
                     char * val = strtok_r (buff_ptr, "\n", &buff_ptr); //Get reminder of line
-                    printf("\t Property : '%s' = '%s'\n",key,val);
+                    C_INFO("\t Property : '%s' = '%s'",key,val);
 
                     switch(category){
                         case APPSETTING_STREAM_TYPE:
                             if(!AppSettingsStream__set_property(self->stream,key,val)){
-                                printf("WARNING: Unknown stream property %s=%s\n",key,val);
+                                C_WARN("Unknown stream property %s=%s",key,val);
                             }//More settings to add here
                             break;
                         case APPSETTING_DISCOVERY_TYPE:
                             if(!AppSettingsDiscovery__set_property(self->discovery,key,val)){
-                                printf("WARNING: Unknown discovery property %s=%s\n",key,val);
+                                C_WARN("Unknown discovery property %s=%s",key,val);
                             }//More settings to add here
                             break;
                         default:
@@ -234,14 +235,14 @@ void AppSettings__load_settings(AppSettings * self){
                     }
                     continue;
                 } else {
-                    printf("WARNING Setting without category\n");
+                    C_WARN("Setting without category");
                 }
             }
         } else {
-            printf("WARNING no config file found. Using default configs. 2\n");
+            C_WARN("No config file found. Using default configs. 2");
         }
     } else {
-        printf("WARNING no config file found. Using default configs. 1\n");
+        C_WARN("No config file found. Using default configs. 1");
     }
 
     if(fptr)
