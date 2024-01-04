@@ -42,6 +42,7 @@ AddDeviceDialog * AddDeviceDialog__create(){
     dialog->elements = malloc(sizeof(DialogElements));
 
     AppDialog__init((AppDialog *)dialog, priv_AddDeviceDialog__create_iu);
+    CObject__set_allocated((CObject *) dialog);
     AppDialog__set_title((AppDialog *)dialog,ADD_DEVICE_TITLE);
     AppDialog__set_submit_label((AppDialog *)dialog,ADD_DEVICE_SUBMIT_LABEL);
     AppDialog__set_show_callback((AppDialog *)dialog,priv_AddDeviceDialog__show_cb);

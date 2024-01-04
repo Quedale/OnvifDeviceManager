@@ -95,6 +95,7 @@ OnvifDetails * OnvifDetails__create(EventQueue * queue){
 void OnvifDetails__destroy(OnvifDetails* self){
     if(self){
         OnvifInfo__destroy(self->info);
+        OnvifNetwork__destroy(self->network);
         free(self);
     }
 }

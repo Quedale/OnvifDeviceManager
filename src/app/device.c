@@ -20,18 +20,18 @@ extern char _binary_warning_png_start[];
 extern char _binary_warning_png_end[];
 
 struct _Device {
-  CObject parent;
+    CObject parent;
 
-  OnvifDevice * onvif_device;
-  GtkWidget * image_handle;
-  GtkWidget * profile_dropdown;
+    OnvifDevice * onvif_device;
+    GtkWidget * image_handle;
+    GtkWidget * profile_dropdown;
 
-  pthread_mutex_t * ref_lock;
-  int profile_index;
-  int selected;
+    P_MUTEX_TYPE ref_lock;
+    int profile_index;
+    int selected;
 
-  void (*profile_callback)(Device *, void *);
-  void * profile_userdata;
+    void (*profile_callback)(Device *, void *);
+    void * profile_userdata;
 };
 
 typedef struct {
@@ -48,6 +48,7 @@ gboolean * gui_Device__display_profiles (void * user_data);
 
 void priv_Device__destroy(CObject * self){
     OnvifDevice__destroy(((Device*)self)->onvif_device);
+    P_MUTEX_CLEANUP(self->ref_lock);
 }
 int _priv_Device__lookup_hostname_netbios(Device * device, char * hostname){
     char * dev_ip = OnvifDevice__get_ip(device->onvif_device);
@@ -229,7 +230,7 @@ exit:
 } 
 
 void priv_Device__profile_changed(GtkComboBox* self, Device * device){
-    pthread_mutex_lock(device->ref_lock);
+    P_MUTEX_LOCK(device->ref_lock);
     int new_index = gtk_combo_box_get_active(self);
     if(new_index == -1){
         new_index = 0; //Default to the first profile if nothing is available
@@ -241,7 +242,7 @@ void priv_Device__profile_changed(GtkComboBox* self, Device * device){
             device->profile_callback(device,device->profile_userdata);
         }
     }
-    pthread_mutex_unlock(device->ref_lock);
+    P_MUTEX_UNLOCK(device->ref_lock);
 }
 
 gboolean * gui_Device__display_profiles (void * user_data){
@@ -320,13 +321,13 @@ void Device__init(Device* self, OnvifDevice * onvif_device) {
     self->profile_index=0;
     self->profile_callback = NULL;
     self->profile_userdata = NULL;
-    self->ref_lock =malloc(sizeof(pthread_mutex_t));
-    pthread_mutex_init(self->ref_lock, NULL);
+    P_MUTEX_SETUP(self->ref_lock);
 }
 
 Device * Device__create(OnvifDevice * onvif_device){
     Device* result = (Device*) malloc(sizeof(Device));
     Device__init(result, onvif_device);
+    CObject__set_allocated((CObject *) result);
     return result;
 }
 
@@ -360,7 +361,7 @@ GtkWidget * Device__create_row (Device * device, char * uri, char* name, char * 
     g_object_set (thumbnail_handle, "margin-end", 10, NULL);
     gtk_grid_attach (GTK_GRID (grid), thumbnail_handle, 0, 1, 1, 3);
 
-    char* markup_name = malloc(strlen("<b>") + strlen(name) + strlen("</b>") +1);
+    char markup_name[strlen("<b>") + strlen(name) + strlen("</b>") +1]; //= malloc(strlen("<b>") + strlen(name) + strlen("</b>") +1);
     strcpy(markup_name, "<b>");
     strcat(markup_name, name);
     strcat(markup_name, "</b>");
@@ -439,9 +440,9 @@ void Device__set_selected(Device * self, int selected){
 
 int Device__get_selected_profile(Device * self){
     int ret = 0;
-    pthread_mutex_lock(self->ref_lock);
+    P_MUTEX_LOCK(self->ref_lock);
     ret = self->profile_index;
-    pthread_mutex_unlock(self->ref_lock);
+    P_MUTEX_UNLOCK(self->ref_lock);
     return ret;
 }
 

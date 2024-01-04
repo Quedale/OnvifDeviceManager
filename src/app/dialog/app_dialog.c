@@ -38,6 +38,9 @@ void priv_AppDialolg__destroy(CObject * self) {
     if(dialog->title){
         free(dialog->title);
     }
+    if(dialog->submit_label){
+        free(dialog->submit_label);
+    }
 }
 
 AppDialogEvent * AppDialogEvent_copy(AppDialogEvent * original){

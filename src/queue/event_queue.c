@@ -1,7 +1,6 @@
 
 #include <stddef.h>
 #include <stdio.h>
-#include <pthread.h>
 #include <unistd.h>
 #include "event_queue.h"
 #include "clist_ts.h"
@@ -16,9 +15,9 @@ struct _EventQueue {
     CListTS events;
     CListTS threads;
 
-    pthread_cond_t sleep_cond;
-    pthread_mutex_t pool_lock;
-    pthread_mutex_t running_events_lock;
+    P_COND_TYPE sleep_cond;
+    P_MUTEX_TYPE pool_lock;
+    P_MUTEX_TYPE running_events_lock;
 
     void (*queue_event_cb)(QueueThread * thread, EventQueueType type, void * user_data);
     void * user_data;
@@ -47,17 +46,21 @@ void priv_EventQueue__destroy(CObject * cobject){
 
         CObject__destroy((CObject *)&self->events);
         CObject__destroy((CObject *)&self->threads);
+
+        P_COND_CLEANUP(self->sleep_cond);
+        P_MUTEX_CLEANUP(self->pool_lock);
+        P_MUTEX_CLEANUP(self->running_events_lock);
     }
 }
 
 void priv_EventQueue__running_event_change(EventQueue * self, int add_flag){
-    pthread_mutex_lock(&self->running_events_lock);
+    P_MUTEX_LOCK(self->running_events_lock);
     if(add_flag){
         self->running_events++;
     } else {
         self->running_events--;
     }
-    pthread_mutex_unlock(&self->running_events_lock);
+    P_MUTEX_UNLOCK(self->running_events_lock);
 }
 
 void EventQueue__init(EventQueue* self) {
@@ -71,15 +74,16 @@ void EventQueue__init(EventQueue* self) {
 
     self->running_events=0;
 
-    pthread_cond_init(&self->sleep_cond, NULL);
-    pthread_mutex_init(&self->pool_lock, NULL);
-    pthread_mutex_init(&self->running_events_lock, NULL);
+    P_COND_SETUP(self->sleep_cond);
+    P_MUTEX_SETUP(self->pool_lock);
+    P_MUTEX_SETUP(self->running_events_lock);
 }
 
 EventQueue* EventQueue__create(void (*queue_event_cb)(QueueThread * thread, EventQueueType type, void * user_data), void * user_data) {
     C_TRACE("create...");
     EventQueue* result = (EventQueue*) malloc(sizeof(EventQueue));
     EventQueue__init(result);
+    CObject__set_allocated((CObject*)result);
     result->queue_event_cb = queue_event_cb;
     result->user_data = user_data;
     return result;
@@ -87,9 +91,9 @@ EventQueue* EventQueue__create(void (*queue_event_cb)(QueueThread * thread, Even
 
 int EventQueue__get_running_event_count(EventQueue * self){
     int ret = -1;
-    pthread_mutex_lock(&self->running_events_lock);
+    P_MUTEX_LOCK(self->running_events_lock);
     ret = self->running_events;
-    pthread_mutex_unlock(&self->running_events_lock);
+    P_MUTEX_UNLOCK(self->running_events_lock);
     return ret;
 }
 
@@ -106,11 +110,11 @@ void EventQueue__remove_thread(EventQueue* self, QueueThread * qt){
 }
 
 void EventQueue__stop(EventQueue* self, int nthread){
-    pthread_mutex_lock(&self->pool_lock);
+    P_MUTEX_LOCK(self->pool_lock);
     int tcount = EventQueue__get_thread_count(self);
     int cancelled_count = 0;
     for(int i=0; i < tcount; i++){
-        QueueThread * thread = (QueueThread *) CListTS__get(&self->threads,i);//self->threads[i];
+        QueueThread * thread = (QueueThread *) CListTS__get(&self->threads,i);
         if(cancelled_count == nthread){
             break;
         }
@@ -119,8 +123,8 @@ void EventQueue__stop(EventQueue* self, int nthread){
             cancelled_count++;
         };
     }
-    pthread_cond_broadcast(&self->sleep_cond);
-    pthread_mutex_unlock(&self->pool_lock);
+    P_COND_BROADCAST(self->sleep_cond);
+    P_MUTEX_UNLOCK(self->pool_lock);
 }
 
 void EventQueue__clear(EventQueue* self){
@@ -135,7 +139,7 @@ void EventQueue__insert(EventQueue* queue, void (*callback)(), void * user_data)
     
     QueueEvent * record = QueueEvent__create(callback,user_data);
     CListTS__add(&queue->events,(CObject*)record);
-    pthread_cond_signal(&queue->sleep_cond);
+    P_COND_SIGNAL(queue->sleep_cond);
 
     C_TRACE("insert - done");
 };
@@ -146,18 +150,18 @@ QueueEvent * EventQueue__pop(EventQueue* self){
 };
 
 void EventQueue__start(EventQueue* self){
-    pthread_mutex_lock(&self->pool_lock);
+    P_MUTEX_LOCK(self->pool_lock);
     QueueThread * qt = QueueThread__create(self);
     CListTS__add(&self->threads,(CObject*)qt);
-    pthread_mutex_unlock(&self->pool_lock);
+    P_MUTEX_UNLOCK(self->pool_lock);
 
     if(self->queue_event_cb){
         self->queue_event_cb(qt,EVENTQUEUE_STARTED,self->user_data);
     }
 };
 
-void EventQueue__wait_condition(EventQueue * self, pthread_mutex_t * lock){
-    pthread_cond_wait(&self->sleep_cond, lock);
+void EventQueue__wait_condition(EventQueue * self, P_MUTEX_TYPE lock){
+    P_COND_WAIT(self->sleep_cond, lock);
 }
 
 void EventQueue_notify_dispatching(EventQueue * self, QueueThread * thread){

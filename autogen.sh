@@ -1044,7 +1044,7 @@ gst_libav_ret=0
 gst_plg_base=0
 gst_plg_good=0
 gst_plg_bad=0
-GSTREAMER_LATEST=1.22.5
+GSTREAMER_LATEST=1.22.8
 
 pkg-config --exists --print-errors "gstreamer-1.0 >= 1.14.4"
 gst_ret=$?

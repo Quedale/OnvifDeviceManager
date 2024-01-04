@@ -7,6 +7,7 @@ typedef struct _EventQueue EventQueue;
 
 #include "queue_thread.h"
 #include "queue_event.h"
+#include "portable_thread.h"
 
 typedef enum {
   EVENTQUEUE_DISPATCHING               = 0,
@@ -25,7 +26,7 @@ void EventQueue__stop(EventQueue* self, int nthread);
 int EventQueue__get_running_event_count(EventQueue * self);
 int EventQueue__get_pending_event_count(EventQueue * self);
 int EventQueue__get_thread_count(EventQueue * self);
-void EventQueue__wait_condition(EventQueue * self, pthread_mutex_t * lock);
+void EventQueue__wait_condition(EventQueue * self, P_MUTEX_TYPE lock);
 void EventQueue_notify_dispatching(EventQueue * self, QueueThread * thread);
 void EventQueue_notify_dispatched(EventQueue * self, QueueThread * thread);
 void EventQueue__remove_thread(EventQueue* self, QueueThread * qt);

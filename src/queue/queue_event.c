@@ -11,6 +11,7 @@ struct _QueueEvent {
 QueueEvent * QueueEvent__create(void (*callback)(), void * user_data){
     QueueEvent * self = malloc(sizeof(QueueEvent));
     QueueEvent__init(self, callback, user_data);
+    CObject__set_allocated((CObject *)self);
     return self;
 }
 

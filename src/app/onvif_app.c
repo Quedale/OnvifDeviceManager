@@ -126,8 +126,17 @@ static gboolean * found_server (void * e) {
     for (i = 0 ; i < server->matches->match_count ; ++i) {
         m = server->matches->matches[i];
         if(!device_already_found(disco_in->app,m->addrs[0])){
-            OnvifDevice * onvif_dev = OnvifDevice__create(g_strdup(m->addrs[0]));
-            add_device(disco_in->app, onvif_dev, onvif_extract_scope("name",m), onvif_extract_scope("hardware",m), onvif_extract_scope("location",m));
+            gchar * addr_dup = g_strdup(m->addrs[0]);
+            OnvifDevice * onvif_dev = OnvifDevice__create(addr_dup);
+            free(addr_dup);
+            
+            char * name = onvif_extract_scope("name",m);
+            char * hw = onvif_extract_scope("hardware",m);
+            char * loc = onvif_extract_scope("location",m);
+            add_device(disco_in->app, onvif_dev, name, hw, loc);
+            free(name);
+            free(hw);
+            free(loc);
         }
     }
 

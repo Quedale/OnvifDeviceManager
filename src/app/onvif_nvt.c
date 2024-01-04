@@ -35,6 +35,11 @@ GtkWidget * create_controls_overlay(RtspPlayer *player){
 
     GtkWidget * fixed = gtk_fixed_new();
     gtk_fixed_put(GTK_FIXED(fixed),widget,10,10); 
+
+    g_object_unref(pixbuf);
+    gdk_pixbuf_loader_close(loader,NULL);
+    g_object_unref(loader);
+
     return fixed;
 }
 

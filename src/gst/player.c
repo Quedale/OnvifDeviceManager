@@ -184,7 +184,7 @@ state_changed_cb (GstBus * bus, GstMessage * msg, RtspPlayer * data)
   /* Using video_bin for state change since the pipeline is PLAYING before the videosink */
   
   //Check if video exists and pad is linked
-  if((data->no_video ||
+  if(data && (data->no_video ||
         (data->video_bin != NULL
         && GST_IS_OBJECT(data->video_bin) 
         &&  GST_MESSAGE_SRC (msg) == GST_OBJECT (data->video_bin)))){
@@ -197,7 +197,7 @@ state_changed_cb (GstBus * bus, GstMessage * msg, RtspPlayer * data)
   }
 
   //Check if audio exists and pad is linked
-  if((data->no_audio ||
+  if(data && (data->no_audio ||
         (data->audio_bin != NULL 
         && GST_IS_OBJECT(data->audio_bin) 
         &&  GST_MESSAGE_SRC (msg) == GST_OBJECT (data->audio_bin))) &&
@@ -206,7 +206,7 @@ state_changed_cb (GstBus * bus, GstMessage * msg, RtspPlayer * data)
   }
 
   //Check that all streams are ready before hiding loading
-  if(data->video_done && data->audio_done && data->pad_found == 1 &&
+  if(data && data->video_done && data->audio_done && data->pad_found == 1 &&
       data->pipeline != NULL && GST_MESSAGE_SRC(msg) == GST_OBJECT(data->pipeline)){
     if(GTK_IS_WIDGET (data->canvas))
       gtk_widget_set_visible(data->canvas, TRUE);
@@ -216,9 +216,10 @@ state_changed_cb (GstBus * bus, GstMessage * msg, RtspPlayer * data)
     }
   }
 
-  if((data->video_bin != NULL && GST_IS_OBJECT(data->video_bin) && GST_MESSAGE_SRC (msg) == GST_OBJECT (data->video_bin)) ||
-      (data->audio_bin != NULL && GST_IS_OBJECT(data->audio_bin) && GST_MESSAGE_SRC (msg) == GST_OBJECT (data->audio_bin)) ||
-      (data->pipeline != NULL && GST_IS_OBJECT(data->pipeline) && GST_MESSAGE_SRC (msg) == GST_OBJECT (data->pipeline))){
+  if(data &&
+      ((data->video_bin && GST_MESSAGE_SRC (msg) == (GstObject*) data->video_bin) ||
+      (data->audio_bin && GST_MESSAGE_SRC (msg) == (GstObject*) data->audio_bin) ||
+      (data->pipeline && GST_MESSAGE_SRC (msg) == (GstObject*) data->pipeline))){
     C_TRACE ("State set to %s for %s\n", gst_element_state_get_name (new_state), GST_OBJECT_NAME (msg->src));
     // printf("[no_audio:%i][no_video:%i][audio_done:%i][video_done:%i][pad_found:%i][pipe:%i]\n",data->no_audio,data->no_video,data->audio_done,data->video_done,data->pad_found,GST_MESSAGE_SRC(msg) == GST_OBJECT(data->pipeline));
   }

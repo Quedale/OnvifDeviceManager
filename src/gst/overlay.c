@@ -1,6 +1,7 @@
 #include "overlay.h"
 #include <math.h>
 #include <gtk/gtk.h>
+#include "clogger.h"
 
 typedef struct _OverlayState {
   gboolean valid;
@@ -29,7 +30,7 @@ void OverlayState__destroy(OverlayState * self){
 void OverlayState__prepare_overlay (GstElement * overlay, GstCaps * caps, gint window_width, gint window_height, gpointer user_data){
 
   OverlayState *s = (OverlayState *) user_data;
-
+  C_DEBUG("Preparing level indicator overlay");
   if (gst_video_info_from_caps (&s->info, caps))
     s->valid = TRUE;
   else
@@ -37,7 +38,7 @@ void OverlayState__prepare_overlay (GstElement * overlay, GstCaps * caps, gint w
 
 }
 
-GstBuffer * create_bar_buffer(double width, double height){
+GstBuffer * create_bar_buffer(gint width, gint height){
 
   guint stride;
   cairo_surface_t *surface;
@@ -54,7 +55,7 @@ GstBuffer * create_bar_buffer(double width, double height){
   guchar *pixdata = cairo_image_surface_get_data(surface);
 
   GstBuffer * buff = gst_buffer_new_and_alloc (height * stride);
-  gst_buffer_fill (buff, 0, pixdata + 24, height * stride);
+  gst_buffer_fill (buff, 0, pixdata, height * stride);
   gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE,
       GST_VIDEO_OVERLAY_COMPOSITION_FORMAT_RGB, width, height);
   
@@ -82,10 +83,10 @@ GstVideoOverlayComposition * OverlayState__draw_overlay (GstElement * overlay, G
     return NULL;
   }
 
-  gdouble margin = 20; //Space betweem border and bar
-  gdouble bwidth = 20; //Bar width
-  gdouble pheight = self->info.height - margin*2; //Height available for drawing
-  gdouble bheight = self->level * pheight / 100; //Actual bar height calculated from level
+  gint margin = 20; //Space betweem border and bar
+  gint bwidth = 20; //Bar width
+  gint pheight = self->info.height - margin*2; //Height available for drawing
+  gint bheight = self->level * pheight / 100; //Actual bar height calculated from level
 
   buff = create_bar_buffer(bwidth,bheight); //Create GstBuffer
 

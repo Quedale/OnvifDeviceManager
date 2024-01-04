@@ -29,6 +29,7 @@ CredentialsDialog * CredentialsDialog__create(){
     CredentialsDialog * dialog = malloc(sizeof(CredentialsDialog));
     dialog->elements = malloc(sizeof(DialogElements));
     AppDialog__init((AppDialog*)dialog,priv_CredentialsDialog__create_ui);
+    CObject__set_allocated((CObject *) dialog);
     AppDialog__set_title((AppDialog *)dialog,CREDENTIALS_DIALOG_TITLE);
     AppDialog__set_submit_label((AppDialog *)dialog,CREDENTIALS_DIALOG_LABEL);
     AppDialog__set_show_callback((AppDialog *)dialog,priv_CredentialsDialog__show_cb);

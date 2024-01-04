@@ -64,6 +64,7 @@ MsgDialog * MsgDialog__create(){
     dialog->msg = NULL;
 
     AppDialog__init((AppDialog *)dialog, priv_MsgDialog__create_ui);
+    CObject__set_allocated((CObject *) dialog);
     AppDialog__set_destroy_callback((AppDialog*)dialog,priv_MsgDialog__destroy);
 
     MsgDialog__reset(dialog);

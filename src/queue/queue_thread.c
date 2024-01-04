@@ -1,6 +1,5 @@
 #include "queue_thread.h"
 #include "queue_event.h"
-#include <pthread.h>
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
@@ -9,12 +8,18 @@
 
 struct _QueueThread {
     CObject parent;
-    pthread_t pthread;
+    P_THREAD_TYPE pthread;
     EventQueue * queue;
-    pthread_mutex_t sleep_lock;
-    pthread_mutex_t cancel_lock;
+    P_MUTEX_TYPE sleep_lock;
+    P_MUTEX_TYPE cancel_lock;
     int cancelled;
 };
+
+void priv_QueueThread__destroy(CObject * cobject){
+    QueueThread * self = (QueueThread *)cobject;
+    P_MUTEX_CLEANUP(self->sleep_lock);
+    P_MUTEX_CLEANUP(self->cancel_lock);
+}
 
 void * priv_QueueThread_call(void * data){
     C_DEBUG("Started...");
@@ -24,13 +29,13 @@ void * priv_QueueThread_call(void * data){
             goto exit;
         }
         if(EventQueue__get_pending_event_count(qt->queue) <= 0){
-            pthread_mutex_lock(&qt->sleep_lock);
+            P_MUTEX_LOCK(qt->sleep_lock);
             if(QueueThread__is_cancelled(qt)){
-                pthread_mutex_unlock(&qt->sleep_lock);
+                P_MUTEX_UNLOCK(qt->sleep_lock);
                 goto exit;
             }
-            EventQueue__wait_condition(qt->queue,&qt->sleep_lock);
-            pthread_mutex_unlock(&qt->sleep_lock);
+            EventQueue__wait_condition(qt->queue,qt->sleep_lock);
+            P_MUTEX_UNLOCK(qt->sleep_lock);
         }
         if(QueueThread__is_cancelled(qt)){
             goto exit;
@@ -51,7 +56,7 @@ void * priv_QueueThread_call(void * data){
 exit:
     C_INFO("Finished...");
     EventQueue__remove_thread(qt->queue,qt);
-    pthread_exit(0);
+    P_THREAD_EXIT;
 };
 
 void QueueThread__init(QueueThread * self, EventQueue* queue){
@@ -59,33 +64,33 @@ void QueueThread__init(QueueThread * self, EventQueue* queue){
 
     self->queue = queue;
 
-    pthread_mutex_init(&self->sleep_lock, NULL);
+    P_MUTEX_SETUP(self->sleep_lock);
+    P_MUTEX_SETUP(self->cancel_lock);
 
-    pthread_mutex_init(&self->cancel_lock, NULL);
-
-    pthread_create(&self->pthread, NULL, priv_QueueThread_call, self);
-
+    P_THREAD_CREATE(self->pthread, priv_QueueThread_call, self);
+    P_THREAD_DETACH(self->pthread);
     CObject__init((CObject *)self);
+    CObject__set_destroy_callback((CObject*)self,priv_QueueThread__destroy);
 }
 
 QueueThread * QueueThread__create(EventQueue* queue){
     QueueThread * qt = malloc(sizeof(QueueThread));
     QueueThread__init(qt,queue);
-
+    CObject__set_allocated((CObject *) qt);
     return qt;
 }
 
 void QueueThread__cancel(QueueThread* self){
-    pthread_mutex_lock(&self->cancel_lock);
+    P_MUTEX_LOCK(self->cancel_lock);
     self->cancelled = 1;
-    pthread_mutex_unlock(&self->cancel_lock);
+    P_MUTEX_UNLOCK(self->cancel_lock);
 }
 
 int QueueThread__is_cancelled(QueueThread* self){
     int ret;
-    pthread_mutex_lock(&self->cancel_lock);
+    P_MUTEX_LOCK(self->cancel_lock);
     ret = self->cancelled;
-    pthread_mutex_unlock(&self->cancel_lock);
+    P_MUTEX_UNLOCK(self->cancel_lock);
     return ret;
 }
 
