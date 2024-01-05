@@ -521,7 +521,7 @@ static GstElement * create_video_bin(RtspPlayer * self){
 
 /* Dynamically link */
 static void on_rtsp_pad_added (GstElement *element, GstPad *new_pad, RtspPlayer * data){
-  g_print ("Received new pad '%s' from '%s':\n", GST_PAD_NAME (new_pad), GST_ELEMENT_NAME (element));
+  C_DEBUG ("Received new pad '%s' from '%s':\n", GST_PAD_NAME (new_pad), GST_ELEMENT_NAME (element));
 
   GstPadLinkReturn pad_ret;
   GstPad *sink_pad = NULL;
