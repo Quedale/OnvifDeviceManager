@@ -929,7 +929,8 @@ if [ $LOCAL = $REMOTE ]; then
 elif [ $LOCAL = $BASE ]; then
     echo "OnvifDiscoveryLib has new changes. Force rebuild..."
     force_rebuild=1
-    skipwsdl="--skip-wsdl"
+    #Temporarely disabled after renaming soapH.h which would fail here
+    # skipwsdl="--skip-wsdl"
 elif [ $REMOTE = $BASE ]; then
     echo "OnvifDiscoveryLib has local changes. Doing nothing..."
     skipwsdl="--skip-wsdl"
