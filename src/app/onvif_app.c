@@ -84,13 +84,20 @@ static void quit_cb (GtkButton *button, OnvifApp *data) {
 static void delete_event_cb (GtkWidget *widget, GdkEvent *event, OnvifApp *data) {
     onvif_app_shutdown(data);
 }
-
 static gboolean * finished_discovery (void * e) {
+    GtkWidget * widget = (GtkWidget *) e;
+
+    gtk_widget_set_sensitive(widget,TRUE);
+
+    return FALSE;
+}
+
+static gboolean * _finished_discovery (void * e) {
     DiscoveryEvent * event = (DiscoveryEvent *) e;
     struct DiscoveryInput * disco_in = (struct DiscoveryInput * ) event->data;
-    
-    gtk_widget_set_sensitive(disco_in->widget,TRUE);
+    gdk_threads_add_idle((void *)finished_discovery,disco_in->widget);
     free(disco_in);
+    CObject__destroy((CObject*)event);
     return FALSE;
 }
 
@@ -140,6 +147,13 @@ static gboolean * found_server (void * e) {
         }
     }
 
+    CObject__destroy((CObject*)event);
+    return FALSE;
+}
+
+static gboolean * _found_server (void * e) {
+    gdk_threads_add_idle((void *)found_server,e);
+
     return FALSE;
 }
 
@@ -156,7 +170,7 @@ void onvif_scan (GtkWidget *widget, OnvifApp * app) {
     CListTS__clear(app->device_list);
 
     //Start UDP Scan
-    struct UdpDiscoverer discoverer = UdpDiscoverer__create(found_server,finished_discovery);
+    struct UdpDiscoverer discoverer = UdpDiscoverer__create(_found_server,_finished_discovery);
 
     //Multiple dispatch in case of packet dropped
     struct DiscoveryInput * disco_in = malloc(sizeof(struct DiscoveryInput));
