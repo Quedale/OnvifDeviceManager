@@ -3,12 +3,6 @@
 #include "../gst/player.h"
 #include "clogger.h"
 
-gboolean * gui_quit_main (void * user_data){
-    C_INFO("Stopping main thread...\n");
-    gtk_main_quit();
-    return FALSE;
-}
-
 void * _thread_destruction(void * event){
     C_INFO("Starting clean up thread...\n");
     OnvifApp * app = (OnvifApp *) event;
@@ -19,7 +13,7 @@ void * _thread_destruction(void * event){
     //Destroying the EventQueue will hang until all threads are finished
     OnvifApp__destroy(app);
 
-    gdk_threads_add_idle((void *)gui_quit_main,app);
+    gtk_main_quit();
 
     pthread_exit(0);
 }
@@ -38,7 +32,7 @@ gboolean * gui_destruction (void * user_data){
 
     pthread_t pthread;
     pthread_create(&pthread, NULL, _thread_destruction, data);
-
+    pthread_detach(pthread);
     return FALSE;
 }
 

@@ -953,9 +953,11 @@ if [ $ret != 0 ]; then
   if [ $FAILED -eq 1 ]; then exit 1; fi
   PATH=$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin:$PATH \
   GSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8 \
-  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG \
+  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$CUTILSLIB_PKG \
   C_INCLUDE_PATH="$(pkg-config --variable=includedir openssl):$(pkg-config --variable=includedir zlib):$C_INCLUDE_PATH" \
-  buildMakeProject srcdir="OnvifDiscoveryLib" prefix="$SUBPROJECT_DIR/OnvifDiscoveryLib/build/dist" bootstrap="--skip-gsoap $skipwsdl" outoftree=true
+  buildMakeProject srcdir="OnvifDiscoveryLib" prefix="$SUBPROJECT_DIR/OnvifDiscoveryLib/build/dist" cmakedir=".." cmakeargs="-DGSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8" bootstrap="--skip-gsoap $skipwsdl" outoftree=true cmakeclean=true
+  # buildMakeProject srcdir="OnvifDiscoveryLib" prefix="$SUBPROJECT_DIR/OnvifDiscoveryLib/build/dist" bootstrap="--skip-gsoap $skipwsdl" outoftree=true
+  
   if [ $FAILED -eq 1 ]; then exit 1; fi
 else
   echo "onvifdisco already found."
@@ -1002,7 +1004,7 @@ if [ $ret != 0 ]; then
   if [ $FAILED -eq 1 ]; then exit 1; fi
   PATH=$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin:$PATH \
   GSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8 \
-  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG:$CUTILSLIB_PKG \
+  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG:$ZLIB_PKG:$CUTILSLIB_PKG \
   C_INCLUDE_PATH="$(pkg-config --variable=includedir openssl):$(pkg-config --variable=includedir zlib):$C_INCLUDE_PATH" \
   buildMakeProject srcdir="OnvifSoapLib" prefix="$SUBPROJECT_DIR/OnvifSoapLib/build/dist" cmakedir=".." cmakeargs="-DGSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8" bootstrap="--skip-gsoap $skipwsdl" outoftree=true cmakeclean=true
   if [ $FAILED -eq 1 ]; then exit 1; fi
