@@ -316,7 +316,8 @@ buildMakeProject(){
     printf "PKG_CONFIG_PATH : ${PKG_CONFIG_PATH}\n"
     printf "${ORANGE}*****************************\n${NC}"
     if [ ! -z "${cmakeclean}" ]
-    then
+    then 
+      rm ${prefix}/lib/libonvif*
       cmake --build "${cmakedir}" --target clean
       find . -iwholename '*cmake*' -not -name CMakeLists.txt -delete
     fi
