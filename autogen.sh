@@ -318,6 +318,8 @@ buildMakeProject(){
     if [ ! -z "${cmakeclean}" ]
     then 
       rm ${prefix}/lib/libonvif*
+      rm ${prefix}/lib/pkgconfig/onvif*.pc
+      rm ${prefix}/lib/pkgconfig/cutils.pc
       cmake --build "${cmakedir}" --target clean
       find . -iwholename '*cmake*' -not -name CMakeLists.txt -delete
     fi
