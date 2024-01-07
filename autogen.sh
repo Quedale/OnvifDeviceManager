@@ -934,6 +934,7 @@ elif [ $LOCAL = $BASE ]; then
     # skipwsdl="--skip-wsdl"
 elif [ $REMOTE = $BASE ]; then
     echo "OnvifDiscoveryLib has local changes. Doing nothing..."
+    #Temporarely disabled after renaming soapH.h which would fail here
     # skipwsdl="--skip-wsdl"
 else
     echo "Error OnvifDiscoveryLib is diverged."
@@ -981,10 +982,12 @@ if [ $LOCAL = $REMOTE ]; then
 elif [ $LOCAL = $BASE ]; then
     echo "OnvifSoapLib has new changes. Force rebuild..."
     force_rebuild=1
-    skipwsdl="--skip-wsdl"
+    #Temporarely disabled after renaming soapH.h which would fail here
+    # skipwsdl="--skip-wsdl"
 elif [ $REMOTE = $BASE ]; then
     echo "OnvifSoapLib has local changes. Doing nothing..."
-    skipwsdl="--skip-wsdl"
+    #Temporarely disabled after renaming soapH.h which would fail here
+    # skipwsdl="--skip-wsdl"
 else
     echo "Error OnvifSoapLib is diverged."
     exit 1
