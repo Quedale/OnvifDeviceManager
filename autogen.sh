@@ -934,7 +934,7 @@ elif [ $LOCAL = $BASE ]; then
     # skipwsdl="--skip-wsdl"
 elif [ $REMOTE = $BASE ]; then
     echo "OnvifDiscoveryLib has local changes. Doing nothing..."
-    skipwsdl="--skip-wsdl"
+    # skipwsdl="--skip-wsdl"
 else
     echo "Error OnvifDiscoveryLib is diverged."
     exit 1
