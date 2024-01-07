@@ -51,6 +51,9 @@ typedef struct _RtspPlayer {
   
   P_MUTEX_TYPE prop_lock;
   P_MUTEX_TYPE player_lock;
+
+  char * user;
+  char * pass;
 } RtspPlayer;
 
 void _RtspPlayer__stop(RtspPlayer* self, int notify);
@@ -84,13 +87,10 @@ static void error_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
   g_clear_error (&err);
   g_free (debug_info);
 
+  C_DEBUG("retry[%d] playing[%d]", data->retry, data->playing);
   if(data->retry < 3 && data->playing == 1 && data->retry_callback){
     //Stopping player after if condition because "playing" gets reset
     _RtspPlayer__stop(data,0);
-    //Location was cleared after resetting the pipeline
-    char * location = RtspPlayer__get_playback_url(data);
-    g_object_set (G_OBJECT (data->src), "location", location, NULL);
-    free(location);
 
     data->playing = 1; //Set playing flag to allow retry
     data->retry++; 
@@ -648,6 +648,8 @@ void create_pipeline(RtspPlayer *self){
 
 void RtspPlayer__init(RtspPlayer* self) {
 
+  self->user = NULL;
+  self->pass = NULL;
   self->location = NULL;
   self->retry_user_data = NULL;
   self->retry_callback = NULL;
@@ -755,6 +757,13 @@ void RtspPlayer__set_playback_url(RtspPlayer* self, char *url) {
   }
   strcpy(self->location,url);
   
+  //New location, new credentials
+  //TODO Fetch cached credentials from store
+  free(self->user);
+  free(self->pass);
+  self->pass = NULL;
+  self->user = NULL;
+
   g_object_set (G_OBJECT (self->src), "location", url, NULL);
   P_MUTEX_UNLOCK(self->prop_lock);
 }
@@ -769,36 +778,29 @@ char * RtspPlayer__get_playback_url(RtspPlayer* self){
 }
 
 void RtspPlayer__set_credentials(RtspPlayer * self, char * user, char * pass){
-  if(self && self->src){
-    g_object_set (G_OBJECT (self->src), "user-id", user, NULL);
-    g_object_set (G_OBJECT (self->src), "user-pw", pass, NULL);
+  if(self){
+    P_MUTEX_LOCK(self->prop_lock);
+    if(self->user)
+      free(self->user);
+    self->user = malloc(strlen(user)+1);
+    strcpy(self->user,user);
+    if(self->pass)
+      free(self->pass);
+    self->pass = malloc(strlen(pass)+1);
+    strcpy(self->pass,pass);
+    P_MUTEX_UNLOCK(self->prop_lock);
   }
 }
 
 void _RtspPlayer__stop(RtspPlayer* self, int notify){
     C_INFO("RtspPlayer__stop\n");
-    if(!self){
+    if(!self || !self->playing){
       return;
     }
 
     P_MUTEX_LOCK(self->player_lock);
 
     self->playing = 0;
-    //Check if state is already stopped or stopping
-    GstState current_state_pipe;
-    GstState current_state_back;
-    int ret_1 = gst_element_get_state (self->pipeline,&current_state_pipe, NULL, GST_CLOCK_TIME_NONE);
-    int ret_2 = RtspBackchannel__get_state (self->backchannel, &current_state_back, NULL, GST_CLOCK_TIME_NONE);
-    if(ret_1 == GST_STATE_CHANGE_ASYNC){
-      ret_1 = gst_element_get_state (self->pipeline, NULL, &current_state_pipe, GST_CLOCK_TIME_NONE);
-    }
-    if(ret_2 == GST_STATE_CHANGE_ASYNC){
-      ret_2 = gst_element_get_state (self->pipeline, NULL, &current_state_back, GST_CLOCK_TIME_NONE);
-    }
-
-    if((ret_1 == GST_STATE_CHANGE_SUCCESS && current_state_pipe <= GST_STATE_READY) && (ret_2 == GST_STATE_CHANGE_SUCCESS && current_state_back <= GST_STATE_READY)){
-      goto unlock;
-    }
 
     GstStateChangeReturn ret;
 
@@ -831,7 +833,6 @@ stop_out:
   if(notify && self->stopped_callback){
     (*(self->stopped_callback))(self, self->stopped_user_data);
   }
-unlock:
   P_MUTEX_UNLOCK(self->player_lock);
 }
 
@@ -841,6 +842,17 @@ void RtspPlayer__stop(RtspPlayer* self){
 
 void _RtspPlayer__play(RtspPlayer* self, int retry){
   P_MUTEX_LOCK(self->player_lock);
+
+  //Restore previous session's properties
+  P_MUTEX_LOCK(self->prop_lock);
+  if(self->user)
+    g_object_set (G_OBJECT (self->src), "user-id", self->user, NULL);
+  if(self->pass)
+    g_object_set (G_OBJECT (self->src), "user-pw", self->pass, NULL);
+  if(self->location)
+    g_object_set (G_OBJECT (self->src), "location", self->location, NULL);
+  P_MUTEX_UNLOCK(self->prop_lock);
+
   C_INFO("RtspPlayer__play retry[%i] - playing[%i]\n",retry,self->playing);
   if(retry && self->playing == 0){//Retry signal after stop requested
     goto exit;
