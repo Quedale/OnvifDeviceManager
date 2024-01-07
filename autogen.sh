@@ -317,8 +317,11 @@ buildMakeProject(){
     printf "${ORANGE}*****************************\n${NC}"
     if [ ! -z "${cmakeclean}" ]
     then 
-      rm ${prefix}/lib/libonvif*
-      rm ${prefix}/lib/pkgconfig/onvif*.pc
+      rm ${prefix}/lib/libonvifsoap.*
+      rm ${prefix}/lib/libonvifdisco.*
+      rm ${prefix}/lib/libcutils.*
+      rm ${prefix}/lib/pkgconfig/onvifsoap.pc
+      rm ${prefix}/lib/pkgconfig/onvifdisco.pc
       rm ${prefix}/lib/pkgconfig/cutils.pc
       cmake --build "${cmakedir}" --target clean
       find . -iwholename '*cmake*' -not -name CMakeLists.txt -delete
