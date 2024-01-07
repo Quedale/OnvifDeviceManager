@@ -56,17 +56,19 @@ int _priv_Device__lookup_hostname_netbios(Device * device, char * hostname){
     int ret;
     //Lookup hostname
     struct in_addr in_a;
+    memset(&in_a,0,sizeof(in_a));
+
     inet_pton(AF_INET, dev_ip, &in_a);
     struct hostent* host;
     host = gethostbyaddr( (const void*)&in_a, 
                         sizeof(struct in_addr), 
                         AF_INET );
     if(host){
-        hostname = host->h_name;
+        strcpy(hostname,host->h_name);
         ret = 1;
     } else {
         C_WARN("Failed to get hostname ...");
-        hostname = NULL;
+        strcpy(hostname,"");
     }
 
     C_INFO("Retrieved hostname : %s",hostname);
@@ -109,6 +111,12 @@ void _priv_Device__lookup_hostname(void * user_data){
         C_WARN("_priv_Device__lookup_hostname - invalid device");
         return;
     }
+
+    char * dev_ip = OnvifDevice__get_ip(device->onvif_device);
+    if(dev_ip == NULL){ //Retrieve ip by hostname
+        OnvifDevice__lookup_ip(device->onvif_device);
+    }
+    free(dev_ip);
 
     if(!_priv_Device__lookup_hostname_dns(device,hostname)){
         _priv_Device__lookup_hostname_netbios(device,hostname);

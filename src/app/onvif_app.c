@@ -85,18 +85,22 @@ static void delete_event_cb (GtkWidget *widget, GdkEvent *event, OnvifApp *data)
     onvif_app_shutdown(data);
 }
 static gboolean * finished_discovery (void * e) {
-    GtkWidget * widget = (GtkWidget *) e;
+    C_TRACE("finished_discovery");
+    struct DiscoveryInput * disco_in = (struct DiscoveryInput * ) e;
 
-    gtk_widget_set_sensitive(widget,TRUE);
+    gtk_widget_set_sensitive(disco_in->widget,TRUE);
+
+    free(disco_in);
 
     return FALSE;
 }
 
 static gboolean * _finished_discovery (void * e) {
+    C_TRACE("_finished_discovery");
     DiscoveryEvent * event = (DiscoveryEvent *) e;
     struct DiscoveryInput * disco_in = (struct DiscoveryInput * ) event->data;
-    gdk_threads_add_idle((void *)finished_discovery,disco_in->widget);
-    free(disco_in);
+    gdk_threads_add_idle((void *)finished_discovery,disco_in);
+    
     CObject__destroy((CObject*)event);
     return FALSE;
 }
@@ -121,6 +125,7 @@ static int device_already_found(OnvifApp * app, char * xaddr){
 }
 
 static gboolean * found_server (void * e) {
+    C_TRACE("found_server");
     DiscoveryEvent * event = (DiscoveryEvent *) e;
 
     DiscoveredServer * server = event->server;
@@ -152,6 +157,7 @@ static gboolean * found_server (void * e) {
 }
 
 static gboolean * _found_server (void * e) {
+    C_TRACE("_found_server");
     gdk_threads_add_idle((void *)found_server,e);
 
     return FALSE;
