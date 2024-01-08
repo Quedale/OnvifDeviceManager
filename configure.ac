@@ -124,6 +124,25 @@ AC_SUBST(GST_PKG_CORE,m4_normalize(
 #Combine packages into one list for pkgconfig
 AC_SUBST(GST_MODULES,"${GST_PKG_CORE} ${EXT_PKG_NV} ${EXT_PKG_LIBAV}")
 
+#Check for debug flag
+AC_ARG_ENABLE(debug,
+    [AS_HELP_STRING([--enable-debug],[Enable runtime debugging @<:@default=no@:>@.])],
+    [case "${enableval}" in
+        yes) targetdebug=yes ;;
+        no)  targetdebug=no ;;
+        true) targetdebug=yes ;;
+        false)  targetdebug=no ;;
+        *) AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
+        esac],
+    [targetdebug="no"])
+AM_CONDITIONAL([DEBUGCOND], [test x$targetdebug = xyes])
+AM_COND_IF([DEBUGCOND],[
+    AC_MSG_NOTICE([DEBUGING MODE enabled])
+    AC_SUBST(DEBUG_FLAG, '-g -O0')
+],[
+    AC_MSG_NOTICE([DEBUGING MODE disabled])
+])
+
 #Check if gstreamer is installed
 AC_ARG_ENABLE(latest,
     [AS_HELP_STRING([--enable-latest],[Force the usage or build gstreamer 1.21.90. @<:@default=no@:>@.])],
@@ -134,7 +153,7 @@ AC_ARG_ENABLE(latest,
         false)  targetgstbuild=no ;;
         *) AC_MSG_ERROR([bad value ${enableval} for --enable-latest]) ;;
         esac],
-    [targetclient="no"])
+    [targetgstbuild="no"])
 AM_CONDITIONAL([GSTBUILDCOND], [test x$targetgstbuild = xyes])
 AM_COND_IF([GSTBUILDCOND],[
     AC_MSG_NOTICE([gstreamer forced - Using latest static libraries])

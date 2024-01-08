@@ -19,6 +19,8 @@ FAILED=0
 ENABLE_LATEST=0
 ENABLE_LIBAV=0
 ENABLE_NVCODEC=0
+ENABLE_FULL_DEBUG=0
+ENABLE_DEBUG=0
 
 i=1;
 
@@ -31,6 +33,13 @@ do
     elif [ "$arg" == "--enable-latest" ]; then
         ENABLE_LATEST=1
         set -- "$@" "$arg"
+    elif [ "$arg" == "--full-debug" ]; then
+        ENABLE_FULL_DEBUG=1
+        ENABLE_DEBUG=1
+        set -- "$@" "--enable-debug=yes"
+    elif [ "$arg" == "--debug" ]; then
+        ENABLE_DEBUG=1
+        set -- "$@" "--enable-debug=yes"
     elif [ "$arg" == "--enable-nvcodec=yes" ] || [ "$arg" == "--enable-nvcodec=true" ]; then
         ENABLE_NVCODEC=1
         set -- "$@" "$arg"
@@ -327,9 +336,13 @@ buildMakeProject(){
       find . -iwholename '*cmake*' -not -name CMakeLists.txt -delete
     fi
 
+    btype="Release"
+    if [ $ENABLE_DEBUG -eq 1 ]; then
+      btype="Debug"
+    fi
     cmake -G "Unix Makefiles" \
       ${cmakeargs} \
-      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_BUILD_TYPE=$btype \
       -DCMAKE_INSTALL_PREFIX="${prefix}" \
       -DENABLE_TESTS=OFF \
       -DENABLE_SHARED=on \
@@ -501,7 +514,10 @@ buildMesonProject() {
               return
           fi
       fi
-
+      btype="release"
+      if [ $ENABLE_DEBUG -eq 1 ]; then
+        btype="debug"
+      fi
       printf "${ORANGE}*****************************\n${NC}"
       printf "${ORANGE}*** Meson Setup ${srcdir} ***\n${NC}"
       printf "${ORANGE}*****************************\n${NC}"
@@ -512,7 +528,7 @@ buildMesonProject() {
           $bindir_val \
           --libdir=lib \
           --includedir=include \
-          --buildtype=release 
+          --buildtype=$btype 
       status=$?
       if [ $status -ne 0 ]; then
           printf "${RED}*****************************\n${NC}"
@@ -548,7 +564,10 @@ buildMesonProject() {
               return
           fi
       fi
-
+      btype="release"
+      if [ $ENABLE_DEBUG -eq 1 ]; then
+        btype="debug"
+      fi
       printf "${ORANGE}*****************************\n${NC}"
       printf "${ORANGE}*** Meson Reconfigure $(pwd) ${srcdir} ***\n${NC}"
       printf "${ORANGE}*****************************\n${NC}"
@@ -559,7 +578,7 @@ buildMesonProject() {
           $bindir_val \
           --libdir=lib \
           --includedir=include \
-          --buildtype=release \
+          --buildtype=$btype \
           --reconfigure
 
       status=$?
