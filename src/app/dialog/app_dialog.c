@@ -445,6 +445,11 @@ void AppDialog__set_closable(AppDialog * self, int closable){
     self->closable = closable;
 }
 
+void AppDialog__set_cancellable(AppDialog * self, int cancellable){
+    AppDialogElements * elements = (AppDialogElements*) self->private;
+    gtk_widget_set_visible(elements->cancel_btn,cancellable);
+}
+
 void AppDialog__hide_actions(AppDialog * self){
     self->action_visible = 0;
     priv_AppDialog__toggle_actions_visibility(self);

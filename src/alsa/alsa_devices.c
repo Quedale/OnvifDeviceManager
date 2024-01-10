@@ -1,8 +1,6 @@
 #include "alsa_devices.h"
-#include <gst/gstinfo.h>
-
-GST_DEBUG_CATEGORY_STATIC (ext_alsa_dev_debug);
-#define GST_CAT_DEFAULT (ext_alsa_dev_debug)
+#include "clogger.h"
+#include <stdlib.h>
 
 void AlsaDevices__init(AlsaDevices* self) {
     self->devices=malloc(0);
@@ -10,9 +8,7 @@ void AlsaDevices__init(AlsaDevices* self) {
 }
 
 AlsaDevices* AlsaDevices__create() {
-    GST_DEBUG_CATEGORY_INIT (ext_alsa_dev_debug, "ext-dev-alsa", 0, "Extension to support Alsa capabilities");
-
-    GST_DEBUG("Create AlsaDevices list");
+    C_DEBUG("Create AlsaDevices list");
     AlsaDevices* result = (AlsaDevices*) malloc(sizeof(AlsaDevices));
     AlsaDevices__init(result);
     return result;
@@ -75,7 +71,7 @@ void AlsaDevice__init(AlsaDevice* self) {
 
 
 AlsaDevice* AlsaDevice__create() {
-    GST_DEBUG("Create AslaDevice object");
+    C_DEBUG("Create AslaDevice object");
     AlsaDevice* result = (AlsaDevice*) malloc(sizeof(AlsaDevice));
     AlsaDevice__init(result);
     return result;

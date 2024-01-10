@@ -6,9 +6,7 @@
 void * _thread_destruction(void * event){
     C_INFO("Starting clean up thread...\n");
     OnvifApp * app = (OnvifApp *) event;
-
-    RtspPlayer__stop(OnvifApp__get_player(app));
-
+    
     //This what may take a long time.
     //Destroying the EventQueue will hang until all threads are finished
     OnvifApp__destroy(app);
@@ -18,6 +16,11 @@ void * _thread_destruction(void * event){
     pthread_exit(0);
 }
 
+void force_shutdown_cb(AppDialogEvent * event){
+    C_WARN("Aborting GTK main thread!!");
+    gtk_main_quit();
+}
+
 gboolean * gui_destruction (void * user_data){
     OnvifApp *data = (OnvifApp *) user_data;
     
@@ -25,10 +28,11 @@ gboolean * gui_destruction (void * user_data){
     MsgDialog * dialog = OnvifApp__get_msg_dialog(data);
     MsgDialog__set_icon(dialog, image);
     AppDialog__set_closable((AppDialog*)dialog, 0);
-    AppDialog__hide_actions((AppDialog*)dialog);
+    AppDialog__set_submit_label((AppDialog*)dialog, "Force Shutdown!");
     AppDialog__set_title((AppDialog*)dialog,"Shutting down...");
+    AppDialog__set_cancellable((AppDialog*)dialog,0);
     MsgDialog__set_message(dialog,"Waiting for running task to finish...");
-    AppDialog__show((AppDialog *) dialog,NULL,NULL,data);
+    AppDialog__show((AppDialog *) dialog,force_shutdown_cb,NULL,data);
 
     pthread_t pthread;
     pthread_create(&pthread, NULL, _thread_destruction, data);

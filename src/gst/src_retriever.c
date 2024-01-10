@@ -3,14 +3,12 @@
 #include <stdio.h>
 #include "src_retriever.h"
 #include "../alsa/alsa_utils.h"
-
-GST_DEBUG_CATEGORY_STATIC (ext_srcret_debug);
-#define GST_CAT_DEFAULT (ext_srcret_debug)
+#include "clogger.h"
 
 int  
 test_audiosrc(char * srcname, char * device){
 
-    GST_DEBUG("Test Audio Src [%s] device [%s]\n",srcname,device);
+    C_DEBUG("Test Audio Src [%s] device [%s]\n",srcname,device);
     //Create temporary pipeline to use AutoDetect element
     GstElement * pipeline = gst_pipeline_new ("audiotest-pipeline");
     GstElement * src = gst_element_factory_make (srcname, "src");
@@ -77,8 +75,6 @@ test_audiosrc(char * srcname, char * device){
 
 void
 retrieve_audiosrc(char * element, char * device){
-    GST_DEBUG_CATEGORY_INIT (ext_srcret_debug, "ext-srcret", 0, "Extension to support Alsa capabilities");
-
     int ret;
     ret = test_audiosrc("pulsesrc", NULL);
     if(ret){

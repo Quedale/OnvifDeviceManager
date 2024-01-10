@@ -15,6 +15,7 @@ void RtspPlayer__set_retry_callback(RtspPlayer* self, void (*retry_callback)(Rts
 void RtspPlayer__set_error_callback(RtspPlayer* self, void (*error_callback)(RtspPlayer *, void *), void * user_data);
 void RtspPlayer__set_stopped_callback(RtspPlayer* self, void (*stopped_callback)(RtspPlayer *, void *), void * user_data);
 void RtspPlayer__set_start_callback(RtspPlayer* self, void (*start_callback)(RtspPlayer *, void *), void * user_data);
+void RtspPlayer__set_port_fallback(RtspPlayer* self, char * port);
 void RtspPlayer__allow_overscale(RtspPlayer * self, int allow_overscale);
 void RtspPlayer__set_playback_url(RtspPlayer* self, char *url);
 char * RtspPlayer__get_playback_url(RtspPlayer* self);

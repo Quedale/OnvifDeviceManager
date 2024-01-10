@@ -165,7 +165,6 @@ gboolean RtspBackchannel__find (GstElement * rtspsrc, guint idx, GstCaps * caps,
 
     gchar *caps_str = gst_caps_to_string (caps);
     g_free (caps_str);
-    C_DEBUG("find\n");
     s = gst_caps_get_structure (caps, 0);
     if (gst_structure_has_field (s, "a-sendonly")) {
         self->back_stream_id = idx;

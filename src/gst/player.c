@@ -1,9 +1,7 @@
 #include "player.h"
 #include "gtk/gstgtkbasesink.h"
 #include "clogger.h"
-
-GST_DEBUG_CATEGORY_STATIC (ext_gst_player_debug);
-#define GST_CAT_DEFAULT (ext_gst_player_debug)
+#include "url_parser.h"
 
 typedef struct _RtspPlayer {
   GstElement *pipeline;
@@ -54,36 +52,55 @@ typedef struct _RtspPlayer {
 
   char * user;
   char * pass;
+
+  char * port_fallback;
 } RtspPlayer;
 
 void _RtspPlayer__stop(RtspPlayer* self, int notify);
 
+static void warning_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
+  GError *err;
+  gchar *debug_info;
+  gst_message_parse_warning (msg, &err, &debug_info);
+  C_WARN ("Warning received from element %s: %s", GST_OBJECT_NAME (msg->src), err->message);
+  C_WARN ("Debugging information: %s", debug_info ? debug_info : "none");
+  g_clear_error (&err);
+  g_free (debug_info);
+}
+
 /* This function is called when an error message is posted on the bus */
 static void error_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
   GError *err;
-  char * type;
   gchar *debug_info;
-
-  /* Print error details on the screen */
-  if (msg->type == GST_MESSAGE_ERROR){
-    gst_message_parse_error (msg, &err, &debug_info);
-    type = "Error";
-  } else {
-    gst_message_parse_warning (msg, &err, &debug_info);
-    type = "Warning";
-  }
-
+  
+  gst_message_parse_error (msg, &err, &debug_info);
+  P_MUTEX_LOCK(data->player_lock);
   if(err->code == GST_RESOURCE_ERROR_SETTINGS && data->enable_backchannel){
     C_WARN ("Backchannel unsupported. Downgrading...");
     data->enable_backchannel = 0;
+    data->retry--; //This doesn't count as a try. Finding out device capabilities count has handshake
   } else if(err->code == GST_RESOURCE_ERROR_NOT_AUTHORIZED ||
       err->code == GST_RESOURCE_ERROR_NOT_FOUND){
     C_ERROR("Non-recoverable error encountered.");
-    RtspPlayer__stop(data);
-  }
+    data->playing = 0;
+  } else if((err->code == GST_RESOURCE_ERROR_OPEN_READ ||
+            err->code == GST_RESOURCE_ERROR_OPEN_WRITE ||
+            err->code == GST_RESOURCE_ERROR_OPEN_READ_WRITE) &&
+            data->port_fallback){
+    char * oldloc = data->location;
+    data->location = URL__set_port(oldloc, data->port_fallback);
+    C_INFO("Stream Correction : '%s' --> '%s'\n",oldloc, data->location);
+    free(oldloc);
 
-  C_ERROR ("%s received from element %s: %s", type, GST_OBJECT_NAME (msg->src), err->message);
+  } else if(err->code == GST_RESOURCE_ERROR_READ){
+    data->retry--; //This doesn't count as a try (After this, will generate GST_RESOURCE_ERROR_OPEN_)
+  }
+  P_MUTEX_UNLOCK(data->player_lock);
+
+  C_ERROR ("Error received from element %s: %s", GST_OBJECT_NAME (msg->src), err->message);
   C_ERROR ("Debugging information: %s", debug_info ? debug_info : "none");
+  C_ERROR ("Error code : %d",err->code);
+
   g_clear_error (&err);
   g_free (debug_info);
 
@@ -91,9 +108,10 @@ static void error_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
   if(data->retry < 3 && data->playing == 1 && data->retry_callback){
     //Stopping player after if condition because "playing" gets reset
     _RtspPlayer__stop(data,0);
-
-    data->playing = 1; //Set playing flag to allow retry
+    P_MUTEX_LOCK(data->player_lock);
+    data->playing = 1; //Restore playing flag after calling stop to allow retry
     data->retry++; 
+    P_MUTEX_UNLOCK(data->player_lock);
     C_WARN("****************************************************");
     C_WARN("Retry attempt #%i",data->retry);
     C_WARN("****************************************************");
@@ -112,66 +130,8 @@ static void error_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
  * We just set the pipeline to READY (which stops playback) */
 static void eos_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
   C_ERROR ("End-Of-Stream reached.\n");
-  RtspBackchannel__stop(data->backchannel);
-  gst_element_set_state (data->pipeline, GST_STATE_NULL);
+  RtspPlayer__stop(data);
 }
-
-// void level_handler(GstBus * bus, GstMessage * message, RtspPlayer *player, const GstStructure *s){
-
-//   gint channels;
-//   GstClockTime endtime;
-//   gdouble peak_dB;
-//   gdouble peak;
-//   const gdouble max_variance = 15;
-//   const GValue *list;
-//   const GValue *value;
-//   GValueArray *peak_arr;
-//   gdouble output = 0;
-//   gint i;
-
-//   if (!gst_structure_get_clock_time (s, "endtime", &endtime))
-//     g_warning ("Could not parse endtime");
-
-//   list = gst_structure_get_value (s, "peak");
-//   peak_arr = (GValueArray *) g_value_get_boxed (list);
-//   channels = peak_arr->n_values;
-
-//   for (i = 0; i < channels; ++i) {
-//     // FIXME 'g_value_array_get_nth' is deprecated: Use 'GArray' instead
-//     #pragma GCC diagnostic push
-//     #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-//     value = g_value_array_get_nth (peak_arr, i);
-//     peak_dB = g_value_get_double (value);
-//     #pragma GCC diagnostic pop
-
-//     /* converting from dB to normal gives us a value between 0.0 and 1.0 */
-//     peak = pow (10, peak_dB / 20);
-
-//     //Add up all channels peaks
-//     output = output + peak * 100; 
-//   }
-
-//   //Optionally only get the highest peak instead of calculating average.
-//   //Average output of all channels
-//   output = output / channels;
-
-//   //Set Output value on player
-//   if(output == player->level){
-//     //Ignore
-//   } else if( output > player->level){
-//     //Set new peak
-//     player->level = output;
-//   } else {
-//     //Lower to a maximum drop of 15 for a graphical decay
-//     gdouble variance = player->level-output;
-//     if(variance > max_variance){
-//       player->level=player->level-max_variance; //The decay value has to match the interval set. We are dealing with 2x faster interval therefor 15/2=7.5
-//     } else {
-//       player->level = output;
-//     }
-//   }
-
-// }
 
 /* This function is called when the pipeline changes states. We use it to
  * keep track of the current state. */
@@ -239,8 +199,10 @@ message_handler (GstBus * bus, GstMessage * message, gpointer p)
       eos_cb(bus,message,player);
       break;
     case GST_MESSAGE_ERROR:
-    case GST_MESSAGE_WARNING:
       error_cb(bus,message,player);
+      break;
+    case GST_MESSAGE_WARNING:
+      warning_cb(bus,message,player);
       break;
     case GST_MESSAGE_INFO:
       C_DEBUG("msg : GST_MESSAGE_INFO\n");
@@ -402,7 +364,7 @@ static GstElement * create_audio_bin(RtspPlayer * self){
   convert = gst_element_factory_make ("audioconvert", NULL);
   level = gst_element_factory_make("level",NULL);
   sink = gst_element_factory_make ("autoaudiosink", NULL);
-
+  g_object_set (G_OBJECT (sink), "sync", FALSE, NULL);
   if (!self->audio_bin ||
       !decoder ||
       !convert ||
@@ -457,6 +419,8 @@ static GstElement * create_video_bin(RtspPlayer * self){
   videoconvert = gst_element_factory_make ("videoconvert", NULL);
   overlay_comp = gst_element_factory_make ("overlaycomposition", NULL);
   self->sink = gst_element_factory_make ("gtkcustomsink", NULL);
+  gst_base_sink_set_qos_enabled(GST_BASE_SINK_CAST(self->sink),FALSE);
+  gst_base_sink_set_sync(GST_BASE_SINK_CAST(self->sink),FALSE);
   gst_gtk_base_custom_sink_set_expand(GST_GTK_BASE_CUSTOM_SINK(self->sink),self->allow_overscale);
 
   if (!self->video_bin ||
@@ -540,7 +504,8 @@ static void on_rtsp_pad_added (GstElement *element, GstPad *new_pad, RtspPlayer 
   // gchar * new_pad_type = gst_structure_get_name (new_pad_struct);
   // printf("caps_str : %s\n",caps_str);
 
-  if (payload_v == 96 || payload_v == 26) {
+  //TODO perform stream selection by stream codec not payload
+  if ((payload_v >= 96 && payload_v <=100) || payload_v == 26) {
     data->pad_found = 1;
     data->no_video = 0;
     data->video_done = 0;
@@ -630,7 +595,7 @@ void create_pipeline(RtspPlayer *self){
       C_ERROR ("Fail to connect select-stream signal...");
   }
 
-  g_object_set (G_OBJECT (self->src), "buffer-mode", 3, NULL);
+  // g_object_set (G_OBJECT (self->src), "buffer-mode", 3, NULL);
   g_object_set (G_OBJECT (self->src), "latency", 0, NULL);
   g_object_set (G_OBJECT (self->src), "teardown-timeout", 0, NULL); 
   g_object_set (G_OBJECT (self->src), "backchannel", self->enable_backchannel, NULL);
@@ -638,6 +603,7 @@ void create_pipeline(RtspPlayer *self){
   g_object_set (G_OBJECT (self->src), "do-retransmission", FALSE, NULL);
   g_object_set (G_OBJECT (self->src), "onvif-mode", TRUE, NULL);
   g_object_set (G_OBJECT (self->src), "is-live", TRUE, NULL);
+  // g_object_set (G_OBJECT (self->src), "tcp-timeout", 500000, NULL);
 
   /* set up bus */
   GstBus *bus = gst_element_get_bus (self->pipeline);
@@ -647,7 +613,7 @@ void create_pipeline(RtspPlayer *self){
 }
 
 void RtspPlayer__init(RtspPlayer* self) {
-
+  self->port_fallback = NULL;
   self->user = NULL;
   self->pass = NULL;
   self->location = NULL;
@@ -683,12 +649,7 @@ void RtspPlayer__init(RtspPlayer* self) {
   }
 }
 
-static int CLASS_INIT=0;
 RtspPlayer * RtspPlayer__create() {
-  if(!CLASS_INIT){
-    CLASS_INIT =1;
-    GST_DEBUG_CATEGORY_INIT (ext_gst_player_debug, "ext-gst-player", 0, "Gstreamer Player");
-  }
   RtspPlayer *result  =  (RtspPlayer *) malloc(sizeof(RtspPlayer));
   RtspPlayer__init(result);
   return result;
@@ -719,7 +680,15 @@ void RtspPlayer__destroy(RtspPlayer* self) {
     if(self->location){
       free(self->location);
     }
-
+    if(self->port_fallback){
+      free(self->port_fallback);
+    }
+    if(self->user){
+      free(self->user);
+    }
+    if(self->pass){
+      free(self->pass);
+    }
     P_MUTEX_CLEANUP(self->prop_lock);
     P_MUTEX_CLEANUP(self->player_lock);
     free(self);
@@ -764,7 +733,17 @@ void RtspPlayer__set_playback_url(RtspPlayer* self, char *url) {
   self->pass = NULL;
   self->user = NULL;
 
-  g_object_set (G_OBJECT (self->src), "location", url, NULL);
+  P_MUTEX_UNLOCK(self->prop_lock);
+}
+
+void RtspPlayer__set_port_fallback(RtspPlayer* self, char * port){
+  P_MUTEX_LOCK(self->prop_lock);
+  if(!self->port_fallback){
+    self->port_fallback = malloc(strlen(port)+1);
+  } else {
+    self->port_fallback = realloc(self->port_fallback,strlen(port)+1);
+  }
+  strcpy(self->port_fallback,port);
   P_MUTEX_UNLOCK(self->prop_lock);
 }
 

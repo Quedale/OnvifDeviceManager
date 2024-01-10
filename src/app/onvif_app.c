@@ -294,6 +294,9 @@ void _play_onvif_stream(void * user_data){
 
     if(CObject__is_valid((CObject*)input->device) && OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NONE){
         RtspPlayer__set_playback_url(input->app->player,uri);
+        char * port = OnvifDevice__get_port(Device__get_device(input->device));
+        RtspPlayer__set_port_fallback(input->app->player,port);
+        free(port);
         OnvifCredentials * ocreds = OnvifDevice__get_credentials(odev);
         RtspPlayer__set_credentials(input->app->player, OnvifCredentials__get_username(ocreds), OnvifCredentials__get_password(ocreds));
     }
@@ -451,13 +454,20 @@ static void switch_page (GtkNotebook* self, GtkWidget* page, guint page_num, Onv
     update_pages(app);
 }
 
-void gui_process_device_scopes(void * user_data){
+gboolean gui_process_device_scopes(void * user_data){
     GUIScopeInput * input = (GUIScopeInput *) user_data;
-    add_device(input->app, input->device, OnvifScopes__extract_scope(input->scopes,"name"), OnvifScopes__extract_scope(input->scopes,"hardware"), OnvifScopes__extract_scope(input->scopes,"location"));
+    char * name = OnvifScopes__extract_scope(input->scopes,"name");
+    char * hardware = OnvifScopes__extract_scope(input->scopes,"hardware");
+    char * location = OnvifScopes__extract_scope(input->scopes,"location");
+    add_device(input->app, input->device, name, hardware, location);
+    free(name);
+    free(hardware);
+    free(location);
     //TODO Save manually added camera to settings
 
     OnvifScopes__destroy(input->scopes);
     free(input);
+    return FALSE;
 }
 
 gboolean * gui_hide_dialog (void * user_data){
@@ -857,6 +867,7 @@ void OnvifApp__destroy(OnvifApp* self){
 }
 
 void profile_callback(Device * device, void * user_data){
+    C_INFO("Switching profile");
     struct DeviceInput input;
     input.app = (OnvifApp *) user_data;
     input.device = device;

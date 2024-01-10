@@ -53,6 +53,7 @@ void AppDialog__set_title(AppDialog * self, char * title);
 void AppDialog__hide_actions(AppDialog * self);
 void AppDialog__show_actions(AppDialog * self);
 void AppDialog__set_closable(AppDialog * self, int closable);
+void AppDialog__set_cancellable(AppDialog * self, int cancellable);
 
 AppDialogEvent * AppDialogEvent_copy(AppDialogEvent * original);
 

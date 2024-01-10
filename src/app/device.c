@@ -243,14 +243,13 @@ void priv_Device__profile_changed(GtkComboBox* self, Device * device){
     if(new_index == -1){
         new_index = 0; //Default to the first profile if nothing is available
     }
-    
+    P_MUTEX_UNLOCK(device->ref_lock);
     if(new_index != device->profile_index){
         device->profile_index = new_index;
         if(device->profile_callback){
             device->profile_callback(device,device->profile_userdata);
         }
     }
-    P_MUTEX_UNLOCK(device->ref_lock);
 }
 
 gboolean * gui_Device__display_profiles (void * user_data){
