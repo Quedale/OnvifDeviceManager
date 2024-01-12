@@ -21,8 +21,16 @@ void force_shutdown_cb(AppDialogEvent * event){
     gtk_main_quit();
 }
 
-gboolean * gui_destruction (void * user_data){
-    OnvifApp *data = (OnvifApp *) user_data;
+int ONVIF_APP_SHUTTING_DOWN = 0;
+
+void onvif_app_shutdown(OnvifApp * data){
+    if(!ONVIF_APP_SHUTTING_DOWN){
+        C_INFO("Calling App Shutdown...\n");
+        ONVIF_APP_SHUTTING_DOWN = 1;
+    } else {
+        C_WARN("Application already shutting down...\n");
+        return;
+    }
     
     GtkWidget * image = create_dotted_slider_animation(10,1);
     MsgDialog * dialog = OnvifApp__get_msg_dialog(data);
@@ -37,11 +45,4 @@ gboolean * gui_destruction (void * user_data){
     pthread_t pthread;
     pthread_create(&pthread, NULL, _thread_destruction, data);
     pthread_detach(pthread);
-    return FALSE;
-}
-
-
-void onvif_app_shutdown(OnvifApp * self){
-    C_INFO("Calling App Shutdown...\n");
-    gdk_threads_add_idle((void *)gui_destruction,self);
 }

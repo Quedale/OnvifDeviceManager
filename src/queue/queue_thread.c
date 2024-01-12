@@ -63,14 +63,16 @@ void QueueThread__init(QueueThread * self, EventQueue* queue){
     memset (self, 0, sizeof (QueueThread));
 
     self->queue = queue;
-
-    P_MUTEX_SETUP(self->sleep_lock);
-    P_MUTEX_SETUP(self->cancel_lock);
-
-    P_THREAD_CREATE(self->pthread, priv_QueueThread_call, self);
-    P_THREAD_DETACH(self->pthread);
     CObject__init((CObject *)self);
     CObject__set_destroy_callback((CObject*)self,priv_QueueThread__destroy);
+    //CObject starts with 1 reference count which is associated to the caller (CListTS will destroy child uppon destruction).
+    //QueueThread needs another reference to allow finishing its run.
+    CObject__addref((CObject*)self);
+    
+    P_MUTEX_SETUP(self->sleep_lock);
+    P_MUTEX_SETUP(self->cancel_lock);
+    P_THREAD_CREATE(self->pthread, priv_QueueThread_call, self);
+    P_THREAD_DETACH(self->pthread);
 }
 
 QueueThread * QueueThread__create(EventQueue* queue){

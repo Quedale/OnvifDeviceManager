@@ -45,5 +45,6 @@ int main(int argc, char *argv[]) {
   /* Start the GTK main loop. We will not regain control until gtk_main_quit is called. */
   gtk_main ();
 
+  gst_deinit ();
   return 0;
 }

@@ -574,6 +574,11 @@ exit:
 
 void add_device_add_cb(AppDialogEvent * event){
     OnvifApp * app = (OnvifApp *) event->user_data;
+    const char * device_uri = AddDeviceDialog__get_device_uri((AddDeviceDialog *)event->dialog);
+    if(!device_uri || !strlen(device_uri)){
+        C_WARN("Ingoring empty field");
+        return;
+    }
     EventQueue__insert(app->queue,_onvif_device_add,AppDialogEvent_copy(event));
 }
 
