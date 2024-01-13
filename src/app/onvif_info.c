@@ -267,7 +267,7 @@ void _update_details_page(void * user_data){
         strcpy(gui_update->serial,ONVIF_GET_INFO_ERROR);
     }
 
-    gui_update->ip = OnvifDevice__get_ip(onvif_device);
+    gui_update->ip = OnvifDevice__get_host(onvif_device);
 
     if(gnetwork_success){
         for(int i=0;i<OnvifInterfaces__get_count(interfaces);i++){

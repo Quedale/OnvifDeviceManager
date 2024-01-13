@@ -601,7 +601,7 @@ void create_pipeline(RtspPlayer *self){
   g_object_set (G_OBJECT (self->src), "backchannel", self->enable_backchannel, NULL);
   g_object_set (G_OBJECT (self->src), "user-agent", "OnvifDeviceManager-Linux-0.0", NULL);
   g_object_set (G_OBJECT (self->src), "do-retransmission", FALSE, NULL);
-  g_object_set (G_OBJECT (self->src), "onvif-mode", TRUE, NULL);
+  // g_object_set (G_OBJECT (self->src), "onvif-mode", TRUE, NULL); //It seems onvif mode can cause segmentation fault with v4l2onvif
   g_object_set (G_OBJECT (self->src), "is-live", TRUE, NULL);
   // g_object_set (G_OBJECT (self->src), "tcp-timeout", 500000, NULL);
 
@@ -661,16 +661,16 @@ void RtspPlayer__destroy(RtspPlayer* self) {
     RtspPlayer__stop(self);
 
     //Waiting for the state to finish changing
-    GstState current_state_pipe;
-    GstState current_state_back;
-    int ret_1 = gst_element_get_state (self->pipeline,&current_state_pipe, NULL, GST_CLOCK_TIME_NONE);
-    int ret_2 = RtspBackchannel__get_state(self->backchannel, &current_state_back, NULL, GST_CLOCK_TIME_NONE);
-    while( (ret_1 && current_state_pipe != GST_STATE_NULL) || ( ret_2 && current_state_pipe != GST_STATE_NULL)){
-      C_DEBUG("Waiting for player to stop...\n");
-      ret_1 = gst_element_get_state (self->pipeline,&current_state_pipe, NULL, GST_CLOCK_TIME_NONE);
-      ret_2 = RtspBackchannel__get_state(self->backchannel, &current_state_back, NULL, GST_CLOCK_TIME_NONE);
-      sleep(0.25);
-    }
+    // GstState current_state_pipe;
+    // GstState current_state_back;
+    // int ret_1 = gst_element_get_state (self->pipeline,&current_state_pipe, NULL, GST_CLOCK_TIME_NONE);
+    // int ret_2 = RtspBackchannel__get_state(self->backchannel, &current_state_back, NULL, GST_CLOCK_TIME_NONE);
+    // while( (ret_1 && current_state_pipe != GST_STATE_NULL) || ( ret_2 && current_state_pipe != GST_STATE_NULL)){
+    //   C_DEBUG("Waiting for player to stop...\n");
+    //   ret_1 = gst_element_get_state (self->pipeline,&current_state_pipe, NULL, GST_CLOCK_TIME_NONE);
+    //   ret_2 = RtspBackchannel__get_state(self->backchannel, &current_state_back, NULL, GST_CLOCK_TIME_NONE);
+    //   sleep(0.25);
+    // }
 
     if(GST_IS_ELEMENT(self->pipeline)){
       gst_object_unref (self->pipeline);
@@ -761,14 +761,31 @@ char * RtspPlayer__get_playback_url(RtspPlayer* self){
 void RtspPlayer__set_credentials(RtspPlayer * self, char * user, char * pass){
   if(self){
     P_MUTEX_LOCK(self->prop_lock);
-    if(self->user)
+
+    if(!user){
       free(self->user);
-    self->user = malloc(strlen(user)+1);
-    strcpy(self->user,user);
-    if(self->pass)
+      self->user = NULL;
+    } else {
+      if(!self->user){
+        self->user = malloc(strlen(user)+1);
+      } else {
+        self->user = realloc(self->user,strlen(user)+1);
+      }
+      strcpy(self->user,user);
+    }
+
+    if(!pass){
       free(self->pass);
-    self->pass = malloc(strlen(pass)+1);
-    strcpy(self->pass,pass);
+      self->pass = NULL;
+    } else {
+      if(!self->pass){
+        self->pass = malloc(strlen(pass)+1);
+      } else {
+        self->pass = realloc(self->pass,strlen(pass)+1);
+      }
+      strcpy(self->pass,pass);
+    }
+
     P_MUTEX_UNLOCK(self->prop_lock);
   }
 }

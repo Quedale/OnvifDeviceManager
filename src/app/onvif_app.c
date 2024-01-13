@@ -349,7 +349,7 @@ int onvif_reload_device(struct DeviceInput * input){
     if(OnvifDevice__get_last_error(odev) != ONVIF_ERROR_NONE)
         OnvifDevice__authenticate(odev);
     //Check if device is valid and authorized (User performed scan before auth finished)
-    if(!CObject__is_valid((CObject*)input->device) || OnvifDevice__get_last_error(odev) == ONVIF_NOT_AUTHORIZED){
+    if(!CObject__is_valid((CObject*)input->device) || OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NOT_AUTHORIZED){
         return 0;
     }
 
@@ -434,7 +434,7 @@ void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
     
     OnvifDevice * odev = Device__get_device(input.device);
     //Prompt for authentication
-    if(OnvifDevice__get_last_error(odev) == ONVIF_NOT_AUTHORIZED){
+    if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NOT_AUTHORIZED){
         input.skip_profiles = 0;
         //Re-dispatched to allow proper focus handling
         gdk_threads_add_idle((void *)gui_show_credentialsdialog,DeviceInput__copy(&input));
@@ -482,7 +482,7 @@ void _onvif_authentication_add(void * user_data){
 
     OnvifDevice__set_credentials(input->device,CredentialsDialog__get_username((CredentialsDialog*)event->dialog),CredentialsDialog__get_password((CredentialsDialog*)event->dialog));
     OnvifDevice__authenticate(input->device);
-    if(OnvifDevice__get_last_error(input->device) == ONVIF_NOT_AUTHORIZED){
+    if(OnvifDevice__get_last_error(input->device) == ONVIF_ERROR_NOT_AUTHORIZED){
         C_WARN("Authentication failed\n");
         goto exit;
     }
@@ -531,7 +531,7 @@ void _onvif_device_add(void * user_data){
     AddDeviceDialog * dialog = (AddDeviceDialog *) event->dialog;
     const char * device_uri = AddDeviceDialog__get_device_uri(dialog);
 
-    OnvifDevice * onvif_dev = OnvifDevice__create(device_uri);
+    OnvifDevice * onvif_dev = OnvifDevice__create((char *)device_uri);
     if(!OnvifDevice__is_valid(onvif_dev)){
         C_ERROR("Invalid URL provided\n");
         OnvifDevice__destroy(onvif_dev);
@@ -542,7 +542,7 @@ void _onvif_device_add(void * user_data){
 
     OnvifDevice__authenticate(onvif_dev);
     OnvifErrorTypes oerror = OnvifDevice__get_last_error(onvif_dev);
-    if(oerror == ONVIF_NOT_AUTHORIZED){
+    if(oerror == ONVIF_ERROR_NOT_AUTHORIZED){
         OnvifDeviceInput * input = malloc(sizeof(OnvifDeviceInput));
         input->app = (OnvifApp *) event->user_data;
         input->device = onvif_dev;
@@ -557,11 +557,11 @@ void _onvif_device_add(void * user_data){
         guiscope->device = onvif_dev;
         guiscope->scopes = scopes;
         gdk_threads_add_idle((void *)gui_process_device_scopes,guiscope);
-    } else if(oerror == ONVIF_CONNECTION_ERROR) {
+    } else if(oerror == ONVIF_ERROR_CONNECTION) {
         C_ERROR("An conncetion error was encountered\n");
         OnvifDevice__destroy(onvif_dev);
         goto exit;
-    } else if(oerror == ONVIF_SOAP_ERROR) {
+    } else if(oerror == ONVIF_ERROR_SOAP) {
         C_ERROR("An soap error was encountered \n");
         OnvifDevice__destroy(onvif_dev);
         goto exit;
@@ -890,10 +890,10 @@ void add_device(OnvifApp * self, OnvifDevice * onvif_dev, char* name, char * har
     for (b=0;b<self->device_list->count;b++){
         Device * dev = (Device *) self->device_list->data[b];
         OnvifDevice * odev = Device__get_device(dev);
-        char * dev_ip = OnvifDevice__get_ip(odev);
+        char * dev_host = OnvifDevice__get_host(odev);
         char * dev_port = OnvifDevice__get_port(odev);
-        C_DEBUG("\tList Record :[%i] %s:%s\n",b,dev_ip,dev_port);
-        free(dev_ip);
+        C_DEBUG("\tList Record :[%i] %s:%s\n",b,dev_host,dev_port);
+        free(dev_host);
         free(dev_port);
     }
 

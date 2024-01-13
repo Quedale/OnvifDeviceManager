@@ -1505,6 +1505,7 @@ if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $gst_nv_ret != 0 ] || [ $EN
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:level=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:v4l2=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:rtsp=enabled"
+        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:jpeg=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:rtp=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:rtpmanager=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:law=enabled"
@@ -1521,6 +1522,7 @@ if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $gst_nv_ret != 0 ] || [ $EN
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:fdkaac=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:videoparsers=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:onvif=enabled"
+        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:jpegformat=enabled"
         # MESON_PARAMS="$MESON_PARAMS -Dugly=enabled"
         # MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-ugly:x264=enabled"
 

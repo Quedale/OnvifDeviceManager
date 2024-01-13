@@ -101,7 +101,7 @@ GST_PLUGIN_STATIC_DECLARE(video4linux2);
 // GST_PLUGIN_STATIC_DECLARE(cairo);
 // GST_PLUGIN_STATIC_DECLARE(gdkpixbuf); // gstgdkpixbuf
 // GST_PLUGIN_STATIC_DECLARE(gtk); // gstgtk
-// GST_PLUGIN_STATIC_DECLARE(jpeg); gstjpeg
+GST_PLUGIN_STATIC_DECLARE(jpeg); // gstjpeg
 // GST_PLUGIN_STATIC_DECLARE(lame); gstlame 
 // GST_PLUGIN_STATIC_DECLARE(dv); gstdv
 // GST_PLUGIN_STATIC_DECLARE(png); gstpng
@@ -141,7 +141,7 @@ GST_PLUGIN_STATIC_DECLARE(asfmux);
 // GST_PLUGIN_STATIC_DECLARE(ivfparse); gstivfparse
 // GST_PLUGIN_STATIC_DECLARE(ivtc); gstivtc
 // GST_PLUGIN_STATIC_DECLARE(jp2kdecimator); gstjp2kdecimator
-// GST_PLUGIN_STATIC_DECLARE(jpegformat); gstjpegformat
+GST_PLUGIN_STATIC_DECLARE(jpegformat); // gstjpegformat
 // GST_PLUGIN_STATIC_DECLARE(rfbsrc); gstrfbsrc
 // GST_PLUGIN_STATIC_DECLARE(midi); gstmidi 
 // GST_PLUGIN_STATIC_DECLARE(mpegpsdemux); gstmpegpsdemux
@@ -317,7 +317,7 @@ onvif_init_static_plugins (void)
     // GST_PLUGIN_STATIC_REGISTER(cairo);
     // GST_PLUGIN_STATIC_REGISTER(gdkpixbuf); // gstgdkpixbuf
     // GST_PLUGIN_STATIC_REGISTER(gtk); // gstgtk
-    // GST_PLUGIN_STATIC_REGISTER(jpeg); gstjpeg
+    GST_PLUGIN_STATIC_REGISTER(jpeg); // gstjpeg
     // GST_PLUGIN_STATIC_REGISTER(lame); gstlame 
     // GST_PLUGIN_STATIC_REGISTER(dv); gstdv
     // GST_PLUGIN_STATIC_REGISTER(png); gstpng
@@ -357,7 +357,7 @@ onvif_init_static_plugins (void)
     // GST_PLUGIN_STATIC_REGISTER(ivfparse); gstivfparse
     // GST_PLUGIN_STATIC_REGISTER(ivtc); gstivtc
     // GST_PLUGIN_STATIC_REGISTER(jp2kdecimator); gstjp2kdecimator
-    // GST_PLUGIN_STATIC_REGISTER(jpegformat); gstjpegformat
+    GST_PLUGIN_STATIC_REGISTER(jpegformat); // gstjpegformat
     // GST_PLUGIN_STATIC_REGISTER(rfbsrc); gstrfbsrc
     // GST_PLUGIN_STATIC_REGISTER(midi); gstmidi
     // GST_PLUGIN_STATIC_REGISTER(mpegpsdemux); gstmpegpsdemux

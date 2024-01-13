@@ -33,7 +33,7 @@ void update_details_priv(OnvifDetails * self){
     }
 
     OnvifDevice * odev = Device__get_device(self->device);
-    if(OnvifDevice__get_last_error(odev) == ONVIF_NOT_AUTHORIZED){
+    if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NOT_AUTHORIZED){
         return;
     }
     gtk_spinner_start (GTK_SPINNER (self->details_loading_handle));

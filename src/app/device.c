@@ -50,56 +50,56 @@ void priv_Device__destroy(CObject * self){
     OnvifDevice__destroy(((Device*)self)->onvif_device);
     P_MUTEX_CLEANUP(self->ref_lock);
 }
-int _priv_Device__lookup_hostname_netbios(Device * device, char * hostname){
-    char * dev_ip = OnvifDevice__get_ip(device->onvif_device);
-    C_INFO("NetBIOS Lookup ... %s",dev_ip);
-    int ret;
-    //Lookup hostname
-    struct in_addr in_a;
-    memset(&in_a,0,sizeof(in_a));
+// int _priv_Device__lookup_hostname_netbios(Device * device, char * hostname){
+//     char * dev_ip = OnvifDevice__get_ip(device->onvif_device);
+//     C_INFO("NetBIOS Lookup ... %s",dev_ip);
+//     int ret;
+//     //Lookup hostname
+//     struct in_addr in_a;
+//     memset(&in_a,0,sizeof(in_a));
 
-    inet_pton(AF_INET, dev_ip, &in_a);
-    struct hostent* host;
-    host = gethostbyaddr( (const void*)&in_a, 
-                        sizeof(struct in_addr), 
-                        AF_INET );
-    if(host){
-        strcpy(hostname,host->h_name);
-        ret = 1;
-    } else {
-        C_WARN("Failed to get hostname ...");
-        strcpy(hostname,"");
-    }
+//     inet_pton(AF_INET, dev_ip, &in_a);
+//     struct hostent* host;
+//     host = gethostbyaddr( (const void*)&in_a, 
+//                         sizeof(struct in_addr), 
+//                         AF_INET );
+//     if(host){
+//         strcpy(hostname,host->h_name);
+//         ret = 1;
+//     } else {
+//         C_WARN("Failed to get hostname ...");
+//         strcpy(hostname,"");
+//     }
 
-    C_INFO("Retrieved hostname : %s",hostname);
-    free(dev_ip);
-    return ret;
-}
+//     C_INFO("Retrieved hostname : %s",hostname);
+//     free(dev_ip);
+//     return ret;
+// }
 
-int _priv_Device__lookup_hostname_dns(Device * device, char * hostname){
-    int ret = 0;
-    char servInfo[NI_MAXSERV];
-    memset(&servInfo,0,sizeof(servInfo));
+// int _priv_Device__lookup_hostname_dns(Device * device, char * hostname){
+//     int ret = 0;
+//     char servInfo[NI_MAXSERV];
+//     memset(&servInfo,0,sizeof(servInfo));
 
-    char * dev_ip = OnvifDevice__get_ip(device->onvif_device);
-    C_INFO("DNS Lookup ... %s",dev_ip);
+//     char * dev_ip = OnvifDevice__get_ip(device->onvif_device);
+//     C_INFO("DNS Lookup ... %s",dev_ip);
 
-    struct sockaddr_in sa_in;
-    sa_in.sin_family = AF_INET;
-    sa_in.sin_addr.s_addr = inet_addr(dev_ip);
-    sa_in.sin_port = htons(25);
+//     struct sockaddr_in sa_in;
+//     sa_in.sin_family = AF_INET;
+//     sa_in.sin_addr.s_addr = inet_addr(dev_ip);
+//     sa_in.sin_port = htons(25);
 
-    if (getnameinfo((struct sockaddr*) &sa_in, sizeof(struct sockaddr), hostname, sizeof(hostname),
-                servInfo, NI_MAXSERV, NI_NAMEREQD)){
-        C_WARN("Failed to get hostname ...");
-    } else {
-        C_INFO("Retrieved host=%s, serv=%s\n", hostname, servInfo);
-        ret = 1;
-    }
+//     if (getnameinfo((struct sockaddr*) &sa_in, sizeof(struct sockaddr), hostname, sizeof(hostname),
+//                 servInfo, NI_MAXSERV, NI_NAMEREQD)){
+//         C_WARN("Failed to get hostname ...");
+//     } else {
+//         C_INFO("Retrieved host=%s, serv=%s\n", hostname, servInfo);
+//         ret = 1;
+//     }
 
-    free(dev_ip);
-    return ret;
-}
+//     free(dev_ip);
+//     return ret;
+// }
 
 void _priv_Device__lookup_hostname(void * user_data){
     Device * device = (Device *) user_data;
@@ -112,15 +112,15 @@ void _priv_Device__lookup_hostname(void * user_data){
         return;
     }
 
-    char * dev_ip = OnvifDevice__get_ip(device->onvif_device);
-    if(dev_ip == NULL){ //Retrieve ip by hostname
-        OnvifDevice__lookup_ip(device->onvif_device);
-    }
-    free(dev_ip);
+    // char * dev_ip = OnvifDevice__get_ip(device->onvif_device);
+    // if(dev_ip == NULL){ //Retrieve ip by hostname
+    //     OnvifDevice__lookup_ip(device->onvif_device);
+    // }
+    // free(dev_ip);
 
-    if(!_priv_Device__lookup_hostname_dns(device,hostname)){
-        _priv_Device__lookup_hostname_netbios(device,hostname);
-    }
+    // if(!_priv_Device__lookup_hostname_dns(device,hostname)){
+    //     _priv_Device__lookup_hostname_netbios(device,hostname);
+    // }
 
     C_TRACE("_priv_Device__lookup_hostname - done");
     CObject__unref((CObject*)device);
@@ -154,7 +154,7 @@ void _priv_Device__load_thumbnail(void * user_data){
         }
         imgdata = OnvifSnapshot__get_buffer(snapshot);
         size = OnvifSnapshot__get_size(snapshot);
-    } else if(oerror == ONVIF_NOT_AUTHORIZED){
+    } else if(oerror == ONVIF_ERROR_NOT_AUTHORIZED){
         imgdata = _binary_locked_icon_png_start;
         size = _binary_locked_icon_png_end - _binary_locked_icon_png_start;
     } else {
@@ -261,7 +261,7 @@ gboolean * gui_Device__display_profiles (void * user_data){
         return FALSE;
     }
 
-    if(OnvifDevice__get_last_error(evt->device->onvif_device) == ONVIF_NOT_AUTHORIZED){
+    if(OnvifDevice__get_last_error(evt->device->onvif_device) == ONVIF_ERROR_NOT_AUTHORIZED){
         C_WARN("gui_Device__display_profiles - unauthorized");
         goto exit;
     }
@@ -299,7 +299,7 @@ void _priv_Device__load_profiles(void * user_data){
         return;
     }
 
-    if(OnvifDevice__get_last_error(device->onvif_device) == ONVIF_NOT_AUTHORIZED){
+    if(OnvifDevice__get_last_error(device->onvif_device) == ONVIF_ERROR_NOT_AUTHORIZED){
         C_TRACE("_priv_Device__load_profiles - unauthorized");
         goto exit;
     }
@@ -378,12 +378,12 @@ GtkWidget * Device__create_row (Device * device, char * uri, char* name, char * 
     gtk_widget_set_hexpand (label, TRUE);
     gtk_grid_attach (GTK_GRID (grid), label, 0, 0, 2, 1);
 
-    char * dev_ip = OnvifDevice__get_ip(device->onvif_device);
-    label = gtk_label_new (dev_ip);
+    char * dev_host = OnvifDevice__get_host(device->onvif_device);
+    label = gtk_label_new (dev_host);
     g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
     gtk_widget_set_hexpand (label, TRUE);
     gtk_grid_attach (GTK_GRID (grid), label, 1, 1, 1, 1);
-    free(dev_ip);
+    free(dev_host);
 
     label = gtk_label_new (hardware);
     g_object_set (label, "margin-top", 5, "margin-end", 5, NULL);
