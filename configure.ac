@@ -36,6 +36,8 @@ AC_DEFUN([SET_GST_PKG_PATH],[
     AC_SUBST(PKG_PATH, '$(abs_srcdir)/subprojects/gstreamer/build/dist/lib/pkgconfig')
     AC_SUBST(PKG_GST_PATH, '$(abs_srcdir)/subprojects/gstreamer/build/dist/lib/gstreamer-1.0/pkgconfig')
     AC_SUBST(GST_PLGS,m4_normalize('
+        gstjpeg
+        gstjpegformat
         gstlevel
         gstximagesink
         gstoverlaycomposition
