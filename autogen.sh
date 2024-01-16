@@ -1081,10 +1081,11 @@ FFMPEG_PKG=$SUBPROJECT_DIR/FFmpeg/dist/lib/pkgconfig
 GST_OMX_PKG_PATH=$SUBPROJECT_DIR/gstreamer/build_omx/dist/lib/gstreamer-1.0/pkgconfig
 GST_PKG_PATH=:$SUBPROJECT_DIR/gstreamer/build/dist/lib/pkgconfig:$SUBPROJECT_DIR/gstreamer/build/dist/lib/gstreamer-1.0/pkgconfig
 gst_ret=0
+GSTREAMER_LATEST=1.22.8
 if [ $ENABLE_LATEST == 0 ]; then
   GSTREAMER_VERSION=1.14.4
 else
-  GSTREAMER_VERSION=1.22.8
+  GSTREAMER_VERSION=$GSTREAMER_LATEST
 fi
 
 gst_core=(
@@ -1182,6 +1183,7 @@ fi
 #Check to see if gstreamer exist on the system
 if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
   gst_ret=0;
+  GSTREAMER_VERSION=$GSTREAMER_LATEST; #If we are to build something, build latest
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB:$FFMPEG_PKG;
   #Gstreamer static plugins needs to be checked individually
   if [ ! -z "$(checkGstreamerPkg version=$GSTREAMER_VERSION static=true)" ]; then
