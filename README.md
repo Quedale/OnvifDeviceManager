@@ -7,19 +7,16 @@ Onvif Device Manager for Linux
 The goal of this project is to implement a Onvif Device Manager similar to the windows client, compatible for linux. I'm also working on adding some Profile T capabilities, such as bidirectional audio.
 
 # Working
-- Onvif WS-Discovery (gsoap)
+- Onvif WS-Discovery and WS-Security (gsoap)
 - Soap Client for Onvif Device and Media service
 - Vew RTSP Stream with backchannel (Push-to-talk)
 - Prototype Soundlevel indicator
-- WS-Security
 - Support system and static libraries. (static recommended)
 - Support Multiple ONVIF Profiles
 - Tested H264, H265 and MJPEG stream
 
 # TODO
-- Logging Framework
 - EventQueue : Interupt pending events when needed
-- Support for HTTPS cameras
 - Implement Logging framework
 - Credential Storage 
 - Edit Onvif device identification
@@ -37,8 +34,12 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 2. Babymonitor terminal (I hope to add common baby monitor feature like playing music)
 3. Cross-room communication terminal
 
- 
- 
+# Tested with
+- [rpos](https://github.com/Quedale/rpos)
+- [v4l2onvif](https://github.com/mpromonet/v4l2onvif)
+- Merit LILIN (PSR5024EX30 & SR7424/8)
+- I am open for any suggestion I can work with
+
 # How to build
 ### Clone repository
 ```
@@ -62,6 +63,7 @@ sudo apt install g++
 sudo apt install python3-pip
 python3 -m pip install meson
 python3 -m pip install ninja
+python3 -m pip install cmake
 sudo apt install libssl-dev
 sudo apt install zlib1g-dev
 sudo apt install libasound2-dev

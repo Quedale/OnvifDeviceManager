@@ -21,12 +21,6 @@ AC_SUBST(PKG_ONVIF_DISCO_PATH, '$(abs_srcdir)/subprojects/OnvifDiscoveryLib/buil
 AC_SUBST(PKG_ONVIF_SOAP_PATH, '$(abs_srcdir)/subprojects/OnvifSoapLib/build/dist/lib/pkgconfig')
 AC_SUBST(PKG_CUTILS_PATH, '$(abs_srcdir)/subprojects/CUtils/build/dist/lib/pkgconfig')
 
-#Declare shared and static packages
-AC_SUBST(GST_LIBS,m4_normalize('
-    gstreamer-1.0
-    gstreamer-video-1.0
-    alsa
-'))
 
 AC_DEFUN([SET_GST_PKG_PATH],[
     #Declare additional plugins to link statically
@@ -54,15 +48,12 @@ AC_DEFUN([SET_GST_PKG_PATH],[
         gstrtsp
         gstrtpmanager 
         gstrtp
-        gstpng
         gstmulaw
         gstinterleave
-        gstdebug
         gstautodetect
         gstaudioparsers
         gstalsa
         gstvolume
-        gstvideotestsrc
         gstvideorate
         gsttypefindfunctions
         gsttcp
@@ -116,15 +107,12 @@ AM_COND_IF([NVCODECCOND],[
     AC_MSG_RESULT([configure: checking NVIDIA codec enabled... no])
 ])
 
+# "gstreamer-plugins-good-1.0 >= 1.14.4" apparently doesn't exist on MX Linux?
 AC_SUBST(GST_PKG_CORE,m4_normalize(
     "gstreamer-1.0 >= 1.14.4 
     gstreamer-plugins-base-1.0 >= 1.14.4 
-    gstreamer-plugins-good-1.0 >= 1.14.4 
     gstreamer-plugins-bad-1.0 >= 1.14.4"
 ))
-
-#Combine packages into one list for pkgconfig
-AC_SUBST(GST_MODULES,"${GST_PKG_CORE} ${EXT_PKG_NV} ${EXT_PKG_LIBAV}")
 
 #Check for debug flag
 AC_ARG_ENABLE(debug,
@@ -159,19 +147,21 @@ AC_ARG_ENABLE(latest,
 AM_CONDITIONAL([GSTBUILDCOND], [test x$targetgstbuild = xyes])
 AM_COND_IF([GSTBUILDCOND],[
     AC_MSG_NOTICE([gstreamer forced - Using latest static libraries])
+    AC_SUBST(EXT_PLGS, '$(EXT_PLGS_LIBAV) $(EXT_PLGS_NV)')
     SET_GST_PKG_PATH
 ], [
-    PKG_CHECK_MODULES(gstreamer,[${GST_MODULES}], [
+    PKG_CHECK_MODULES(gstreamer,[${GST_PKG_CORE}], [
         AC_MSG_NOTICE([gstreamer >= 1.14.4 found - Using shared libraries])
         AC_SUBST(GST_LINK_TYPE, [-Wl,-Bdynamic])
     ], [
         AC_MSG_NOTICE([gstreamer >= 1.14.4 not found. - Using latest static libraries])
+        #Apply extra defined plugin only when using static library
+        AC_SUBST(EXT_PLGS, '$(EXT_PLGS_LIBAV) $(EXT_PLGS_NV)')
         SET_GST_PKG_PATH
     ])
 ])
 
 AC_SUBST(EXT_CFLAGS, '$(EXT_CFLAGS_LIBAV) $(EXT_CFLAGS_NV)')
-AC_SUBST(EXT_PLGS, '$(EXT_PLGS_LIBAV) $(EXT_PLGS_NV)')
 
 #Declare all path for pkg-config to search
 AC_SUBST(PKG_FULL_PATH, '$(PKG_PATH):$(PKG_GST_PATH):$(PKG_FFMPEG_PATH):$(PKG_PULSE_PATH):$(PKG_ALSA_PATH):$(PKG_GUDEV_PATH):$(PKG_UDEV_PATH):$(PKG_GLIB_PATH):$(PKG_V4L2_PATH):$(PKG_ONVIF_DISCO_PATH):$(PKG_ONVIF_SOAP_PATH):$(PKG_CUTILS_PATH):$(PKG_OPENSSL_PATH)')

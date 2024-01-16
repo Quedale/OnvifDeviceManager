@@ -110,8 +110,8 @@ void add_device(OnvifApp * self, OnvifDevice * onvif_dev, char* name, char * har
 static int device_already_found(OnvifApp * app, char * xaddr){
     int b;
     int ret = 0;
-    for (b=0;b<app->device_list->count;b++){
-        Device * dev = (Device *) app->device_list->data[b];
+    for (b=0;b<CListTS__get_count(app->device_list);b++){
+        Device * dev = (Device *) CListTS__get(app->device_list,b);
         OnvifDevice * odev = Device__get_device(dev);
         OnvifDeviceService * devserv = OnvifDevice__get_device_service(odev);
         char * endpoint = OnvifDeviceService__get_endpoint(devserv);
@@ -428,7 +428,7 @@ void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
     //Set newly selected device
     int pos;
     pos = gtk_list_box_row_get_index (GTK_LIST_BOX_ROW (row));
-    input.app->device = (Device *) input.app->device_list->data[pos];
+    input.app->device = (Device *) CListTS__get(input.app->device_list,pos);;
     Device__set_selected(input.app->device,1);
     input.device = input.app->device;
     
@@ -887,8 +887,8 @@ void add_device(OnvifApp * self, OnvifDevice * onvif_dev, char* name, char * har
 
     CListTS__add(self->device_list,(CObject*)device);
     int b;
-    for (b=0;b<self->device_list->count;b++){
-        Device * dev = (Device *) self->device_list->data[b];
+    for (b=0;b<CListTS__get_count(self->device_list);b++){
+        Device * dev = (Device *) CListTS__get(self->device_list,b);
         OnvifDevice * odev = Device__get_device(dev);
         char * dev_host = OnvifDevice__get_host(odev);
         char * dev_port = OnvifDevice__get_port(odev);

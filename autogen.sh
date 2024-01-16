@@ -27,7 +27,7 @@ i=1;
 for arg in "$@" 
 do
     shift
-    if [ "$arg" == "--enable-libav=yes" ] || [ "$arg" == "--enable-libav=true" ]; then
+    if [ "$arg" == "--enable-libav=yes" ] || [ "$arg" == "--enable-libav=true" ] || [ "$arg" == "--enable-libav" ]; then
         ENABLE_LIBAV=1
         set -- "$@" "$arg"
     elif [ "$arg" == "--enable-latest" ]; then
@@ -40,7 +40,7 @@ do
     elif [ "$arg" == "--debug" ]; then
         ENABLE_DEBUG=1
         set -- "$@" "--enable-debug=yes"
-    elif [ "$arg" == "--enable-nvcodec=yes" ] || [ "$arg" == "--enable-nvcodec=true" ]; then
+    elif [ "$arg" == "--enable-nvcodec=yes" ] || [ "$arg" == "--enable-nvcodec=true" ] || [ "$arg" == "--enable-nvcodec" ]; then
         ENABLE_NVCODEC=1
         set -- "$@" "$arg"
     else
@@ -650,6 +650,17 @@ checkProg () {
   fi
 }
 
+pkgCheck() {
+  local name minver
+  local "${@}"
+
+  min_ver=""
+  if [ ! -z ${minver} ]; then
+    min_ver=" >= ${minver}"
+  fi
+  echo $(PKG_CONFIG_PATH=$PKG_CONFIG_PATH pkg-config --print-errors --errors-to-stdout "${name} $min_ver");
+}
+
 isMesonInstalled(){
   local major minor micro # reset first
   local "${@}"
@@ -1070,51 +1081,120 @@ FFMPEG_PKG=$SUBPROJECT_DIR/FFmpeg/dist/lib/pkgconfig
 GST_OMX_PKG_PATH=$SUBPROJECT_DIR/gstreamer/build_omx/dist/lib/gstreamer-1.0/pkgconfig
 GST_PKG_PATH=:$SUBPROJECT_DIR/gstreamer/build/dist/lib/pkgconfig:$SUBPROJECT_DIR/gstreamer/build/dist/lib/gstreamer-1.0/pkgconfig
 gst_ret=0
-gst_nv_ret=0
-gst_libav_ret=0
-gst_plg_base=0
-gst_plg_good=0
-gst_plg_bad=0
-GSTREAMER_LATEST=1.22.8
-
-pkg-config --exists --print-errors "gstreamer-1.0 >= 1.14.4"
-gst_ret=$?
-pkg-config --exists --print-errors "gstreamer-plugins-base-1.0 >= 1.14.4"
-gst_plg_base=$?
-pkg-config --exists --print-errors "gstreamer-plugins-good-1.0 >= 1.14.4"
-gst_plg_good=$?
-pkg-config --exists --print-errors "gstreamer-plugins-bad-1.0 >= 1.14.4"
-gst_plg_bad=$?
-if [ $ENABLE_LIBAV -eq 1 ]; then
-  pkg-config --exists --print-errors "gstlibav >= 1.14.4"
-  gst_libav_ret=$?
+if [ $ENABLE_LATEST == 0 ]; then
+  GSTREAMER_VERSION=1.14.4
+else
+  GSTREAMER_VERSION=1.22.8
 fi
 
-if [ $ENABLE_NVCODEC -eq 1 ]; then
-  pkg-config --exists --print-errors "gstnvcodec >= 1.14.4"
-  gst_nv_ret=$?
+gst_core=(
+  "gstreamer-1.0;gstreamer-1.0"
+  "gstreamer-plugins-base-1.0;gstreamer-plugins-base-1.0"
+  "gstreamer-plugins-good-1.0;gstreamer-plugins-good-1.0" #For some reason this doesn't come out? Relying on plugins
+  "gstreamer-plugins-bad-1.0;gstreamer-plugins-bad-1.0"
+)
+
+gst_base_plugins=( 
+    "app;gstapp"
+    "typefind;gsttypefindfunctions"
+    "audiotestsrc;gstaudiotestsrc"
+    # "videotestsrc"
+    "playback;gstplayback"
+    "x11;gstximagesink"
+    "alsa;gstalsa"
+    "videoconvertscale;gstvideoconvertscale"
+    "videorate;gstvideorate"
+    "rawparse;gstrawparse"
+    "pbtypes;gstpbtypes"
+    "audioresample;gstaudioresample"
+    "audioconvert;gstaudioconvert"
+    "volume;gstvolume"
+    "tcp;gsttcp"
+    "overlaycomposition;gstoverlaycomposition"
+  )
+gst_good_plugins=(
+    "level;gstlevel"
+    "rtsp;gstrtsp"
+    "jpeg;gstjpeg"
+    "rtp;gstrtp"
+    "rtpmanager;gstrtpmanager"
+    "law;gstmulaw"
+    "autodetect;gstautodetect"
+    "pulse;gstpulseaudio"
+    "interleave;gstinterleave"
+    "audioparsers;gstaudioparsers"
+    "udp;gstudp"
+    "v4l2;gstvideo4linux2"
+    # "debugutils"  # This is to support v4l2h264enc element with capssetter #Workaround https://gitlab.freedesktop.org/gstreamer/gstreamer/-/issues/1056
+    # "png" # This is required for the snapshot feature
+)
+
+gst_bad_plugins=(
+    "openh264;gstopenh264"
+    "fdkaac;gstfdkaac"
+    "videoparsers;gstvideoparsersbad"
+    "onvif;gstrtponvif"
+    "jpegformat;gstjpegformat"
+    "v4l2codecs;gstv4l2codecs"
+)
+if [ $ENABLE_NVCODEC != 0 ]; then gst_bad_plugins+=("nvcodec;gstnvcodec"); fi
+
+checkGstreamerPkg () {
+  local static version # reset first
+  local "${@}"
+
+  gstpkgret=0;
+  if [ -z "${static}" ]; then
+    for gst_p in ${gst_core[@]}; do
+      IFS=";" read -r -a arr <<< "${gst_p}"
+      if [ ! -z "$(pkgCheck name=${arr[1]} minver=${version})" ]; then
+        printf "  missing core package ${arr[0]} >= ${version}\n";
+      fi
+    done
+  else
+    for gst_p in ${gst_base_plugins[@]}; do
+      IFS=";" read -r -a arr <<< "${gst_p}"
+      if [ ! -z "$(pkgCheck name=${arr[1]} minver=${version})" ]; then
+        printf "  missing base plugin ${arr[0]} >= ${version}\n";
+      fi
+    done
+    for gst_p in ${gst_good_plugins[@]}; do
+      IFS=";" read -r -a arr <<< "${gst_p}"
+      if [ ! -z "$(pkgCheck name=${arr[1]} minver=${version})" ]; then
+        printf "  missing good plugin ${arr[0]} >= ${version}\n";
+      fi
+    done
+    for gst_p in ${gst_bad_plugins[@]}; do
+      IFS=";" read -r -a arr <<< "${gst_p}"
+      if [ ! -z "$(pkgCheck name=${arr[1]} minver=${version})" ]; then
+        printf "  missing bad plugin ${arr[0]} >= ${version}\n";
+      fi
+    done
+  fi
+}
+
+#Gstreamer install on system doesn't break down by plugin, but groups them under base,good,bad,ugly
+if [ ! -z "$(checkGstreamerPkg version=$GSTREAMER_VERSION)" ]; then
+  printf "Gstreamer not installed on system.. \n$(checkGstreamerPkg version=$GSTREAMER_VERSION)\n"
+  gst_ret=1;
 fi
 
 #Check to see if gstreamer exist on the system
-if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $gst_nv_ret != 0 ] || [ $ENABLE_LATEST != 0 ] || [ $gst_plg_base != 0 ] || [ $gst_plg_good != 0 ] || [ $gst_plg_bad != 0 ]; then
-
-  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB \
-  pkg-config --exists --print-errors "gstreamer-1.0 >= $GSTREAMER_LATEST"
-  gst_ret=$?
-  if [ $ENABLE_LIBAV -eq 1 ]; then
-    PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB:$FFMPEG_PKG \
-    pkg-config --exists --print-errors "gstlibav >= $GSTREAMER_LATEST"
-    gst_libav_ret=$?
+if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
+  gst_ret=0;
+  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB:$FFMPEG_PKG;
+  #Gstreamer static plugins needs to be checked individually
+  if [ ! -z "$(checkGstreamerPkg version=$GSTREAMER_VERSION static=true)" ]; then
+    printf "Gstreamer static library not built.. \n$(checkGstreamerPkg version=$GSTREAMER_VERSION static=true)\n"
+    gst_ret=1;
   fi
-
-  if [ $ENABLE_NVCODEC -eq 1 ]; then
-    PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB \
-    pkg-config --exists --print-errors "gstnvcodec >= $GSTREAMER_LATEST"
-    gst_nv_ret=$?
+  if [ $ENABLE_LIBAV -eq 1 ] && [ ! -z "$(pkgCheck name=gstlibav minver=$GSTREAMER_VERSION)" ]; then
+    echo "missing libav plugin >= $GSTREAMER_VERSION";
+    gst_ret=1;
   fi
 
   #Global check if gstreamer is already built
-  if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $gst_nv_ret != 0 ]; then
+  if [ $gst_ret != 0 ]; then
     ################################################################
     # 
     #    Build gettext and libgettext dependency
@@ -1415,8 +1495,7 @@ if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $gst_nv_ret != 0 ] || [ $EN
         echo "nasm already installed."
     fi
 
-    echo "gst_ret : $gst_ret | gst_libav_ret : $gst_libav_ret | gst_nv_ret : $gst_nv_ret"
-    if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $gst_nv_ret != 0 ]; then
+    if [ $gst_ret != 0 ]; then
         MESON_PARAMS=""
         if [ $ENABLE_LIBAV -eq 1 ]; then
             echo "LIBAV Feature enabled..."
@@ -1473,8 +1552,9 @@ if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $gst_nv_ret != 0 ] || [ $EN
             MESON_PARAMS="$MESON_PARAMS -Dlibav=enabled"
         fi
 
-        pullOrClone path="https://gitlab.freedesktop.org/gstreamer/gstreamer.git" tag=$GSTREAMER_LATEST
+        pullOrClone path="https://gitlab.freedesktop.org/gstreamer/gstreamer.git" tag=$GSTREAMER_VERSION
 
+        #build meson params
         # Force disable subproject features
         MESON_PARAMS="$MESON_PARAMS -Dglib:tests=false"
         MESON_PARAMS="$MESON_PARAMS -Dlibdrm:cairo-tests=false"
@@ -1485,54 +1565,18 @@ if [ $gst_ret != 0 ] || [ $gst_libav_ret != 0 ] || [ $gst_nv_ret != 0 ] || [ $EN
         MESON_PARAMS="$MESON_PARAMS -Dgood=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dbad=enabled"
         MESON_PARAMS="$MESON_PARAMS -Dgpl=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:app=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:typefind=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:audiotestsrc=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:videotestsrc=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:playback=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:x11=enabled"
-        # MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:xvideo=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:alsa=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:videoconvertscale=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:videorate=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:rawparse=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:pbtypes=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:audioresample=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:audioconvert=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:volume=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:tcp=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-base:overlaycomposition=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:level=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:v4l2=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:rtsp=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:jpeg=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:rtp=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:rtpmanager=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:law=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:autodetect=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:pulse=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:interleave=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:audioparsers=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:udp=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:openh264=enabled"
-        if [ $ENABLE_NVCODEC != 0 ]; then
-          MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:nvcodec=enabled"
-        fi
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:v4l2codecs=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:fdkaac=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:videoparsers=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:onvif=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:jpegformat=enabled"
-        # MESON_PARAMS="$MESON_PARAMS -Dugly=enabled"
-        # MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-ugly:x264=enabled"
-
-        #Below is required for to workaround https://gitlab.freedesktop.org/gstreamer/gstreamer/-/issues/1056
-        # This is to support v4l2h264enc element with capssetter
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:debugutils=enabled"
-
-        # This is required for the snapshot feature
-        MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-good:png=enabled"
-
+        for gst_p in ${gst_base_plugins[@]}; do
+          IFS=";" read -r -a arr <<< "${gst_p}"
+          MESON_PARAMS+=" -Dgst-plugins-base:${arr[0]}=enabled"
+        done
+        for gst_p in ${gst_good_plugins[@]}; do
+          IFS=";" read -r -a arr <<< "${gst_p}"
+          MESON_PARAMS+=" -Dgst-plugins-good:${arr[0]}=enabled"
+        done
+        for gst_p in ${gst_bad_plugins[@]}; do
+          IFS=";" read -r -a arr <<< "${gst_p}"
+          MESON_PARAMS+=" -Dgst-plugins-bad:${arr[0]}=enabled"
+        done
         MESON_PARAMS="-Dauto_features=disabled $MESON_PARAMS"
         MESON_PARAMS="--strip $MESON_PARAMS"
 
