@@ -1180,11 +1180,13 @@ if [ ! -z "$(checkGstreamerPkg version=$GSTREAMER_VERSION)" ]; then
   gst_ret=1;
 fi
 
+PKG_PULSE=$SUBPROJECT_DIR/pulseaudio/build/dist/lib/pkgconfig
+
 #Check to see if gstreamer exist on the system
 if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
   gst_ret=0;
   GSTREAMER_VERSION=$GSTREAMER_LATEST; #If we are to build something, build latest
-  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB:$FFMPEG_PKG;
+  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB:$FFMPEG_PKG:$ALSA_PKG:$PKG_PULSE;
   #Gstreamer static plugins needs to be checked individually
   if [ ! -z "$(checkGstreamerPkg version=$GSTREAMER_VERSION static=true)" ]; then
     printf "Gstreamer static library not built.. \n$(checkGstreamerPkg version=$GSTREAMER_VERSION static=true)\n"
@@ -1422,7 +1424,6 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
     #   sudo apt install libpulse-dev (tested 12.2)
     # 
     ################################################################
-    PKG_PULSE=$SUBPROJECT_DIR/pulseaudio/build/dist/lib/pkgconfig
     PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_PULSE \
     pkg-config --exists --print-errors "libpulse >= 12.2"
     ret=$?
