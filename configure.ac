@@ -21,6 +21,11 @@ AC_SUBST(PKG_ONVIF_DISCO_PATH, '$(abs_srcdir)/subprojects/OnvifDiscoveryLib/buil
 AC_SUBST(PKG_ONVIF_SOAP_PATH, '$(abs_srcdir)/subprojects/OnvifSoapLib/build/dist/lib/pkgconfig')
 AC_SUBST(PKG_CUTILS_PATH, '$(abs_srcdir)/subprojects/CUtils/build/dist/lib/pkgconfig')
 
+AC_SUBST(GST_LIBS,m4_normalize('
+    gstreamer-1.0
+    gstreamer-video-1.0
+    alsa
+'))
 
 AC_DEFUN([SET_GST_PKG_PATH],[
     #Declare additional plugins to link statically
@@ -110,6 +115,7 @@ AM_COND_IF([NVCODECCOND],[
 # "gstreamer-plugins-good-1.0 >= 1.14.4" apparently doesn't exist on MX Linux?
 AC_SUBST(GST_PKG_CORE,m4_normalize(
     "gstreamer-1.0 >= 1.14.4 
+    gstreamer-video-1.0 >= 1.14.4
     gstreamer-plugins-base-1.0 >= 1.14.4 
     gstreamer-plugins-bad-1.0 >= 1.14.4"
 ))
