@@ -368,6 +368,9 @@ GtkWidget * Device__create_row (Device * device, char * uri, char* name, char * 
     g_object_set (thumbnail_handle, "margin-end", 10, NULL);
     gtk_grid_attach (GTK_GRID (grid), thumbnail_handle, 0, 1, 1, 3);
 
+    if(!name){
+        name = "N/A";
+    }
     char markup_name[strlen("<b>") + strlen(name) + strlen("</b>") +1]; //= malloc(strlen("<b>") + strlen(name) + strlen("</b>") +1);
     strcpy(markup_name, "<b>");
     strcat(markup_name, name);

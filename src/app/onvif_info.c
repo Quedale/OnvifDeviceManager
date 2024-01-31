@@ -1,5 +1,6 @@
 #include "onvif_info.h"
 #include "gui_utils.h"
+#include "clogger.h"
 
 #define ONVIF_GET_HOSTNAME_ERROR "Error retrieving hostname"
 #define ONVIF_GET_SCOPES_ERROR "Error retreiving scopes"
@@ -101,31 +102,31 @@ void OnvifInfo__destroy(OnvifInfo* self){
 gboolean * onvif_info_gui_update (void * user_data){
     InfoGUIUpdate * update = (InfoGUIUpdate *) user_data;
 
-    gtk_entry_set_text(GTK_ENTRY(update->info->name_lbl),update->name);
+    if(update->name) gtk_entry_set_text(GTK_ENTRY(update->info->name_lbl),update->name);
     gtk_editable_set_editable  ((GtkEditable*)update->info->name_lbl, FALSE);
 
-    gtk_entry_set_text(GTK_ENTRY(update->info->hostname_lbl),update->hostname);
+    if(update->hostname) gtk_entry_set_text(GTK_ENTRY(update->info->hostname_lbl),update->hostname);
     gtk_editable_set_editable  ((GtkEditable*)update->info->hostname_lbl, FALSE);
 
-    gtk_entry_set_text(GTK_ENTRY(update->info->location_lbl),update->location);
+    if(update->location) gtk_entry_set_text(GTK_ENTRY(update->info->location_lbl),update->location);
     gtk_editable_set_editable  ((GtkEditable*)update->info->location_lbl, FALSE);
 
-    gtk_entry_set_text(GTK_ENTRY(update->info->manufacturer_lbl),update->manufacturer);
+    if(update->manufacturer) gtk_entry_set_text(GTK_ENTRY(update->info->manufacturer_lbl),update->manufacturer);
     gtk_editable_set_editable  ((GtkEditable*)update->info->manufacturer_lbl, FALSE);
 
-    gtk_entry_set_text(GTK_ENTRY(update->info->model_lbl),update->model);
+    if(update->model) gtk_entry_set_text(GTK_ENTRY(update->info->model_lbl),update->model);
     gtk_editable_set_editable  ((GtkEditable*)update->info->model_lbl, FALSE);
 
-    gtk_entry_set_text(GTK_ENTRY(update->info->hardware_lbl),update->hardware);
+    if(update->hardware) gtk_entry_set_text(GTK_ENTRY(update->info->hardware_lbl),update->hardware);
     gtk_editable_set_editable  ((GtkEditable*)update->info->hardware_lbl, FALSE);
 
-    gtk_entry_set_text(GTK_ENTRY(update->info->firmware_lbl),update->firmware);
+    if(update->firmware) gtk_entry_set_text(GTK_ENTRY(update->info->firmware_lbl),update->firmware);
     gtk_editable_set_editable  ((GtkEditable*)update->info->firmware_lbl, FALSE);
 
-    gtk_entry_set_text(GTK_ENTRY(update->info->serial_lbl),update->serial);
+    if(update->serial) gtk_entry_set_text(GTK_ENTRY(update->info->serial_lbl),update->serial);
     gtk_editable_set_editable  ((GtkEditable*)update->info->serial_lbl, FALSE);
 
-    gtk_entry_set_text(GTK_ENTRY(update->info->ip_lbl),update->ip);
+    if(update->ip) gtk_entry_set_text(GTK_ENTRY(update->info->ip_lbl),update->ip);
     gtk_editable_set_editable  ((GtkEditable*)update->info->ip_lbl, FALSE);
 
     for(int i=0;i<update->mac_count;i++){
@@ -147,10 +148,10 @@ gboolean * onvif_info_gui_update (void * user_data){
         gtk_widget_show_all(grid);
     }
 
-    gtk_entry_set_text(GTK_ENTRY(update->info->version_lbl),update->version);
+    if(update->version) gtk_entry_set_text(GTK_ENTRY(update->info->version_lbl),update->version);
     gtk_editable_set_editable  ((GtkEditable*)update->info->version_lbl, FALSE);
 
-    gtk_entry_set_text(GTK_ENTRY(update->info->uri_lbl),update->uri);
+    if(update->uri) gtk_entry_set_text(GTK_ENTRY(update->info->uri_lbl),update->uri);
     gtk_editable_set_editable  ((GtkEditable*)update->info->uri_lbl, FALSE);
 
     if(update->info->done_callback)
@@ -190,7 +191,6 @@ void _update_details_page(void * user_data){
         goto exit;
     }
 
-    int ghostname_success = 0;
     int ginfo_success = 0;
     int gnetwork_success = 0;
     int gscopes_success = 0;
@@ -198,7 +198,6 @@ void _update_details_page(void * user_data){
     OnvifDeviceService * devserv = OnvifDevice__get_device_service(onvif_device);
 
     hostname = OnvifDeviceService__getHostname(devserv);
-    if(OnvifDevice__get_last_error(onvif_device) == ONVIF_ERROR_NONE) ghostname_success = 1;
     if(!CObject__is_valid((CObject*)self->device) || !Device__is_selected(self->device))
         goto exit;
 
@@ -221,13 +220,7 @@ void _update_details_page(void * user_data){
     gui_update->info = self;
     gui_update->mac_count = 0;
     gui_update->macs= malloc(0);
-
-    if(ghostname_success){
-        gui_update->hostname = hostname; //No need to copy since OnvifDevice__device_getHostname returns malloc pointer
-    } else {
-        gui_update->hostname = malloc(strlen(ONVIF_GET_HOSTNAME_ERROR)+1);
-        strcpy(gui_update->hostname,ONVIF_GET_HOSTNAME_ERROR);
-    }
+    gui_update->hostname = hostname; //No need to copy since OnvifDevice__device_getHostname returns malloc pointer
 
     if(gscopes_success){
         gui_update->name = OnvifScopes__extract_scope(scopes,"name"); //No need to copy since extract_scope returns a malloc pointer

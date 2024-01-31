@@ -1081,7 +1081,7 @@ FFMPEG_PKG=$SUBPROJECT_DIR/FFmpeg/dist/lib/pkgconfig
 GST_OMX_PKG_PATH=$SUBPROJECT_DIR/gstreamer/build_omx/dist/lib/gstreamer-1.0/pkgconfig
 GST_PKG_PATH=:$SUBPROJECT_DIR/gstreamer/build/dist/lib/pkgconfig:$SUBPROJECT_DIR/gstreamer/build/dist/lib/gstreamer-1.0/pkgconfig
 gst_ret=0
-GSTREAMER_LATEST=1.22.8
+GSTREAMER_LATEST=1.22.9
 if [ $ENABLE_LATEST == 0 ]; then
   GSTREAMER_VERSION=1.14.4
 else
@@ -1137,6 +1137,7 @@ gst_bad_plugins=(
     "onvif;gstrtponvif"
     "jpegformat;gstjpegformat"
     "v4l2codecs;gstv4l2codecs"
+    "libde265;gstde265"
 )
 if [ $ENABLE_NVCODEC != 0 ]; then gst_bad_plugins+=("nvcodec;gstnvcodec"); fi
 
@@ -1181,12 +1182,13 @@ if [ ! -z "$(checkGstreamerPkg version=$GSTREAMER_VERSION)" ]; then
 fi
 
 PKG_PULSE=$SUBPROJECT_DIR/pulseaudio/build/dist/lib/pkgconfig
+LIBDE265_PKG=$SUBPROJECT_DIR/libde265/dist/lib/pkgconfig
 
 #Check to see if gstreamer exist on the system
 if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
   gst_ret=0;
   GSTREAMER_VERSION=$GSTREAMER_LATEST; #If we are to build something, build latest
-  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB:$FFMPEG_PKG:$ALSA_PKG:$PKG_PULSE;
+  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB:$FFMPEG_PKG:$ALSA_PKG:$PKG_PULSE:$LIBDE265_PKG
   #Gstreamer static plugins needs to be checked individually
   if [ ! -z "$(checkGstreamerPkg version=$GSTREAMER_VERSION static=true)" ]; then
     printf "Gstreamer static library not built.. \n$(checkGstreamerPkg version=$GSTREAMER_VERSION static=true)\n"
@@ -1499,6 +1501,16 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
     fi
 
     if [ $gst_ret != 0 ]; then
+        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$LIBDE265_PKG
+        if [ ! -z "$(pkgCheck name=libde265 minver=v1.0.15)" ]; then
+          pullOrClone path="https://github.com/strukturag/libde265.git" tag=v1.0.15
+          if [ $FAILED -eq 1 ]; then exit 1; fi
+          buildMakeProject srcdir="libde265" prefix="$SUBPROJECT_DIR/libde265/dist"
+          if [ $FAILED -eq 1 ]; then exit 1; fi
+        else
+          echo "libde265 already installed."
+        fi
+
         MESON_PARAMS=""
         if [ $ENABLE_LIBAV -eq 1 ]; then
             echo "LIBAV Feature enabled..."

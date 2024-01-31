@@ -209,6 +209,7 @@ GST_PLUGIN_STATIC_DECLARE(pulseaudio);
 // GST_PLUGIN_STATIC_DECLARE(rtspclientsink);
 // GST_PLUGIN_STATIC_DECLARE(nle); gstnle
 // GST_PLUGIN_STATIC_DECLARE(ges); gstges
+GST_PLUGIN_STATIC_DECLARE(de265);
 // extern void g_io_environmentproxy_load (gpointer data);
 // extern void g_io_openssl_load (gpointer data);
 
@@ -423,6 +424,7 @@ onvif_init_static_plugins (void)
 #ifndef ENABLERPI
     GST_PLUGIN_STATIC_REGISTER(pulseaudio);
 #endif
+    GST_PLUGIN_STATIC_REGISTER(de265);
     // GST_PLUGIN_STATIC_REGISTER(rtspclientsink);
     // GST_PLUGIN_STATIC_REGISTER(nle); gstnle
     // GST_PLUGIN_STATIC_REGISTER(ges); gstges

@@ -2,6 +2,7 @@
 #include "gtk/gstgtkbasesink.h"
 #include "clogger.h"
 #include "url_parser.h"
+#include "gst/rtsp/gstrtsptransport.h"
 
 typedef struct _RtspPlayer {
   GstElement *pipeline;
@@ -62,8 +63,10 @@ static void warning_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
   GError *err;
   gchar *debug_info;
   gst_message_parse_warning (msg, &err, &debug_info);
-  C_WARN ("Warning received from element %s: %s", GST_OBJECT_NAME (msg->src), err->message);
-  C_WARN ("Debugging information: %s", debug_info ? debug_info : "none");
+  if(strcmp(err->message,"Empty Payload.")){ //Ignoring rtp empty payload warnings
+    C_WARN ("Warning received from element %s: %s", GST_OBJECT_NAME (msg->src), err->message);
+    C_WARN ("Debugging information: %s", debug_info ? debug_info : "none");
+  }
   g_clear_error (&err);
   g_free (debug_info);
 }
@@ -491,11 +494,12 @@ static void on_rtsp_pad_added (GstElement *element, GstPad *new_pad, RtspPlayer 
   GstPad *sink_pad = NULL;
   GstCaps *new_pad_caps = NULL;
   GstStructure *new_pad_struct = NULL;
+  char *capsName;
 
   /* Check the new pad's type */
   new_pad_caps = gst_pad_get_current_caps (new_pad);
   new_pad_struct = gst_caps_get_structure (new_pad_caps, 0);
-  
+  capsName = gst_caps_to_string(new_pad_caps);
 
   gint payload_v;
   gst_structure_get_int(new_pad_struct,"payload", &payload_v);
@@ -505,7 +509,7 @@ static void on_rtsp_pad_added (GstElement *element, GstPad *new_pad, RtspPlayer 
   // printf("caps_str : %s\n",caps_str);
 
   //TODO perform stream selection by stream codec not payload
-  if ((payload_v >= 96 && payload_v <=100) || payload_v == 26) {
+  if (g_strrstr(capsName, "video")){
     data->pad_found = 1;
     data->no_video = 0;
     data->video_done = 0;
@@ -518,37 +522,32 @@ static void on_rtsp_pad_added (GstElement *element, GstPad *new_pad, RtspPlayer 
 
     pad_ret = gst_pad_link (new_pad, sink_pad);
     if (GST_PAD_LINK_FAILED (pad_ret)) {
-      g_printerr ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(video_bin));
+      C_ERROR ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(video_bin));
       //TODO Show error on canvas
       data->no_video = 1;
       goto exit;
     }
 
     gst_element_sync_state_with_parent(video_bin);
-  } else if (payload_v == 0) {
+  } else if (g_strrstr(capsName,"audio")){
     data->pad_found = 1;
     data->no_audio = 0;
     data->audio_done = 0;
-    const gchar * audio_format_v = gst_structure_get_string(new_pad_struct,"encoding-name");
-    if(!strcmp(audio_format_v,"PCMU")){
-      GstElement * audio_bin = create_audio_bin(data);
+    GstElement * audio_bin = create_audio_bin(data);
 
-      gst_bin_add_many (GST_BIN (data->pipeline), audio_bin, NULL);
+    gst_bin_add_many (GST_BIN (data->pipeline), audio_bin, NULL);
 
-      sink_pad = gst_element_get_static_pad (audio_bin, "bin_sink");
-      pad_ret = gst_pad_link (new_pad, sink_pad);
-      if (GST_PAD_LINK_FAILED (pad_ret)) {
-        g_printerr ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(audio_bin));
-        data->no_audio = 1;
-        goto exit;
-      }
-
-      gst_element_sync_state_with_parent(audio_bin);
-    } else {
-      GST_FIXME("Add support to other audio format...\n");
+    sink_pad = gst_element_get_static_pad (audio_bin, "bin_sink");
+    pad_ret = gst_pad_link (new_pad, sink_pad);
+    if (GST_PAD_LINK_FAILED (pad_ret)) {
+      C_ERROR ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(audio_bin));
+      data->no_audio = 1;
+      goto exit;
     }
+
+    gst_element_sync_state_with_parent(audio_bin);
   } else {
-    GST_FIXME("Support other payload formats %i\n",payload_v);
+    C_ERROR("Support other payload formats %i\n",payload_v);
   }
 
 exit:
@@ -600,10 +599,11 @@ void create_pipeline(RtspPlayer *self){
   g_object_set (G_OBJECT (self->src), "teardown-timeout", 0, NULL); 
   g_object_set (G_OBJECT (self->src), "backchannel", self->enable_backchannel, NULL);
   g_object_set (G_OBJECT (self->src), "user-agent", "OnvifDeviceManager-Linux-0.0", NULL);
-  g_object_set (G_OBJECT (self->src), "do-retransmission", FALSE, NULL);
-  // g_object_set (G_OBJECT (self->src), "onvif-mode", TRUE, NULL); //It seems onvif mode can cause segmentation fault with v4l2onvif
+  g_object_set (G_OBJECT (self->src), "do-retransmission", TRUE, NULL);
+  g_object_set (G_OBJECT (self->src), "onvif-mode", FALSE, NULL); //It seems onvif mode can cause segmentation fault with v4l2onvif
   g_object_set (G_OBJECT (self->src), "is-live", TRUE, NULL);
   // g_object_set (G_OBJECT (self->src), "tcp-timeout", 500000, NULL);
+  g_object_set (G_OBJECT (self->src), "protocols", GST_RTSP_LOWER_TRANS_TCP, NULL); //TODO Allow changing this via settings
 
   /* set up bus */
   GstBus *bus = gst_element_get_bus (self->pipeline);
