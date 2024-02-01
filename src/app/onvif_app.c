@@ -84,26 +84,6 @@ static void quit_cb (GtkButton *button, OnvifApp *data) {
 static void delete_event_cb (GtkWidget *widget, GdkEvent *event, OnvifApp *data) {
     onvif_app_shutdown(data);
 }
-static gboolean * finished_discovery (void * e) {
-    C_TRACE("finished_discovery");
-    struct DiscoveryInput * disco_in = (struct DiscoveryInput * ) e;
-
-    gtk_widget_set_sensitive(disco_in->widget,TRUE);
-
-    free(disco_in);
-
-    return FALSE;
-}
-
-static gboolean * _finished_discovery (void * e) {
-    C_TRACE("_finished_discovery");
-    DiscoveryEvent * event = (DiscoveryEvent *) e;
-    struct DiscoveryInput * disco_in = (struct DiscoveryInput * ) event->data;
-    gdk_threads_add_idle((void *)finished_discovery,disco_in);
-    
-    CObject__destroy((CObject*)event);
-    return FALSE;
-}
 
 void add_device(OnvifApp * self, OnvifDevice * onvif_dev, char* name, char * hardware, char * location);
 
@@ -156,11 +136,29 @@ static gboolean * found_server (void * e) {
     return FALSE;
 }
 
-static gboolean * _found_server (void * e) {
+void _found_server (DiscoveryEvent * event) {
     C_TRACE("_found_server");
-    gdk_threads_add_idle((void *)found_server,e);
+    gdk_threads_add_idle((void *)found_server,event);
+}
+
+gboolean * finished_discovery (void * e) {
+    C_TRACE("finished_discovery");
+    struct DiscoveryInput * disco_in = (struct DiscoveryInput * ) e;
+
+    gtk_widget_set_sensitive(disco_in->widget,TRUE);
+
+    free(disco_in);
 
     return FALSE;
+}
+
+void _start_onvif_discovery(void * user_data){
+    struct DiscoveryInput * disco_in = (struct DiscoveryInput *) user_data;
+    //Start UDP Scan
+    struct UdpDiscoverer discoverer = UdpDiscoverer__create(_found_server);
+    UdpDiscoverer__start(&discoverer, disco_in, AppSettingsDiscovery__get_repeat(disco_in->app->settings->discovery), AppSettingsDiscovery__get_timeout(disco_in->app->settings->discovery));
+    
+    gdk_threads_add_idle((void *)finished_discovery,disco_in);
 }
 
 void onvif_scan (GtkWidget *widget, OnvifApp * app) {
@@ -175,15 +173,12 @@ void onvif_scan (GtkWidget *widget, OnvifApp * app) {
     EventQueue__clear(app->queue);
     CListTS__clear(app->device_list);
 
-    //Start UDP Scan
-    struct UdpDiscoverer discoverer = UdpDiscoverer__create(_found_server,_finished_discovery);
-
     //Multiple dispatch in case of packet dropped
     struct DiscoveryInput * disco_in = malloc(sizeof(struct DiscoveryInput));
     disco_in->app = app;
     disco_in->widget = widget;
-    //TODO Support retry_count by settings
-    UdpDiscoverer__start(&discoverer, disco_in, AppSettingsDiscovery__get_repeat(app->settings->discovery), AppSettingsDiscovery__get_timeout(app->settings->discovery));
+
+    EventQueue__insert(app->queue,_start_onvif_discovery,disco_in);
 }
 
 void error_onvif_stream(RtspPlayer * player, void * user_data){
@@ -575,6 +570,7 @@ exit:
 void add_device_add_cb(AppDialogEvent * event){
     OnvifApp * app = (OnvifApp *) event->user_data;
     const char * device_uri = AddDeviceDialog__get_device_uri((AddDeviceDialog *)event->dialog);
+    C_INFO("Manually adding device URL : '%s'",device_uri);
     if(!device_uri || !strlen(device_uri)){
         C_WARN("Ingoring empty field");
         return;
