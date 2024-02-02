@@ -12,6 +12,11 @@ typedef struct _AddDeviceDialog {
 } AddDeviceDialog;
 
 AddDeviceDialog * AddDeviceDialog__create();
-const char * AddDeviceDialog__get_device_uri(AddDeviceDialog * dialog);
+const char * AddDeviceDialog__get_host(AddDeviceDialog * dialog);
+const char * AddDeviceDialog__get_port(AddDeviceDialog * dialog);
+const char * AddDeviceDialog__get_user(AddDeviceDialog * dialog);
+const char * AddDeviceDialog__get_pass(AddDeviceDialog * dialog);
+const char * AddDeviceDialog__get_protocol(AddDeviceDialog * dialog);
+void AddDeviceDialog__set_error(AddDeviceDialog * self, char * error);
 
 #endif

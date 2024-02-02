@@ -40,6 +40,7 @@ void onvif_app_shutdown(OnvifApp * data){
     AppDialog__set_title((AppDialog*)dialog,"Shutting down...");
     AppDialog__set_cancellable((AppDialog*)dialog,0);
     MsgDialog__set_message(dialog,"Waiting for running task to finish...");
+    AppDialog__show_actions((AppDialog*)dialog);
     AppDialog__show((AppDialog *) dialog,force_shutdown_cb,NULL,data);
 
     pthread_t pthread;

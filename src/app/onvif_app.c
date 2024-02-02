@@ -11,6 +11,7 @@
 #include "task_manager.h"
 #include "clist_ts.h"
 #include "clogger.h"
+#include "../animations/dotted_slider.h"
 
 typedef struct _OnvifApp {
     Device* device; /* Currently selected device */
@@ -471,79 +472,36 @@ gboolean * gui_hide_dialog (void * user_data){
     return FALSE;
 }
 
-void _onvif_authentication_add(void * user_data){
-    AppDialogEvent * event = (AppDialogEvent *) user_data;
-    OnvifDeviceInput * input = (OnvifDeviceInput *) event->user_data;
-
-    OnvifDevice__set_credentials(input->device,CredentialsDialog__get_username((CredentialsDialog*)event->dialog),CredentialsDialog__get_password((CredentialsDialog*)event->dialog));
-    OnvifDevice__authenticate(input->device);
-    if(OnvifDevice__get_last_error(input->device) == ONVIF_ERROR_NOT_AUTHORIZED){
-        C_WARN("Authentication failed\n");
-        goto exit;
-    }
-
-    OnvifDeviceService * devserv = OnvifDevice__get_device_service(input->device);
-    OnvifScopes * scopes = OnvifDeviceService__getScopes(devserv);
-
-    GUIScopeInput * guiscope = malloc(sizeof(GUIScopeInput));
-    guiscope->app = input->app;
-    guiscope->device = input->device;
-    guiscope->scopes = scopes;
-    gdk_threads_add_idle((void *)gui_process_device_scopes,guiscope);
-
-    //Hide both dialogs
-    gdk_threads_add_idle((void *)gui_hide_dialog,input->app->cred_dialog);
-    gdk_threads_add_idle((void *)gui_hide_dialog,input->app->add_dialog);
-
-    //Input was used to dispatch credential dialog user_data.
-    free(input);
-
-exit:
-    free(event);
-}
-
-void dialog_login_add_cb(AppDialogEvent * event){
-    C_INFO("OnvifAuthentication add attempt...\n");
-    OnvifDeviceInput * input = (OnvifDeviceInput *) event->user_data;
-    EventQueue__insert(input->app->queue,_onvif_authentication_add,AppDialogEvent_copy(event));
-}
-
-void dialog_cancel_add_cb(AppDialogEvent * event){
-    AppDialog * dialog = (AppDialog*)event->dialog;
-    OnvifDeviceInput * input = (OnvifDeviceInput *) dialog->user_data;
-    OnvifDevice__destroy(input->device);
-    dialog_cancel_cb(event);
-}
-
-gboolean * gui_show_credentialsdialog_add (void * user_data){
-    OnvifDeviceInput * input = (OnvifDeviceInput *) user_data;
-    AppDialog__show((AppDialog*)input->app->cred_dialog,dialog_login_add_cb, dialog_cancel_add_cb,input);
-    return FALSE;
-}
 
 void _onvif_device_add(void * user_data){
     AppDialogEvent * event = (AppDialogEvent *) user_data;
     AddDeviceDialog * dialog = (AddDeviceDialog *) event->dialog;
-    const char * device_uri = AddDeviceDialog__get_device_uri(dialog);
+    const char * host = AddDeviceDialog__get_host((AddDeviceDialog *)event->dialog);
+    const char * port = AddDeviceDialog__get_port((AddDeviceDialog *)event->dialog);
+    const char * protocol = AddDeviceDialog__get_protocol((AddDeviceDialog *)event->dialog);
 
-    OnvifDevice * onvif_dev = OnvifDevice__create((char *)device_uri);
+    char fullurl[strlen(protocol) + 3 + strlen(host) + 1 + strlen(port) + strlen("/onvif/device_service") + 1];
+    strcpy(fullurl,protocol);
+    strcat(fullurl,"://");
+    strcat(fullurl,host);
+    strcat(fullurl,":");
+    strcat(fullurl,port);
+    strcat(fullurl,"/onvif/device_service");
+
+    C_INFO("Manually adding URL : '%s'",fullurl);
+
+    OnvifDevice * onvif_dev = OnvifDevice__create((char *)fullurl);
     if(!OnvifDevice__is_valid(onvif_dev)){
         C_ERROR("Invalid URL provided\n");
         OnvifDevice__destroy(onvif_dev);
         goto exit;
-    } else {
-        C_INFO("Valid device added [%s]\n",device_uri);
     }
+    OnvifDevice__set_credentials(onvif_dev,AddDeviceDialog__get_user((AddDeviceDialog *)event->dialog),AddDeviceDialog__get_pass((AddDeviceDialog *)event->dialog));
+   
 
     OnvifDevice__authenticate(onvif_dev);
     OnvifErrorTypes oerror = OnvifDevice__get_last_error(onvif_dev);
-    if(oerror == ONVIF_ERROR_NOT_AUTHORIZED){
-        OnvifDeviceInput * input = malloc(sizeof(OnvifDeviceInput));
-        input->app = (OnvifApp *) event->user_data;
-        input->device = onvif_dev;
-        gdk_threads_add_idle((void *)gui_show_credentialsdialog_add,input);
-        goto exit;
-    } else if(oerror == ONVIF_ERROR_NONE) {
+    if(oerror == ONVIF_ERROR_NONE) {
         //Extract scope
         OnvifDeviceService * devserv = OnvifDevice__get_device_service(onvif_dev);
         OnvifScopes * scopes = OnvifDeviceService__getScopes(devserv);
@@ -552,35 +510,53 @@ void _onvif_device_add(void * user_data){
         guiscope->device = onvif_dev;
         guiscope->scopes = scopes;
         gdk_threads_add_idle((void *)gui_process_device_scopes,guiscope);
-    } else if(oerror == ONVIF_ERROR_CONNECTION) {
-        C_ERROR("An conncetion error was encountered\n");
-        OnvifDevice__destroy(onvif_dev);
-        goto exit;
-    } else if(oerror == ONVIF_ERROR_SOAP) {
-        C_ERROR("An soap error was encountered \n");
+    } else {
+        if(oerror == ONVIF_ERROR_NOT_AUTHORIZED){
+            AddDeviceDialog__set_error(dialog,"Unauthorized...");
+        } else if(oerror == ONVIF_ERROR_NOT_VALID){
+            AddDeviceDialog__set_error(dialog,"Not a valid ONVIF device...");
+        } else if(oerror == ONVIF_ERROR_SOAP){
+            AddDeviceDialog__set_error(dialog,"Unexected soap error occured...");
+        } else if(oerror == ONVIF_ERROR_CONNECTION){
+            AddDeviceDialog__set_error(dialog,"Failed to connect...");
+        }
+        C_ERROR("An soap error was encountered %d\n",oerror);
         OnvifDevice__destroy(onvif_dev);
         goto exit;
     }
 
     gdk_threads_add_idle((void *)gui_hide_dialog,dialog);
 exit:
+    MsgDialog * msgdialog = OnvifApp__get_msg_dialog((OnvifApp *) event->user_data);
+    gdk_threads_add_idle((void *)gui_hide_dialog,msgdialog);
     free(event);
 }
 
 void add_device_add_cb(AppDialogEvent * event){
     OnvifApp * app = (OnvifApp *) event->user_data;
-    const char * device_uri = AddDeviceDialog__get_device_uri((AddDeviceDialog *)event->dialog);
-    C_INFO("Manually adding device URL : '%s'",device_uri);
-    if(!device_uri || !strlen(device_uri)){
-        C_WARN("Ingoring empty field");
+    const char * host = AddDeviceDialog__get_host((AddDeviceDialog *)event->dialog);
+    if(!host || strlen(host) < 2){
+        C_WARN("Host field invalid. (too short)");
         return;
     }
+
+    GtkWidget * image = create_dotted_slider_animation(10,1);
+    MsgDialog * dialog = OnvifApp__get_msg_dialog(app);
+    MsgDialog__set_icon(dialog, image);
+    AppDialog__set_closable((AppDialog*)dialog, 0);
+    AppDialog__hide_actions((AppDialog*)dialog);
+    AppDialog__set_title((AppDialog*)dialog,"Working...");
+    AppDialog__set_cancellable((AppDialog*)dialog,0);
+    MsgDialog__set_message(dialog,"Testing ONVIF device configuration...");
+    AppDialog__show((AppDialog *) dialog,NULL,NULL,NULL);
+
     EventQueue__insert(app->queue,_onvif_device_add,AppDialogEvent_copy(event));
 }
 
 void onvif_add_device (GtkWidget *widget, OnvifApp * app) {
     AppDialog__show((AppDialog *) app->add_dialog,add_device_add_cb,NULL,app);
 }
+
 /*
  *
  *  UI Creation
