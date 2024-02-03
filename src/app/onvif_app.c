@@ -847,15 +847,20 @@ void OnvifApp__destroy(OnvifApp* self){
         free(self);
     }
 }
-
+void _profile_callback (void * user_data){
+    struct DeviceInput * event = (struct DeviceInput *) user_data;
+    RtspPlayer__stop(event->app->player);
+    onvif_reload_device(event);
+    free(event);
+}
+    
 void profile_callback(Device * device, void * user_data){
     C_INFO("Switching profile");
-    struct DeviceInput input;
-    input.app = (OnvifApp *) user_data;
-    input.device = device;
-    input.skip_profiles = 1;
-    RtspPlayer__stop(input.app->player);
-    onvif_reload_device(&input);
+    struct DeviceInput * input = malloc(sizeof(struct DeviceInput));
+    input->app = (OnvifApp *) user_data;
+    input->device = device;
+    input->skip_profiles = 1;
+    EventQueue__insert(input->app->queue,_profile_callback,input);
 }
 
 void add_device(OnvifApp * self, OnvifDevice * onvif_dev, char* name, char * hardware, char * location){
