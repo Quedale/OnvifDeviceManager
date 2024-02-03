@@ -11,7 +11,7 @@ typedef struct _Device Device;
 
 Device * Device__create(OnvifDevice * onvif_device);
 void Device__set_profile_callback(Device * device, void (*profile_callback)(Device *, void *), void * profile_userdata);
-void Device__lookup_hostname(Device* device, EventQueue * queue); 
+// void Device__lookup_hostname(Device* device, EventQueue * queue); 
 void Device__load_thumbnail(Device* device, EventQueue * queue);
 void Device__load_profiles(Device* device, EventQueue * queue);
 GtkWidget * Device__create_row (Device * device, char * uri, char* name, char * hardware, char * location);

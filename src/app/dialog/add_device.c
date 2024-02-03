@@ -55,7 +55,7 @@ int check_for_valid_host_char(const char c){
 
 void host_text_validate(GtkEditable *editable, const gchar *text, gint length, gint *position, gpointer data){
     const char * oldtext = gtk_entry_get_text(GTK_ENTRY(editable));
-    char ntext[strlen(oldtext) + 2];
+    char ntext[strlen(oldtext) + strlen(text) + 1];
     strcpy(ntext,oldtext);
     strcat(ntext,text);
 

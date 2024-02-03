@@ -41,7 +41,7 @@ typedef struct {
 
 void priv_Device__destroy(CObject * self);
 void priv_Device__profile_changed(GtkComboBox* self, Device * device);
-void _priv_Device__lookup_hostname(void * user_data);
+// void _priv_Device__lookup_hostname(void * user_data);
 void _priv_Device__load_thumbnail(void * user_data);
 void _priv_Device__load_profiles(void * user_data);
 gboolean * gui_Device__display_profiles (void * user_data);
@@ -101,30 +101,30 @@ void priv_Device__destroy(CObject * self){
 //     return ret;
 // }
 
-void _priv_Device__lookup_hostname(void * user_data){
-    Device * device = (Device *) user_data;
-    char hostname[NI_MAXHOST];
-    memset(&hostname,0,sizeof(hostname));
+// void _priv_Device__lookup_hostname(void * user_data){
+//     Device * device = (Device *) user_data;
+//     char hostname[NI_MAXHOST];
+//     memset(&hostname,0,sizeof(hostname));
     
-    C_DEBUG("_priv_Device__lookup_hostname\n");
-    if(!CObject__addref((CObject*)device)){
-        C_WARN("_priv_Device__lookup_hostname - invalid device");
-        return;
-    }
+//     C_DEBUG("_priv_Device__lookup_hostname\n");
+//     if(!CObject__addref((CObject*)device)){
+//         C_WARN("_priv_Device__lookup_hostname - invalid device");
+//         return;
+//     }
 
-    // char * dev_ip = OnvifDevice__get_ip(device->onvif_device);
-    // if(dev_ip == NULL){ //Retrieve ip by hostname
-    //     OnvifDevice__lookup_ip(device->onvif_device);
-    // }
-    // free(dev_ip);
+//     // char * dev_ip = OnvifDevice__get_ip(device->onvif_device);
+//     // if(dev_ip == NULL){ //Retrieve ip by hostname
+//     //     OnvifDevice__lookup_ip(device->onvif_device);
+//     // }
+//     // free(dev_ip);
 
-    // if(!_priv_Device__lookup_hostname_dns(device,hostname)){
-    //     _priv_Device__lookup_hostname_netbios(device,hostname);
-    // }
+//     // if(!_priv_Device__lookup_hostname_dns(device,hostname)){
+//     //     _priv_Device__lookup_hostname_netbios(device,hostname);
+//     // }
 
-    C_TRACE("_priv_Device__lookup_hostname - done");
-    CObject__unref((CObject*)device);
-}
+//     C_TRACE("_priv_Device__lookup_hostname - done");
+//     CObject__unref((CObject*)device);
+// }
 
 void _priv_Device__load_thumbnail(void * user_data){
     C_DEBUG("_priv_Device__load_thumbnail");
@@ -338,10 +338,10 @@ Device * Device__create(OnvifDevice * onvif_device){
     return result;
 }
 
-void Device__lookup_hostname(Device* device, EventQueue * queue){
-    C_DEBUG("Device__lookup_hostname");
-    EventQueue__insert(queue,_priv_Device__lookup_hostname,device);
-}
+// void Device__lookup_hostname(Device* device, EventQueue * queue){
+//     C_DEBUG("Device__lookup_hostname");
+//     EventQueue__insert(queue,_priv_Device__lookup_hostname,device);
+// }
 
 void Device__load_thumbnail(Device* device, EventQueue * queue){
     C_DEBUG("Device__load_thumbnail");

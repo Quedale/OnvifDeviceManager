@@ -72,13 +72,17 @@ void set_element_priority(char * element_name, int priority){
       C_WARN("Element '%s' not found.",element_name);
       return;
   }
-  C_WARN("Found element '%s'. Lowering priority to %d...",element_name,priority);
-  gst_plugin_feature_set_rank(plugfeat, priority);
+  int rank = gst_plugin_feature_get_rank(plugfeat);
+  if(rank > priority){
+    C_WARN("Found element '%s'. Lowering priority from %d to %d...",element_name,rank,priority);
+    gst_plugin_feature_set_rank(plugfeat, priority);
+  } else if(rank < priority){
+    C_WARN("Found element '%s'. Increasing priority from %d to %d...",element_name,rank,priority);
+    gst_plugin_feature_set_rank(plugfeat, priority);
+  }
 
   gst_object_unref(plugfeat);
 }
-
-
 
 int main(int argc, char *argv[]) {
   // signal(SIGSEGV, handler);   // install our handler
@@ -87,6 +91,7 @@ int main(int argc, char *argv[]) {
   // CRYPTO_thread_setup();
   
   c_log_set_level(C_ALL_E);
+  c_log_set_thread_color(ANSI_COLOR_DRK_GREEN, P_THREAD_ID);
 
   /* Initialize GTK */
   gtk_init (&argc, &argv);
@@ -104,8 +109,6 @@ int main(int argc, char *argv[]) {
   print_elements_by_type("video/x-h265");
   print_elements_by_type("image/jpeg");
   print_elements_by_type("video/x-av1");
-
-  gst_debug_set_threshold_for_name ("ext-gst-player", GST_LEVEL_DEBUG);
   
   C_INFO("Using Gstreamer Version : %i.%i.%i.%i",GST_PLUGINS_BASE_VERSION_MAJOR,GST_PLUGINS_BASE_VERSION_MINOR,GST_PLUGINS_BASE_VERSION_MICRO,GST_PLUGINS_BASE_VERSION_NANO);
   

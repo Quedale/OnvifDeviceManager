@@ -146,7 +146,9 @@ gboolean * finished_discovery (void * e) {
     C_TRACE("finished_discovery");
     struct DiscoveryInput * disco_in = (struct DiscoveryInput * ) e;
 
-    gtk_widget_set_sensitive(disco_in->widget,TRUE);
+    if(GTK_IS_WIDGET(disco_in->widget)){
+        gtk_widget_set_sensitive(disco_in->widget,TRUE);
+    }
 
     free(disco_in);
 
@@ -184,7 +186,10 @@ void onvif_scan (GtkWidget *widget, OnvifApp * app) {
 
 void error_onvif_stream(RtspPlayer * player, void * user_data){
     OnvifApp * app = (OnvifApp *) user_data;
-    gtk_spinner_stop (GTK_SPINNER (app->player_loading_handle));
+    //On shutdown, the player may dispatch this event after the window is destroyed
+    if(GTK_IS_SPINNER(app->player_loading_handle)){
+        gtk_spinner_stop (GTK_SPINNER (app->player_loading_handle));
+    }
 }
 
 void stopped_onvif_stream(RtspPlayer * player, void * user_data){
@@ -249,7 +254,7 @@ void onvif_display_device_row(OnvifApp * self, Device * device, int skip_profile
     input->skip_profiles = skip_profiles;
 
     /* nslookup doesn't require onvif authentication. Dispatch event now. */
-    Device__lookup_hostname(device,self->queue);
+    // Device__lookup_hostname(device,self->queue);
 
     EventQueue__insert(self->queue,_display_onvif_device,input);
 }

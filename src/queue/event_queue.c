@@ -132,7 +132,6 @@ void EventQueue__clear(EventQueue* self){
 }
 
 void EventQueue__insert(EventQueue* queue, void (*callback)(), void * user_data){
-    C_TRACE("insert");
     if(!CObject__is_valid((CObject*)queue)){
         return;//Stop accepting events
     }
@@ -140,8 +139,6 @@ void EventQueue__insert(EventQueue* queue, void (*callback)(), void * user_data)
     QueueEvent * record = QueueEvent__create(callback,user_data);
     CListTS__add(&queue->events,(CObject*)record);
     P_COND_SIGNAL(queue->sleep_cond);
-
-    C_TRACE("insert - done");
 };
 
 QueueEvent * EventQueue__pop(EventQueue* self){

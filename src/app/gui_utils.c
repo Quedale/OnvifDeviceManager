@@ -9,7 +9,6 @@ typedef struct {
 
 gboolean * gui_update_widget_image_priv(void * user_data){
     ImageGUIUpdate * iguiu = (ImageGUIUpdate *) user_data;
-    C_TRACE("gui_update_widget_image_priv");
 
     if(GTK_IS_WIDGET(iguiu->handle)){
         gtk_container_foreach (GTK_CONTAINER (iguiu->handle), (void*) gtk_widget_destroy, NULL);
@@ -17,7 +16,6 @@ gboolean * gui_update_widget_image_priv(void * user_data){
             gtk_container_add (GTK_CONTAINER (iguiu->handle), iguiu->image);
             gtk_widget_show (iguiu->image);
             if(GTK_IS_SPINNER(iguiu->image)){
-                C_TRACE("gui_update_widget_image_priv - starting spinner");
                 gtk_spinner_start (GTK_SPINNER (iguiu->image));
             }
         }
@@ -26,7 +24,6 @@ gboolean * gui_update_widget_image_priv(void * user_data){
     }
 
     free(iguiu);
-    C_TRACE("gui_update_widget_image_priv done");
     return FALSE;
 }
 
@@ -40,7 +37,9 @@ void gui_update_widget_image(GtkWidget * image, GtkWidget * handle){
 
 gboolean * gui_widget_destroy (void * user_data){
     GtkWidget * widget = (GtkWidget *) user_data;
-    gtk_widget_destroy(widget);
+    if(GTK_IS_WIDGET(widget)){
+        gtk_widget_destroy(widget);
+    }
     return FALSE;
 }
 
