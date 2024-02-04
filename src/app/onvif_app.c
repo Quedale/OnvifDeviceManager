@@ -479,6 +479,7 @@ gboolean * gui_hide_dialog (void * user_data){
 
 
 void _onvif_device_add(void * user_data){
+    MsgDialog * msgdialog;
     AppDialogEvent * event = (AppDialogEvent *) user_data;
     AddDeviceDialog * dialog = (AddDeviceDialog *) event->dialog;
     const char * host = AddDeviceDialog__get_host((AddDeviceDialog *)event->dialog);
@@ -532,7 +533,7 @@ void _onvif_device_add(void * user_data){
 
     gdk_threads_add_idle((void *)gui_hide_dialog,dialog);
 exit:
-    MsgDialog * msgdialog = OnvifApp__get_msg_dialog((OnvifApp *) event->user_data);
+    msgdialog = OnvifApp__get_msg_dialog((OnvifApp *) event->user_data);
     gdk_threads_add_idle((void *)gui_hide_dialog,msgdialog);
     free(event);
 }
