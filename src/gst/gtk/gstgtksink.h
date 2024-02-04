@@ -44,7 +44,7 @@ struct _GstGtkCustomSink
   GstGtkBaseCustomSink       parent;
 };
 
-GST_ELEMENT_REGISTER_DECLARE (gtkcustomsink);
+GST_ELEMENT_REGISTER_DECLARE (gtkcustomsink)
 
 G_END_DECLS
 

@@ -36,7 +36,7 @@
  * #GtkGstCustomWidget is an #GtkWidget that renders GStreamer video buffers.
  */
 
-G_DEFINE_TYPE (GtkGstCustomWidget, gtk_gst_custom_widget, GTK_TYPE_DRAWING_AREA);
+G_DEFINE_TYPE (GtkGstCustomWidget, gtk_gst_custom_widget, GTK_TYPE_DRAWING_AREA)
 
 static gboolean
 gtk_gst_custom_widget_draw (GtkWidget * widget, cairo_t * cr)

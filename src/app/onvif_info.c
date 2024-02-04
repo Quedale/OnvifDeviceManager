@@ -289,7 +289,7 @@ void _update_details_page(void * user_data){
 
     gui_update->uri = OnvifDeviceService__get_endpoint(devserv);
 
-    gdk_threads_add_idle((void *)onvif_info_gui_update,gui_update);
+    gdk_threads_add_idle(G_SOURCE_FUNC(onvif_info_gui_update),gui_update);
 exit:
     OnvifDeviceInformation__destroy(dev_info);
     OnvifInterfaces__destroy(interfaces);
@@ -330,7 +330,7 @@ void OnvifInfo_clear_details(OnvifInfo * self){
     gtk_entry_set_text(GTK_ENTRY(self->ip_lbl),"");
     gtk_editable_set_editable  ((GtkEditable*)self->ip_lbl, FALSE);
 
-    gtk_container_foreach (GTK_CONTAINER (self->mac_lbl), (void*) gtk_widget_destroy, NULL);
+    gtk_container_foreach (GTK_CONTAINER (self->mac_lbl), (GtkCallback)gui_widget_destroy, NULL);
 
     gtk_entry_set_text(GTK_ENTRY(self->version_lbl),"");
     gtk_editable_set_editable  ((GtkEditable*)self->version_lbl, FALSE);

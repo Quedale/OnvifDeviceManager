@@ -57,7 +57,7 @@ exit:
     C_INFO("Finished...");
     EventQueue__remove_thread(qt->queue,qt);
     P_THREAD_EXIT;
-};
+}
 
 void QueueThread__init(QueueThread * self, EventQueue* queue){
     memset (self, 0, sizeof (QueueThread));

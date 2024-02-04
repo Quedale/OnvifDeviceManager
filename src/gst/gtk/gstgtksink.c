@@ -50,9 +50,9 @@ GST_STATIC_PAD_TEMPLATE ("sink",
 #define gst_gtk_custom_sink_parent_class parent_class
 G_DEFINE_TYPE_WITH_CODE (GstGtkCustomSink, gst_gtk_custom_sink, GST_TYPE_GTK_BASE_CUSTOM_SINK,
     GST_DEBUG_CATEGORY_INIT (gst_debug_gtk_custom_sink, "gtkcustomsink", 0,
-        "Gtk Video Sink"));
+        "Gtk Video Sink"))
 GST_ELEMENT_REGISTER_DEFINE (gtkcustomsink, "gtkcustomsink", GST_RANK_NONE,
-    GST_TYPE_GTK_SINK);
+    GST_TYPE_GTK_SINK)
 
 static void
 gst_gtk_custom_sink_class_init (GstGtkCustomSinkClass * klass)

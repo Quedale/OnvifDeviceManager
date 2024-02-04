@@ -139,7 +139,7 @@ static gboolean * found_server (void * e) {
 
 void _found_server (DiscoveryEvent * event) {
     C_TRACE("_found_server");
-    gdk_threads_add_idle((void *)found_server,event);
+    gdk_threads_add_idle(G_SOURCE_FUNC(found_server),event);
 }
 
 gboolean * finished_discovery (void * e) {
@@ -161,7 +161,7 @@ void _start_onvif_discovery(void * user_data){
     struct UdpDiscoverer discoverer = UdpDiscoverer__create(_found_server);
     UdpDiscoverer__start(&discoverer, disco_in, AppSettingsDiscovery__get_repeat(disco_in->app->settings->discovery), AppSettingsDiscovery__get_timeout(disco_in->app->settings->discovery));
     
-    gdk_threads_add_idle((void *)finished_discovery,disco_in);
+    gdk_threads_add_idle(G_SOURCE_FUNC(finished_discovery),disco_in);
 }
 
 void onvif_scan (GtkWidget *widget, OnvifApp * app) {
@@ -172,7 +172,7 @@ void onvif_scan (GtkWidget *widget, OnvifApp * app) {
     stopped_onvif_stream(app->player,app);
 
     //Clearing the list
-    gtk_container_foreach (GTK_CONTAINER (app->listbox), (GtkCallback)gtk_widget_destroy, NULL);
+    gtk_container_foreach (GTK_CONTAINER (app->listbox), (GtkCallback)gui_widget_destroy, NULL);
     EventQueue__clear(app->queue);
     CListTS__clear(app->device_list);
 
@@ -194,7 +194,9 @@ void error_onvif_stream(RtspPlayer * player, void * user_data){
 
 void stopped_onvif_stream(RtspPlayer * player, void * user_data){
     OnvifApp * app = (OnvifApp *) user_data;
-    gtk_spinner_stop (GTK_SPINNER (app->player_loading_handle));
+    if(GTK_IS_SPINNER(app->player_loading_handle)){
+        gtk_spinner_stop (GTK_SPINNER (app->player_loading_handle));
+    }
 }
 
 void start_onvif_stream(RtspPlayer * player, void * user_data){
@@ -359,7 +361,7 @@ int onvif_reload_device(struct DeviceInput * input){
     Device__set_thumbnail(input->device,image);
 
     onvif_display_device_row(input->app, input->device, input->skip_profiles);
-    gdk_threads_add_idle((void *)gui_update_pages,input->app);
+    gdk_threads_add_idle(G_SOURCE_FUNC(gui_update_pages),input->app);
     if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NONE)
         _play_onvif_stream(DeviceInput__copy(input));
 
@@ -438,7 +440,7 @@ void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
     if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NOT_AUTHORIZED){
         input.skip_profiles = 0;
         //Re-dispatched to allow proper focus handling
-        gdk_threads_add_idle((void *)gui_show_credentialsdialog,DeviceInput__copy(&input));
+        gdk_threads_add_idle(G_SOURCE_FUNC(gui_show_credentialsdialog),DeviceInput__copy(&input));
         return;
     }
 
@@ -515,7 +517,7 @@ void _onvif_device_add(void * user_data){
         guiscope->app = (OnvifApp *) event->user_data;
         guiscope->device = onvif_dev;
         guiscope->scopes = scopes;
-        gdk_threads_add_idle((void *)gui_process_device_scopes,guiscope);
+        gdk_threads_add_idle(G_SOURCE_FUNC(gui_process_device_scopes),guiscope);
     } else {
         if(oerror == ONVIF_ERROR_NOT_AUTHORIZED){
             AddDeviceDialog__set_error(dialog,"Unauthorized...");
@@ -531,10 +533,10 @@ void _onvif_device_add(void * user_data){
         goto exit;
     }
 
-    gdk_threads_add_idle((void *)gui_hide_dialog,dialog);
+    gdk_threads_add_idle(G_SOURCE_FUNC(gui_hide_dialog),dialog);
 exit:
     msgdialog = OnvifApp__get_msg_dialog((OnvifApp *) event->user_data);
-    gdk_threads_add_idle((void *)gui_hide_dialog,msgdialog);
+    gdk_threads_add_idle(G_SOURCE_FUNC(gui_hide_dialog),msgdialog);
     free(event);
 }
 
@@ -789,7 +791,7 @@ void eventqueue_dispatch_cb(QueueThread * thread, EventQueueType type, void * us
 
     update->text = malloc(strlen(str)+1);
     strcpy(update->text,str);
-    gdk_threads_add_idle((void *)gui_set_task_label,update);
+    gdk_threads_add_idle(G_SOURCE_FUNC(gui_set_task_label),update);
 }
 
 OnvifApp * OnvifApp__create(){

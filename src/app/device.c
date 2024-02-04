@@ -310,7 +310,7 @@ void _priv_Device__load_profiles(void * user_data){
         GUIProfileEvent * evt = malloc(sizeof(GUIProfileEvent));
         evt->device = device;
         evt->profiles = profiles;
-        gdk_threads_add_idle((void *)gui_Device__display_profiles,evt);
+        gdk_threads_add_idle(G_SOURCE_FUNC(gui_Device__display_profiles),evt);
     } else {
         OnvifProfiles__destroy(profiles);
     }

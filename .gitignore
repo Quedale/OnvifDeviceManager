@@ -26,3 +26,4 @@ py-compile
 test-driver
 onvifmgr
 onvifmgr_settings.ini
+.vscode

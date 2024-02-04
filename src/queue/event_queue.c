@@ -139,12 +139,12 @@ void EventQueue__insert(EventQueue* queue, void (*callback)(), void * user_data)
     QueueEvent * record = QueueEvent__create(callback,user_data);
     CListTS__add(&queue->events,(CObject*)record);
     P_COND_SIGNAL(queue->sleep_cond);
-};
+}
 
 QueueEvent * EventQueue__pop(EventQueue* self){
     C_TRACE("pop");
     return (QueueEvent*) CListTS__pop(&self->events);
-};
+}
 
 void EventQueue__start(EventQueue* self){
     P_MUTEX_LOCK(self->pool_lock);
@@ -155,7 +155,7 @@ void EventQueue__start(EventQueue* self){
     if(self->queue_event_cb){
         self->queue_event_cb(qt,EVENTQUEUE_STARTED,self->user_data);
     }
-};
+}
 
 void EventQueue__wait_condition(EventQueue * self, P_MUTEX_TYPE lock){
     P_COND_WAIT(self->sleep_cond, lock);

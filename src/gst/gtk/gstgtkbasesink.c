@@ -81,9 +81,9 @@ enum
 G_DEFINE_ABSTRACT_TYPE_WITH_CODE (GstGtkBaseCustomSink, gst_gtk_base_custom_sink,
     GST_TYPE_VIDEO_SINK,
     G_IMPLEMENT_INTERFACE (GST_TYPE_NAVIGATION,
-        gst_gtk_base_custom_sink_navigation_interface_init);
+        gst_gtk_base_custom_sink_navigation_interface_init)
     GST_DEBUG_CATEGORY_INIT (gst_debug_gtk_base_custom_sink,
-        "gtkbasecustomsink", 0, "Gtk Video Sink base class"));
+        "gtkbasecustomsink", 0, "Gtk Video Sink base class"))
 
 
 static void
@@ -372,7 +372,7 @@ gst_gtk_base_custom_sink_navigation_send_event (GstNavigation * navigation,
   pad = gst_pad_get_peer (GST_VIDEO_SINK_PAD (sink));
 
   GST_TRACE_OBJECT (sink, "navigation event %" GST_PTR_FORMAT,
-      gst_event_get_structure (event));
+      (void *)gst_event_get_structure (event));
 
   if (GST_IS_PAD (pad) && GST_IS_EVENT (event)) {
     if (!gst_pad_send_event (pad, gst_event_ref (event))) {
@@ -394,9 +394,9 @@ gst_gtk_base_custom_sink_navigation_interface_init (GstNavigationInterface * ifa
 #endif
 }
 
-static gboolean
-gst_gtk_base_custom_sink_start_on_main (GstBaseSink * bsink)
+static void * gst_gtk_base_custom_sink_start_on_main (void * data)
 {
+  GstBaseSink * bsink = (GstBaseSink *) data;
   GstGtkBaseCustomSink *gst_sink = GST_GTK_BASE_CUSTOM_SINK (bsink);
   // GstGtkBaseCustomSinkClass *klass = GST_GTK_BASE_CUSTOM_SINK_GET_CLASS (bsink);
   GtkWidget *toplevel;
@@ -427,7 +427,7 @@ gst_gtk_base_custom_sink_start_on_main (GstBaseSink * bsink)
   //       G_CALLBACK (window_destroy_cb), gst_sink);
   }
 
-  return TRUE;
+  return (void*) TRUE;
 }
 
 static void gst_gtk_base_custom_sink_set_element_expand(GstGtkBaseCustomSink * bsink){
@@ -449,9 +449,9 @@ gst_gtk_base_custom_sink_start (GstBaseSink * bsink)
       gst_gtk_base_custom_sink_start_on_main, bsink);
 }
 
-static gboolean
-gst_gtk_base_custom_sink_stop_on_main (GstBaseSink * bsink)
+void * gst_gtk_base_custom_sink_stop_on_main (void * data)
 {
+  GstBaseSink * bsink = (GstBaseSink *) data;
   GstGtkBaseCustomSink *gst_sink = GST_GTK_BASE_CUSTOM_SINK (bsink);
   if (gst_sink->window) {
     gtk_widget_destroy (gst_sink->window);
@@ -459,7 +459,7 @@ gst_gtk_base_custom_sink_stop_on_main (GstBaseSink * bsink)
     gst_sink->widget = NULL;
   }
 
-  return TRUE;
+  return (void*)TRUE;
 }
 
 static gboolean
@@ -474,11 +474,13 @@ gst_gtk_base_custom_sink_stop (GstBaseSink * bsink)
   return TRUE;
 }
 
-static void
-gst_gtk_widget_show_all_and_unref (GtkWidget * widget)
+static void *
+gst_gtk_widget_show_all_and_unref (void * data)
 {
+  GtkWidget * widget = (GtkWidget *) data;
   gtk_widget_show_all (widget);
   g_object_unref (widget);
+  return NULL;
 }
 
 static GstStateChangeReturn
@@ -549,7 +551,7 @@ gboolean
 gst_gtk_base_custom_sink_set_caps (GstBaseSink * bsink, GstCaps * caps)
 {
   GstGtkBaseCustomSink *gtk_sink = GST_GTK_BASE_CUSTOM_SINK (bsink);
-  GST_DEBUG ("set caps with %" GST_PTR_FORMAT, caps);
+  GST_DEBUG ("set caps with %" GST_PTR_FORMAT, (void *) caps);
 
   if (!gst_video_info_from_caps (&gtk_sink->v_info, caps))
     return FALSE;
@@ -576,7 +578,7 @@ static GstFlowReturn
 gst_gtk_base_custom_sink_show_frame (GstVideoSink * vsink, GstBuffer * buf)
 {
   GstGtkBaseCustomSink *gtk_sink;
-  GST_TRACE ("rendering buffer:%p", buf);
+  GST_TRACE ("rendering buffer:%p", (void *) buf);
 
   gtk_sink = GST_GTK_BASE_CUSTOM_SINK (vsink);
 

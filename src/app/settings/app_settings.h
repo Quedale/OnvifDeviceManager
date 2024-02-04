@@ -9,6 +9,7 @@
 
 typedef struct _AppSettings AppSettings;
 typedef enum _AppSettingsType {
+    APPSETTING_INVALID = -1,
     APPSETTING_STREAM_TYPE = 0,
     APPSETTING_DISCOVERY_TYPE = 1,
 } AppSettingsType;

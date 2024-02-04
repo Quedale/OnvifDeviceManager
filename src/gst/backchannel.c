@@ -12,7 +12,7 @@ typedef struct _RtspBackchannel {
     GstElement * pipeline;
     GstElement *mic_volume_element;
     GstElement *appsink;
-    guint back_stream_id;
+    int back_stream_id;
     GstElement * rtspsrc;
 } RtspBackchannel;
 
@@ -73,11 +73,11 @@ void RtspBackchannel__mute(RtspBackchannel* self, gboolean mute) {
     }
 }
 
-GstState RtspBackchannel__get_state(RtspBackchannel * self, GstState * state, GstState * nstate, GstClockTime clock){
+GstStateChangeReturn RtspBackchannel__get_state(RtspBackchannel * self, GstState * state, GstState * nstate){
     if(self && GST_IS_ELEMENT(self->pipeline)){
         return gst_element_get_state (self->pipeline,state, nstate, GST_CLOCK_TIME_NONE);
     }
-    return GST_STATE_NULL;
+    return GST_STATE_CHANGE_FAILURE;
 }
 
 void RtspBackchannel__check_mic(RtspBackchannel * self){

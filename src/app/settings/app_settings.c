@@ -56,7 +56,7 @@ void _save_settings(void * user_data){
         C_ERROR("Failed to write to settings file!\n");
     }
 
-    gdk_threads_add_idle((void *)save_done,self);
+    gdk_threads_add_idle(G_SOURCE_FUNC(save_done),self);
 
 }
 
@@ -183,7 +183,7 @@ void AppSettings__create_ui(AppSettings * self){
 void AppSettings__load_settings(AppSettings * self){
     FILE *fptr = NULL;
     
-    AppSettingsType category = -1;
+    AppSettingsType category = APPSETTING_INVALID;
     
     C_INFO("Reading Settings file %s",CONFIG_FILE_PATH);
     if (access(CONFIG_FILE_PATH, F_OK) == 0) {
@@ -209,7 +209,7 @@ void AppSettings__load_settings(AppSettings * self){
                     }//More settings to add here
 
                     continue;
-                } else if(category != -1){
+                } else if(category != APPSETTING_INVALID){
                     char * buff_ptr = (char*)buffer;
                     char * key = strtok_r (buff_ptr, "=", &buff_ptr);
                     if(key == NULL){ //Handles empty lines

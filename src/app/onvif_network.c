@@ -56,7 +56,7 @@ void _update_network_page(void * user_data){
     gui_update->network = self;
     //TODO Fetch networking details
 
-    gdk_threads_add_idle((void *)onvif_network_gui_update,gui_update);
+    gdk_threads_add_idle(G_SOURCE_FUNC(onvif_network_gui_update),gui_update);
 
 exit:
     CObject__unref((CObject*)self->device);

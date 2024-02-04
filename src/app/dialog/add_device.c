@@ -91,7 +91,7 @@ void AddDeviceDialog__set_error(AddDeviceDialog * self, char * error){
     data->dialog = self;
     data->error = malloc(strlen(error)+1);
     strcpy(data->error,error);
-    gdk_threads_add_idle((void *)gui_AddDeviceDialog__set_error,data);
+    gdk_threads_add_idle(G_SOURCE_FUNC(gui_AddDeviceDialog__set_error),data);
 }
 
 GtkWidget * priv_AddDeviceDialog__create_iu(AppDialogEvent * event){

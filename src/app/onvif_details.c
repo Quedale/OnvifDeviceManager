@@ -16,7 +16,9 @@ typedef struct _OnvifDetails {
 
 void hide_loading_cb(void * user_data){
     OnvifDetails * details = (OnvifDetails *) user_data;
-    gtk_spinner_stop (GTK_SPINNER (details->details_loading_handle));
+    if(GTK_IS_SPINNER(details->details_loading_handle)){
+        gtk_spinner_stop (GTK_SPINNER (details->details_loading_handle));
+    }
 }
 
 void network_hide_loading_cb(OnvifNetwork * self, void * user_data){
