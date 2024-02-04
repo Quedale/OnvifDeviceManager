@@ -1505,7 +1505,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
         if [ ! -z "$(pkgCheck name=libde265 minver=v1.0.15)" ]; then
           pullOrClone path="https://github.com/strukturag/libde265.git" tag=v1.0.15
           if [ $FAILED -eq 1 ]; then exit 1; fi
-          buildMakeProject srcdir="libde265" prefix="$SUBPROJECT_DIR/libde265/dist"
+          buildMakeProject srcdir="libde265" prefix="$SUBPROJECT_DIR/libde265/dist" configure="--disable-sherlock265"
           if [ $FAILED -eq 1 ]; then exit 1; fi
         else
           echo "libde265 already installed."
