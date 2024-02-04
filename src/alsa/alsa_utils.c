@@ -1,5 +1,4 @@
 
-#include <alsa/asoundlib.h>
 #include "alsa_utils.h"
 #include "alsa_devices.h"
 #include "clogger.h"
