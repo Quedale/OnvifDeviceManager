@@ -4,6 +4,7 @@
 #include "src_retriever.h"
 #include "../alsa/alsa_utils.h"
 #include "clogger.h"
+#include "clist_ts.h"
 
 int  
 test_audiosrc(char * srcname, char * device){
@@ -83,10 +84,10 @@ retrieve_audiosrc(char * element, char * device){
         return;
     }
 
-    AlsaDevices* dev_list = get_alsa_device_list(SND_PCM_STREAM_CAPTURE);
+    CListTS * dev_list = get_alsa_device_list(SND_PCM_STREAM_CAPTURE);
     int i;
-    for(i=0;i<dev_list->count;i++){
-        AlsaDevice * dev = dev_list->devices[i];
+    for(i=0;i<CListTS__get_count(dev_list);i++){
+        AlsaDevice * dev = (AlsaDevice *) CListTS__get(dev_list,i);
 
         char hw_dev[7];  
         hw_dev[0] = 'h';
@@ -101,12 +102,12 @@ retrieve_audiosrc(char * element, char * device){
         if(ret){
             strcpy(element,"alsasrc");
             strcpy(device,hw_dev);
-            AlsaDevices__destroy(dev_list);
+            CObject__destroy((CObject*)dev_list);
             return;
         }
     }
 
-    AlsaDevices__destroy(dev_list);
+    CObject__destroy((CObject*)dev_list);
     element[0] = '\0';
     device[0] = '\0';
 }

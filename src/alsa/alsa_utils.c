@@ -2,9 +2,10 @@
 #include "alsa_utils.h"
 #include "alsa_devices.h"
 #include "clogger.h"
+#include "clist_ts.h"
 
-AlsaDevices* get_alsa_device_list(snd_pcm_stream_t stream){
-    AlsaDevices* list = AlsaDevices__create(); 
+CListTS * get_alsa_device_list(snd_pcm_stream_t stream){
+    CListTS * list = CListTS__create(); 
 
 	snd_ctl_t *handle;
 	int card, err, dev; //, idx;
@@ -59,7 +60,7 @@ AlsaDevices* get_alsa_device_list(snd_pcm_stream_t stream){
             AlsaDevice__set_dev_index(alsadev,dev);
             AlsaDevice__set_dev_id(alsadev,(char *) snd_pcm_info_get_id(pcminfo));
             AlsaDevice__set_dev_name(alsadev,(char *) snd_pcm_info_get_name(pcminfo));
-            AlsaDevices__insert_element(list,alsadev,list->count);
+			CListTS__add(list,(CObject*)alsadev);
 		}
 		snd_ctl_close(handle);
 	next_card:
