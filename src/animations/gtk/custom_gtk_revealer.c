@@ -249,7 +249,6 @@ custom_gtk_revealer_set_property (GObject      *object,
       custom_gtk_revealer_set_reveal_child (revealer, g_value_get_boolean (value));
       break;
     case PROP_START_DELAY:
-      printf("setting prop start?\n");
       custom_gtk_revealer_set_start_delay (revealer, g_value_get_uint (value));
       break;
     case PROP_SHOW_DELAY:
@@ -680,19 +679,15 @@ custom_custom_gtk_revealer_get_delay_for_cycle(CustomGtkRevealer * revealer){
   CustomGtkRevealerPrivate *priv = custom_gtk_revealer_get_instance_private (revealer);
   
   guint delay = priv->delay;
-  if(priv->first_start && priv->start_delay != -1){
+  if(priv->first_start && priv->start_delay != -1U){
     priv->first_start = FALSE;
     delay = priv->start_delay;
-    printf("delayx %d\n",priv->start_delay);
-  } else if(priv->current_pos == 0 && priv->show_delay != -1){
+  } else if(priv->current_pos == 0 && priv->show_delay != -1U){
     delay = priv->show_delay;
-    printf("delayy %d\n",delay);
-  } else if(priv->current_pos == 1 && priv->hide_delay != -1){
+  } else if(priv->current_pos == 1 && priv->hide_delay != -1U){
     delay = priv->hide_delay;
-    printf("delayz %d\n",delay);
   }
 
-  printf("delay %d\n",delay);
   return delay;
 }
 
@@ -878,7 +873,6 @@ custom_gtk_revealer_set_start_delay (CustomGtkRevealer *revealer,
 
   CustomGtkRevealerPrivate *priv = custom_gtk_revealer_get_instance_private (revealer);
   priv->start_delay = start_delay;
-  printf("custom_gtk_revealer_set_start_delay \n");
 }
 
 guint custom_gtk_revealer_get_start_delay (CustomGtkRevealer *revealer){
@@ -901,7 +895,6 @@ custom_gtk_revealer_set_delay (CustomGtkRevealer *revealer,
                                guint     delay)
 {
   g_return_if_fail (CUSTOM_IS_GTK_REVEALER (revealer));
-  printf("custom_gtk_revealer_set_delay %d\n",delay);
   CustomGtkRevealerPrivate *priv = custom_gtk_revealer_get_instance_private (revealer);
   priv->delay = delay;
 }
