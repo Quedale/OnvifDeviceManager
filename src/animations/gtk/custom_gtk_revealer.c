@@ -78,6 +78,8 @@ enum  {
   PROP_0,
   PROP_TRANSITION_TYPE,
   PROP_TRANSITION_DURATION,
+  PROP_SHOW_TRANSITION_DURATION,
+  PROP_HIDE_TRANSITION_DURATION,
   PROP_REVEAL_CHILD,
   PROP_CHILD_REVEALED,
   PROP_START_DELAY,
@@ -90,6 +92,8 @@ enum  {
 typedef struct {
   CustomGtkRevealerTransitionType transition_type;
   guint transition_duration;
+  guint show_transition_duration;
+  guint hide_transition_duration;
 
   GdkWindow* bin_window;
   GdkWindow* view_window;
@@ -166,6 +170,8 @@ custom_gtk_revealer_init (CustomGtkRevealer *revealer)
 
   priv->transition_type = CUSTOM_GTK_REVEALER_TRANSITION_TYPE_SLIDE_DOWN;
   priv->transition_duration = 250;
+  priv->show_transition_duration = -1;
+  priv->hide_transition_duration = -1;
   priv->current_pos = 0.0;
   priv->target_pos = 0.0;
   priv->first_start = TRUE;
@@ -204,6 +210,12 @@ custom_gtk_revealer_get_property (GObject    *object,
       break;
     case PROP_TRANSITION_DURATION:
       g_value_set_uint (value, custom_gtk_revealer_get_transition_duration (revealer));
+      break;
+    case PROP_SHOW_TRANSITION_DURATION:
+      g_value_set_uint (value, custom_gtk_revealer_get_show_transition_duration (revealer));
+      break;
+    case PROP_HIDE_TRANSITION_DURATION:
+      g_value_set_uint (value, custom_gtk_revealer_get_hide_transition_duration (revealer));
       break;
     case PROP_REVEAL_CHILD:
       g_value_set_boolean (value, custom_gtk_revealer_get_reveal_child (revealer));
@@ -244,6 +256,12 @@ custom_gtk_revealer_set_property (GObject      *object,
       break;
     case PROP_TRANSITION_DURATION:
       custom_gtk_revealer_set_transition_duration (revealer, g_value_get_uint (value));
+      break;
+    case PROP_SHOW_TRANSITION_DURATION:
+      custom_gtk_revealer_set_show_transition_duration (revealer, g_value_get_uint (value));
+      break;
+    case PROP_HIDE_TRANSITION_DURATION:
+      custom_gtk_revealer_set_hide_transition_duration (revealer, g_value_get_uint (value));
       break;
     case PROP_REVEAL_CHILD:
       custom_gtk_revealer_set_reveal_child (revealer, g_value_get_boolean (value));
@@ -303,6 +321,20 @@ custom_gtk_revealer_class_init (CustomGtkRevealerClass *klass)
                        P_("Transition duration"),
                        P_("The animation duration, in milliseconds"),
                        0, G_MAXUINT, 250,
+                       CUSTOM_PARAM_READWRITE | G_PARAM_CONSTRUCT | G_PARAM_EXPLICIT_NOTIFY);
+
+  props[PROP_SHOW_TRANSITION_DURATION] =
+    g_param_spec_uint ("show-transition-duration",
+                       P_("Show transition duration"),
+                       P_("The animation duration for showing the widget, in milliseconds"),
+                       0, G_MAXUINT, -1,
+                       CUSTOM_PARAM_READWRITE | G_PARAM_CONSTRUCT | G_PARAM_EXPLICIT_NOTIFY);
+
+  props[PROP_HIDE_TRANSITION_DURATION] =
+    g_param_spec_uint ("hide-transition-duration",
+                       P_("Hide transition duration"),
+                       P_("The animation duration for hiding the widget, in milliseconds"),
+                       0, G_MAXUINT, -1,
                        CUSTOM_PARAM_READWRITE | G_PARAM_CONSTRUCT | G_PARAM_EXPLICIT_NOTIFY);
 
   props[PROP_REVEAL_CHILD] =
@@ -691,6 +723,20 @@ custom_custom_gtk_revealer_get_delay_for_cycle(CustomGtkRevealer * revealer){
   return delay;
 }
 
+static guint
+custom_custom_gtk_revealer_get_duration_for_cycle(CustomGtkRevealer * revealer){
+  CustomGtkRevealerPrivate *priv = custom_gtk_revealer_get_instance_private (revealer);
+  
+  guint duration = priv->transition_duration;
+  if(priv->current_pos == 0 && priv->show_transition_duration != -1U){
+    duration = priv->show_transition_duration;
+  } else if(priv->current_pos == 1 && priv->hide_transition_duration != -1U){
+    duration = priv->hide_transition_duration;
+  }
+
+  return duration;
+}
+
 static void
 custom_gtk_revealer_start_animation (CustomGtkRevealer *revealer,
                               gdouble      target)
@@ -716,7 +762,7 @@ custom_gtk_revealer_start_animation (CustomGtkRevealer *revealer,
         priv->tick_id =
           gtk_widget_add_tick_callback (widget, custom_gtk_revealer_animate_cb, revealer, NULL);
       custom_gtk_progress_tracker_start (&priv->tracker,
-                                  priv->transition_duration * 1000,
+                                  custom_custom_gtk_revealer_get_duration_for_cycle(revealer) * 1000,
                                   custom_custom_gtk_revealer_get_delay_for_cycle(revealer) * 1000,
                                   1.0);
     }
@@ -1130,8 +1176,102 @@ custom_gtk_revealer_set_transition_duration (CustomGtkRevealer *revealer,
   if (priv->transition_duration == value)
     return;
 
-  priv->transition_duration = value;
+  if(value > 0){
+    priv->transition_duration = value;
+  } else {
+    priv->transition_duration = 1; //Fail safe.
+  }
   g_object_notify_by_pspec (G_OBJECT (revealer), props[PROP_TRANSITION_DURATION]);
+}
+
+/**
+ * custom_gtk_revealer_get_show_transition_duration:
+ * @revealer: a #CustomGtkRevealer
+ *
+ * Returns the amount of time (in milliseconds) that
+ * showing transitions will take.
+ *
+ * Returns: the transition duration
+ *
+ * Since: 3.10
+ */
+guint
+custom_gtk_revealer_get_show_transition_duration (CustomGtkRevealer *revealer)
+{
+  CustomGtkRevealerPrivate *priv = custom_gtk_revealer_get_instance_private (revealer);
+
+  g_return_val_if_fail (CUSTOM_IS_GTK_REVEALER (revealer), 0);
+
+  return priv->show_transition_duration;
+}
+
+/**
+ * custom_gtk_revealer_set_show_transition_duration:
+ * @revealer: a #CustomGtkRevealer
+ * @duration: the new duration, in milliseconds
+ *
+ * Sets the duration that showing transitions will take.
+ *
+ * Since: 3.10
+ */
+void
+custom_gtk_revealer_set_show_transition_duration (CustomGtkRevealer *revealer,
+                                      guint        value)
+{
+  CustomGtkRevealerPrivate *priv = custom_gtk_revealer_get_instance_private (revealer);
+
+  g_return_if_fail (CUSTOM_IS_GTK_REVEALER (revealer));
+
+  if (priv->show_transition_duration == value)
+    return;
+
+  priv->show_transition_duration = value;
+  g_object_notify_by_pspec (G_OBJECT (revealer), props[PROP_SHOW_TRANSITION_DURATION]);
+}
+
+/**
+ * custom_gtk_revealer_get_hide_transition_duration:
+ * @revealer: a #CustomGtkRevealer
+ *
+ * Returns the amount of time (in milliseconds) that
+ * hiding transitions will take.
+ *
+ * Returns: the transition duration
+ *
+ * Since: 3.10
+ */
+guint
+custom_gtk_revealer_get_hide_transition_duration (CustomGtkRevealer *revealer)
+{
+  CustomGtkRevealerPrivate *priv = custom_gtk_revealer_get_instance_private (revealer);
+
+  g_return_val_if_fail (CUSTOM_IS_GTK_REVEALER (revealer), 0);
+
+  return priv->hide_transition_duration;
+}
+
+/**
+ * custom_gtk_revealer_set_hide_transition_duration:
+ * @revealer: a #CustomGtkRevealer
+ * @duration: the new duration, in milliseconds
+ *
+ * Sets the duration that hiding transitions will take.
+ *
+ * Since: 3.10
+ */
+void
+custom_gtk_revealer_set_hide_transition_duration (CustomGtkRevealer *revealer,
+                                      guint        value)
+{
+  CustomGtkRevealerPrivate *priv = custom_gtk_revealer_get_instance_private (revealer);
+
+  g_return_if_fail (CUSTOM_IS_GTK_REVEALER (revealer));
+
+  if (priv->hide_transition_duration == value)
+    return;
+
+  priv->hide_transition_duration = value;
+  g_object_notify_by_pspec (G_OBJECT (revealer), props[PROP_HIDE_TRANSITION_DURATION]);
 }
 
 /**

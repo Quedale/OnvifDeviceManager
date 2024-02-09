@@ -39,7 +39,8 @@ GtkWidget * gtk_dotted_slider_animation_new(int item_count,unsigned int animatio
 
         GtkWidget * revealer = custom_gtk_revealer_new();
         custom_gtk_revealer_set_transition_type(CUSTOM_GTK_REVEALER(revealer),CUSTOM_GTK_REVEALER_TRANSITION_TYPE_CROSSFADE);
-        custom_gtk_revealer_set_transition_duration(CUSTOM_GTK_REVEALER(revealer),animation_time*1000);
+        custom_gtk_revealer_set_transition_duration(CUSTOM_GTK_REVEALER(revealer),0);
+        custom_gtk_revealer_set_hide_transition_duration(CUSTOM_GTK_REVEALER(revealer),animation_time*1000);
         custom_gtk_revealer_set_start_delay(CUSTOM_GTK_REVEALER(revealer),delay*1000);
 
         g_signal_connect (revealer, "notify::child-revealed", G_CALLBACK (change_direction), NULL);

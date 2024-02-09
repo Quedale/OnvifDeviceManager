@@ -103,6 +103,16 @@ void custom_gtk_revealer_set_delay (CustomGtkRevealer *revealer, guint     delay
 
 guint custom_gtk_revealer_get_delay (CustomGtkRevealer *revealer);
 
+guint                      custom_gtk_revealer_get_show_transition_duration (CustomGtkRevealer               *revealer);
+
+void                       custom_gtk_revealer_set_show_transition_duration (CustomGtkRevealer               *revealer,
+                                                                 guint                      duration);
+
+guint                      custom_gtk_revealer_get_hide_transition_duration (CustomGtkRevealer               *revealer);
+
+void                       custom_gtk_revealer_set_hide_transition_duration (CustomGtkRevealer               *revealer,
+                                                                 guint                      duration);
+
 G_END_DECLS
 
 #endif
