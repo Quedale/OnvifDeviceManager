@@ -907,6 +907,15 @@ void custom_gtk_revealer_restart(CustomGtkRevealer *revealer){
   CustomGtkRevealerPrivate *priv = custom_gtk_revealer_get_instance_private (revealer);
 
   priv->first_start = TRUE;
+
+  //Reset tracker state
+  memset(&priv->tracker,0,sizeof(priv->tracker));
+
+  //Reset child state without animation
+  GtkWidget * child = gtk_bin_get_child (GTK_BIN (revealer));
+  if (child != NULL) gtk_widget_set_child_visible (child, FALSE);
+  priv->current_pos = 0.0;
+  priv->target_pos = 0.0;
 }
 
 /**

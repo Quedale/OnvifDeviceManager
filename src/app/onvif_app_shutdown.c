@@ -1,5 +1,5 @@
 #include "onvif_app_shutdown.h"
-#include "../animations/dotted_slider.h"
+#include "../animations/gtk/gtk_dotted_slider_widget.h"
 #include "../gst/player.h"
 #include "clogger.h"
 
@@ -32,9 +32,9 @@ void onvif_app_shutdown(OnvifApp * data){
         return;
     }
     
-    GtkWidget * image = create_dotted_slider_animation(10,1);
+    GtkWidget * slider = gtk_dotted_slider_new(GTK_ORIENTATION_HORIZONTAL, 5,10,1);
     MsgDialog * dialog = OnvifApp__get_msg_dialog(data);
-    MsgDialog__set_icon(dialog, image);
+    MsgDialog__set_icon(dialog, slider);
     AppDialog__set_closable((AppDialog*)dialog, 0);
     AppDialog__set_submit_label((AppDialog*)dialog, "Force Shutdown!");
     AppDialog__set_title((AppDialog*)dialog,"Shutting down...");
