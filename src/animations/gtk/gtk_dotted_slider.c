@@ -52,7 +52,7 @@ GtkWidget * gtk_dotted_slider_animation_new(int item_count,unsigned int animatio
         
         gtk_container_add(GTK_CONTAINER(revealer),widget);
     
-        gtk_box_pack_start(GTK_BOX(vbox), revealer,     FALSE, FALSE, 0);
+        gtk_box_pack_start(GTK_BOX(vbox), revealer, TRUE, FALSE, 0);
 
     }
 

@@ -18,11 +18,11 @@ int main(int argc, char *argv[])
     g_signal_connect (G_OBJECT (window), "delete-event", G_CALLBACK (delete_event_cb), NULL);
     gtk_window_set_title (GTK_WINDOW (window), "GtkDottedSlider demo");
 
-    GtkWidget * grid = gtk_grid_new ();
-    gtk_container_add(GTK_CONTAINER(window),grid);
-
     GtkWidget * w = gtk_dotted_slider_animation_new(10,1);
-    gtk_grid_attach (GTK_GRID (grid), w, 0, 0, 1, 1);
+
+    GtkWidget* vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_box_pack_start(GTK_BOX(vbox), w,     TRUE, FALSE, 0);
+    gtk_container_add(GTK_CONTAINER(window),vbox);
 
 
     gtk_window_set_default_size(GTK_WINDOW(window),100,100);
