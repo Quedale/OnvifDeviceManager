@@ -890,6 +890,8 @@ custom_gtk_revealer_get_reveal_child (CustomGtkRevealer *revealer)
 gboolean
 custom_gtk_revealer_get_child_revealed (CustomGtkRevealer *revealer)
 {
+  g_return_val_if_fail (CUSTOM_IS_GTK_REVEALER (revealer), FALSE);
+
   CustomGtkRevealerPrivate *priv = custom_gtk_revealer_get_instance_private (revealer);
   gboolean animation_finished = (priv->target_pos == priv->current_pos);
   gboolean reveal_child = custom_gtk_revealer_get_reveal_child (revealer);
@@ -898,6 +900,13 @@ custom_gtk_revealer_get_child_revealed (CustomGtkRevealer *revealer)
     return reveal_child;
   else
     return !reveal_child;
+}
+
+void custom_gtk_revealer_restart(CustomGtkRevealer *revealer){
+  g_return_if_fail (CUSTOM_IS_GTK_REVEALER (revealer));
+  CustomGtkRevealerPrivate *priv = custom_gtk_revealer_get_instance_private (revealer);
+
+  priv->first_start = TRUE;
 }
 
 /**

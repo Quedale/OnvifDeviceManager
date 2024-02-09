@@ -87,6 +87,8 @@ void                       custom_gtk_revealer_set_transition_type     (CustomGt
 GDK_AVAILABLE_IN_3_10
 CustomGtkRevealerTransitionType  custom_gtk_revealer_get_transition_type     (CustomGtkRevealer               *revealer);
 
+void custom_gtk_revealer_restart(CustomGtkRevealer *revealer);
+
 void custom_gtk_revealer_set_start_delay (CustomGtkRevealer *revealer, guint     delay);
 
 guint custom_gtk_revealer_get_start_delay (CustomGtkRevealer *revealer);

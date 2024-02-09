@@ -10,20 +10,19 @@ const char * CSS_DOT_r = "* {\n" \
 "}";
 
 static void change_direction (CustomGtkRevealer *revealer){
+    gboolean revealed = custom_gtk_revealer_get_reveal_child(CUSTOM_GTK_REVEALER(revealer));
     if (gtk_widget_get_mapped (GTK_WIDGET (revealer))){
-        custom_gtk_revealer_set_reveal_child(CUSTOM_GTK_REVEALER(revealer),!custom_gtk_revealer_get_reveal_child(CUSTOM_GTK_REVEALER(revealer)));
+        custom_gtk_revealer_set_reveal_child(CUSTOM_GTK_REVEALER(revealer),!revealed);
+    } else if(revealed) {
+        //Finish hiding widgets to avoid breaking state between hiding/showing the slider
+        custom_gtk_revealer_set_reveal_child(CUSTOM_GTK_REVEALER(revealer),!revealed);
     }
 }
 
-gboolean * gui_dotted_show(void * user_data){
-    custom_gtk_revealer_set_reveal_child(CUSTOM_GTK_REVEALER(user_data),TRUE);
-    return FALSE;
+void dotted_map_event (GtkWidget* self, gpointer user_data){
+    custom_gtk_revealer_restart(CUSTOM_GTK_REVEALER(self));
+    custom_gtk_revealer_set_reveal_child(CUSTOM_GTK_REVEALER(self),TRUE);
 }
-
-void gtk_dotted_realize (GtkWidget* revealer){
-    gdk_threads_add_idle(G_SOURCE_FUNC(gui_dotted_show),revealer);
-}
-
 
 GtkWidget * gtk_dotted_slider_animation_new(int item_count,unsigned int animation_time){
     GtkCssProvider * cssProvider;
@@ -44,7 +43,7 @@ GtkWidget * gtk_dotted_slider_animation_new(int item_count,unsigned int animatio
         custom_gtk_revealer_set_start_delay(CUSTOM_GTK_REVEALER(revealer),delay*1000);
 
         g_signal_connect (revealer, "notify::child-revealed", G_CALLBACK (change_direction), NULL);
-        g_signal_connect (revealer, "realize", G_CALLBACK (gtk_dotted_realize), NULL);
+        g_signal_connect (revealer, "map", G_CALLBACK (dotted_map_event), NULL);
 
         GtkWidget * widget = gtk_label_new("");
 
