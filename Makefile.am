@@ -11,7 +11,7 @@ TAB  := $(NULL)<tab>$(NULL)
 AUTOMAKE_OPTIONS = foreign subdir-objects
 
 bin_PROGRAMS = onvifmgr 
-EXTRA_PROGRAMS = onvifclient onvifserver giftest overlaytest queuetest dottedslider clogger playertest dotteddemo
+EXTRA_PROGRAMS = onvifclient onvifserver giftest overlaytest queuetest dottedslider clogger playertest dotteddemo dottedwidget
 
 playertest_SOURCES = $(top_srcdir)/sample/player-test.c \
 					$(top_srcdir)/src/alsa/alsa_devices.c \
@@ -42,6 +42,10 @@ onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c \
 					$(top_srcdir)/src/alsa/alsa_devices.c \
 					$(top_srcdir)/src/alsa/alsa_utils.c \
 					$(top_srcdir)/src/animations/dotted_slider.c \
+					$(top_srcdir)/src/animations/gtk/custom_gtk_revealer.c \
+					$(top_srcdir)/src/animations/gtk/custom_gtk_progress_tracker.c \
+					$(top_srcdir)/src/animations/gtk/gtk_dotted_slider.c \
+					$(top_srcdir)/src/animations/gtk/gtk_dotted_slider_widget.c \
 					$(top_srcdir)/src/app/device.c \
 					$(top_srcdir)/src/app/gui_utils.c \
 					$(top_srcdir)/src/app/onvif_app_shutdown.c \
@@ -101,6 +105,14 @@ dotteddemo_SOURCES = $(top_srcdir)/sample/slider-test.c \
 					$(top_srcdir)/src/animations/gtk/custom_gtk_progress_tracker.c
 dotteddemo_CFLAGS = -Wall -Wextra -Wpedantic -Wno-unused-parameter $(DEBUG_FLAG) -DHAVE_CONFIG_H $(GST_STATIC_FLAG) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap onvifdisco` $(EXT_CFLAGS) -I$(top_srcdir)/build/dist/include -Wall -Wextra -Wpedantic 
 dotteddemo_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap onvifdisco` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
+
+dottedwidget_SOURCES = $(top_srcdir)/sample/widget-test.c \
+					$(top_srcdir)/src/animations/gtk/gtk_dotted_slider_widget.c \
+					$(top_srcdir)/src/animations/gtk/custom_gtk_revealer.c \
+					$(top_srcdir)/src/animations/gtk/custom_gtk_progress_tracker.c
+dottedwidget_CFLAGS = -Wall -Wextra -Wpedantic -Wno-unused-parameter $(DEBUG_FLAG) -DHAVE_CONFIG_H $(GST_STATIC_FLAG) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap onvifdisco` $(EXT_CFLAGS) -I$(top_srcdir)/build/dist/include -Wall -Wextra -Wpedantic 
+dottedwidget_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap onvifdisco` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
+
 
 paths$(EXEEXT):
 	@echo "PKG_FULL_PATH : $(PKG_FULL_PATH)"
