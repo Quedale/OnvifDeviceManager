@@ -41,7 +41,6 @@ onvifserver_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_F
 onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c \
 					$(top_srcdir)/src/alsa/alsa_devices.c \
 					$(top_srcdir)/src/alsa/alsa_utils.c \
-					$(top_srcdir)/src/animations/dotted_slider.c \
 					$(top_srcdir)/src/animations/gtk/custom_gtk_revealer.c \
 					$(top_srcdir)/src/animations/gtk/custom_gtk_progress_tracker.c \
 					$(top_srcdir)/src/animations/gtk/gtk_dotted_slider.c \
@@ -58,7 +57,9 @@ onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c \
 					$(top_srcdir)/src/app/dialog/add_device.c \
 					$(top_srcdir)/src/app/dialog/app_dialog.c \
 					$(top_srcdir)/src/app/dialog/credentials_input.c \
+					$(top_srcdir)/src/app/dialog/gtkprofilepanel.c \
 					$(top_srcdir)/src/app/dialog/msg_dialog.c \
+					$(top_srcdir)/src/app/dialog/profiles_dialog.c \
 					$(top_srcdir)/src/app/settings/app_settings_discovery.c \
 					$(top_srcdir)/src/app/settings/app_settings_stream.c \
 					$(top_srcdir)/src/app/settings/app_settings.c \
@@ -79,7 +80,7 @@ onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c \
 
 onvifmgr_CFLAGS = -Wall -Wextra -Wpedantic -Wno-unused-parameter $(DEBUG_FLAG) -DHAVE_CONFIG_H $(GST_STATIC_FLAG) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap onvifdisco` $(EXT_CFLAGS) -I$(top_srcdir)/build/dist/include -Wall -Wextra -Wpedantic 
 onvifmgr_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap onvifdisco` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
-onvifmgr_LDADD = locked-icon.o microphone.o warning.o
+onvifmgr_LDADD = locked-icon.o microphone.o warning.o save.o
 
 queuetest_SOURCES = $(top_srcdir)/src/demo/queue_test.c $(top_srcdir)/src/queue/event_queue.c
 queuetest_CFLAGS = -Wall -lpthread -Wall 
@@ -143,6 +144,10 @@ locked-icon.o$(EXEEXT):
 warning.o$(EXEEXT):
 	@echo "  CCLD     warning.o"
 	@cd $(abs_top_srcdir)/images && ld -r -b binary -o $(abs_builddir)/warning.o warning.png && cd ..
+
+save.o$(EXEEXT):
+	@echo "  CCLD     save.o"
+	@cd $(abs_top_srcdir)/images && ld -r -b binary -o $(abs_builddir)/save.o save.png && cd ..
 
 uninstall-onvifsoaplib$(EXEEXT):
 	cd $(abs_top_srcdir)/subprojects/OnvifSoapLib && $(MAKE) $(JOB_FLAG) uninstall GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd ..

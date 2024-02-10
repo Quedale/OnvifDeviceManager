@@ -1,5 +1,5 @@
 #ifndef MSG_DIALOG_H_ 
-#define ADD_DMSG_DIALOG_H_EV_H_
+#define MSG_DIALOG_H_
 
 #include <gtk/gtk.h>
 #include "app_dialog.h"

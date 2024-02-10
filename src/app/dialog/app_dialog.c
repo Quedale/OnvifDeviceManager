@@ -22,7 +22,7 @@ void priv_AppDialog_cancel_event (GtkWidget *widget, AppDialog * dialog);
 void priv_AppDialog_show_event (AppDialog * dialog);
 GtkWidget * priv_AppDialog__create_panel(AppDialog * dialog);
 GtkWidget * priv_AppDialog_create_parent_ui (AppDialog * dialog);
-GtkWidget * priv_AppDialog__create_buttons(AppDialog * dialog);
+void priv_AppDialog__create_buttons(AppDialog * dialog);
 gboolean priv_AppDialog__keypress_function (GtkWidget *widget, GdkEventKey *event, AppDialog * dialog);
 void priv_AppDialog__update_title(AppDialog * dialog);
 void priv_AppDialog__update_submit_label(AppDialog * dialog);
@@ -59,6 +59,10 @@ void AppDialog__set_destroy_callback(AppDialog* self, void (*destroy_callback)(A
     self->destroy_callback = destroy_callback;
 }
 
+void * AppDialog__get_user_data(AppDialog * self){
+    return self->user_data;
+}
+
 void AppDialog__init(AppDialog* self, GtkWidget * (*create_ui)(AppDialogEvent *)) {
     CObject__init((CObject*)self);
     CObject__set_destroy_callback((CObject*)self,priv_AppDialolg__destroy);
@@ -73,6 +77,8 @@ void AppDialog__init(AppDialog* self, GtkWidget * (*create_ui)(AppDialogEvent *)
     self->show_callback = NULL;
     self->user_data = NULL;
     self->closable = 1;
+    self->submittable = 1;
+    self->cancellable = 1;
     self->private = malloc(sizeof(AppDialogElements));
     self->create_ui = create_ui;
     priv_AppDialog__create_ui(self);
@@ -292,7 +298,7 @@ GtkWidget * priv_AppDialog__create_panel(AppDialog * dialog){
         gtk_grid_attach (GTK_GRID (grid), widget, 0, 1, 1, 1);
     }
 
-    elements->action_panel = priv_AppDialog__create_buttons(dialog);
+    priv_AppDialog__create_buttons(dialog);
     gtk_grid_attach (GTK_GRID (grid), elements->action_panel, 0, 2, 1, 1);
 
     g_object_unref (cssProvider);  
@@ -300,38 +306,46 @@ GtkWidget * priv_AppDialog__create_panel(AppDialog * dialog){
     return grid;
 }
 
-GtkWidget * priv_AppDialog__create_buttons(AppDialog * dialog){
+void priv_AppDialog__attach_cancel_button(AppDialog *dialog){
+    if(dialog->cancellable){
+        AppDialogElements * elements = (AppDialogElements *) dialog->private; 
+        elements->cancel_btn = gtk_button_new ();
+        GtkWidget * label = gtk_label_new("Cancel");
+        gtk_container_add (GTK_CONTAINER (elements->cancel_btn), label);
+        gtk_grid_attach (GTK_GRID (elements->action_panel), elements->cancel_btn, 2, 0, 1, 1);
+        g_signal_connect (elements->cancel_btn, "clicked", G_CALLBACK (priv_AppDialog_cancel_event), dialog);
+    }
+}
+
+void priv_AppDialog__attach_submit_button(AppDialog *dialog){
+    if(dialog->submittable){
+        AppDialogElements * elements = (AppDialogElements *) dialog->private; 
+        elements->submit_btn = gtk_button_new ();
+        GtkWidget * label = gtk_label_new(dialog->submit_label);
+        g_object_set (elements->submit_btn, "margin-end", 10, NULL);
+        gtk_container_add (GTK_CONTAINER (elements->submit_btn), label);
+        g_signal_connect (elements->submit_btn, "clicked", G_CALLBACK (priv_AppDialog_submit_event), dialog);
+        gtk_grid_attach (GTK_GRID (elements->action_panel), elements->submit_btn, 1, 0, 1, 1);
+    }
+}
+
+void priv_AppDialog__create_buttons(AppDialog * dialog){
     GtkWidget * label;
-    GtkWidget * grid = gtk_grid_new ();
-    g_object_set (grid, "margin", 5, NULL);
-
-    label = gtk_label_new("");
-    gtk_widget_set_hexpand (label, TRUE);
-    gtk_grid_attach (GTK_GRID (grid), label, 0, 0, 1, 1);
-
     AppDialogElements * elements = (AppDialogElements *) dialog->private; 
-
-    elements->submit_btn = gtk_button_new ();
-    label = gtk_label_new(dialog->submit_label);
-    g_object_set (elements->submit_btn, "margin-end", 10, NULL);
-    gtk_container_add (GTK_CONTAINER (elements->submit_btn), label);
-    gtk_widget_set_opacity(elements->submit_btn,1);
-    g_signal_connect (elements->submit_btn, "clicked", G_CALLBACK (priv_AppDialog_submit_event), dialog);
-    
-    gtk_grid_attach (GTK_GRID (grid), elements->submit_btn, 1, 0, 1, 1);
-
-    elements->cancel_btn = gtk_button_new ();
-    label = gtk_label_new("Cancel");
-    gtk_container_add (GTK_CONTAINER (elements->cancel_btn), label);
-    gtk_widget_set_opacity(elements->cancel_btn,1);
-    gtk_grid_attach (GTK_GRID (grid), elements->cancel_btn, 2, 0, 1, 1);
-    g_signal_connect (elements->cancel_btn, "clicked", G_CALLBACK (priv_AppDialog_cancel_event), dialog);
+    elements->action_panel = gtk_grid_new ();
+    g_object_set (elements->action_panel, "margin", 5, NULL);
 
     label = gtk_label_new("");
     gtk_widget_set_hexpand (label, TRUE);
-    gtk_grid_attach (GTK_GRID (grid), label, 3, 0, 1, 1);
+    gtk_grid_attach (GTK_GRID (elements->action_panel), label, 0, 0, 1, 1);
 
-    return grid;
+    priv_AppDialog__attach_submit_button(dialog);
+
+    priv_AppDialog__attach_cancel_button(dialog);
+
+    label = gtk_label_new("");
+    gtk_widget_set_hexpand (label, TRUE);
+    gtk_grid_attach (GTK_GRID (elements->action_panel), label, 3, 0, 1, 1);
 }
 
 void priv_AppDialog__root_panel_show_cb (GtkWidget* self, AppDialog * dialog){
@@ -401,9 +415,15 @@ GtkWidget * priv_AppDialog_create_parent_ui (AppDialog * dialog) {
 void priv_AppDialog__update_title(AppDialog * dialog){
     AppDialogElements * elements = (AppDialogElements *) dialog->private;
     if(elements && GTK_IS_WIDGET(elements->title_lbl)){
-        char * new_title = malloc(strlen(APPDIALOG_TITLE_PREFIX) + strlen(dialog->title) + strlen(APPDIALOG_TITLE_SUFFIX) +1);
+        char * input;
+        if(dialog->title){
+            input = dialog->title;
+        } else {
+            input = "Empty Title";
+        }
+        char * new_title = malloc(strlen(APPDIALOG_TITLE_PREFIX) + strlen(input) + strlen(APPDIALOG_TITLE_SUFFIX) +1);
         strcpy(new_title,APPDIALOG_TITLE_PREFIX);
-        strcat(new_title,dialog->title);
+        strcat(new_title,input);
         strcat(new_title,APPDIALOG_TITLE_SUFFIX);
 
         gtk_label_set_markup (GTK_LABEL (elements->title_lbl), new_title);
@@ -445,9 +465,26 @@ void AppDialog__set_closable(AppDialog * self, int closable){
     self->closable = closable;
 }
 
+void AppDialog__set_submitable(AppDialog * self, int submitable){
+    AppDialogElements * elements = (AppDialogElements*) self->private;
+    self->submittable = submitable;
+    if(GTK_IS_WIDGET(elements->submit_btn) && !submitable){
+        gtk_widget_destroy(elements->submit_btn);
+        elements->submit_btn = NULL;
+    } else if(!GTK_IS_WIDGET(elements->submit_btn) && submitable){
+        priv_AppDialog__attach_submit_button(self);
+    }
+}
+
 void AppDialog__set_cancellable(AppDialog * self, int cancellable){
     AppDialogElements * elements = (AppDialogElements*) self->private;
-    gtk_widget_set_visible(elements->cancel_btn,cancellable);
+    self->cancellable = cancellable;
+    if(GTK_IS_WIDGET(elements->cancel_btn) && !cancellable){
+        gtk_widget_destroy(elements->cancel_btn);
+        elements->cancel_btn = NULL;
+    } else if(!GTK_IS_WIDGET(elements->cancel_btn) && cancellable){
+        priv_AppDialog__attach_cancel_button(self);
+    }
 }
 
 void AppDialog__hide_actions(AppDialog * self){

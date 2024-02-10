@@ -11,7 +11,7 @@
 #include "task_manager.h"
 #include "clist_ts.h"
 #include "clogger.h"
-#include "../animations/dotted_slider.h"
+#include "../animations/gtk/gtk_dotted_slider_widget.h"
 
 typedef struct _OnvifApp {
     Device* device; /* Currently selected device */
@@ -23,6 +23,7 @@ typedef struct _OnvifApp {
     GtkWidget *player_loading_handle;
     GtkWidget *task_label;
 
+    ProfilesDialog * profiles_dialog;
     CredentialsDialog * cred_dialog;
     AddDeviceDialog * add_dialog;
     MsgDialog * msg_dialog;
@@ -40,7 +41,6 @@ typedef struct _OnvifApp {
 struct DeviceInput {
     Device * device;
     OnvifApp * app;
-    int skip_profiles;
 };
 
 struct DiscoveryInput {
@@ -60,12 +60,12 @@ typedef struct {
 } OnvifDeviceInput;
 
 void stopped_onvif_stream(RtspPlayer * player, void * user_data);
+void _profile_callback (void * user_data);
 
 struct DeviceInput * DeviceInput__copy(struct DeviceInput * self){
     struct DeviceInput * copy = malloc(sizeof(struct DeviceInput));
     copy->app = self->app;
     copy->device = self->device;
-    copy->skip_profiles = self->skip_profiles;
     return copy;
 }
 
@@ -230,6 +230,7 @@ void _display_onvif_device(void * user_data){
     OnvifDevice * odev = Device__get_device(input->device);
 
     /* Start by authenticating the device then start retrieve thumbnail */
+    /* Authenticating construct the device sserv*/
     if(OnvifDevice__get_last_error(odev) != ONVIF_ERROR_NONE)
         OnvifDevice__authenticate(odev);
 
@@ -238,8 +239,7 @@ void _display_onvif_device(void * user_data){
     }
 
     /* Display Profile dropdown */
-    if(!input->skip_profiles && OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NONE)
-        Device__load_profiles(input->device,input->app->queue);
+    Device__select_default_profile(input->device);
 
     /* Display row thumbnail. Default to profile index 0 */
     Device__load_thumbnail(input->device,input->app->queue);
@@ -249,11 +249,10 @@ exit:
     free(input);
 }
 
-void onvif_display_device_row(OnvifApp * self, Device * device, int skip_profiles){
+void onvif_display_device_row(OnvifApp * self, Device * device){
     struct DeviceInput * input = malloc(sizeof(struct DeviceInput));
     input->device = device;
     input->app = self;
-    input->skip_profiles = skip_profiles;
 
     /* nslookup doesn't require onvif authentication. Dispatch event now. */
     // Device__lookup_hostname(device,self->queue);
@@ -289,7 +288,7 @@ void _play_onvif_stream(void * user_data){
 
     /* Set the URI to play */
     OnvifMediaService * media_service = OnvifDevice__get_media_service(odev);
-    char * uri = OnvifMediaService__getStreamUri(media_service,Device__get_selected_profile(input->device));
+    char * uri = OnvifMediaService__getStreamUri(media_service,OnvifProfile__get_index(Device__get_selected_profile(input->device)));
     if(!uri){
         stopped_onvif_stream(input->app->player,input->app);
         goto exit;
@@ -360,7 +359,7 @@ int onvif_reload_device(struct DeviceInput * input){
     GtkWidget * image = gtk_spinner_new ();
     Device__set_thumbnail(input->device,image);
 
-    onvif_display_device_row(input->app, input->device, input->skip_profiles);
+    onvif_display_device_row(input->app, input->device);
     gdk_threads_add_idle(G_SOURCE_FUNC(gui_update_pages),input->app);
     if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NONE)
         _play_onvif_stream(DeviceInput__copy(input));
@@ -438,7 +437,6 @@ void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
     OnvifDevice * odev = Device__get_device(input.device);
     //Prompt for authentication
     if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NOT_AUTHORIZED){
-        input.skip_profiles = 0;
         //Re-dispatched to allow proper focus handling
         gdk_threads_add_idle(G_SOURCE_FUNC(gui_show_credentialsdialog),DeviceInput__copy(&input));
         return;
@@ -548,7 +546,7 @@ void add_device_add_cb(AppDialogEvent * event){
         return;
     }
 
-    GtkWidget * image = create_dotted_slider_animation(10,1);
+    GtkWidget * image = gtk_dotted_slider_new(GTK_ORIENTATION_HORIZONTAL, 5,10,1);
     MsgDialog * dialog = OnvifApp__get_msg_dialog(app);
     MsgDialog__set_icon(dialog, image);
     AppDialog__set_closable((AppDialog*)dialog, 0);
@@ -590,6 +588,7 @@ void create_ui (OnvifApp * app) {
     gtk_container_set_border_width (GTK_CONTAINER (grid), 10);
     gtk_overlay_add_overlay(GTK_OVERLAY(overlay),grid);
 
+    AppDialog__add_to_overlay((AppDialog *) app->profiles_dialog,GTK_OVERLAY(overlay));
     AppDialog__add_to_overlay((AppDialog *) app->add_dialog,GTK_OVERLAY(overlay));
     AppDialog__add_to_overlay((AppDialog *) app->cred_dialog,GTK_OVERLAY(overlay));
     AppDialog__add_to_overlay((AppDialog *) app->msg_dialog, GTK_OVERLAY(overlay));
@@ -794,14 +793,22 @@ void eventqueue_dispatch_cb(QueueThread * thread, EventQueueType type, void * us
     gdk_threads_add_idle(G_SOURCE_FUNC(gui_set_task_label),update);
 }
 
+void OnvifApp__profile_selected(ProfilesDialog * dialog, OnvifProfile * profile){
+    Device * device =  AppDialog__get_user_data((AppDialog *) dialog);
+
+    if(Device__set_selected_profile(device,profile)){
+        struct DeviceInput * input = malloc(sizeof(struct DeviceInput));
+        input->app = (OnvifApp *) Device__get_app(device);
+        input->device = device;
+        EventQueue__insert(input->app->queue,_profile_callback,input);
+    }
+}
+
 OnvifApp * OnvifApp__create(){
     OnvifApp *app  =  malloc(sizeof(OnvifApp));
     app->device_list = CListTS__create();
     app->device = NULL;
     app->task_label = NULL;
-    app->add_dialog = AddDeviceDialog__create();
-    app->cred_dialog = CredentialsDialog__create();
-    app->msg_dialog = MsgDialog__create();
     app->queue = EventQueue__create(eventqueue_dispatch_cb,app);
     app->details = OnvifDetails__create(app->queue);
     app->settings = AppSettings__create(app->queue);
@@ -827,6 +834,11 @@ OnvifApp * OnvifApp__create(){
     RtspPlayer__set_error_callback(app->player, error_onvif_stream, app);
     RtspPlayer__set_stopped_callback(app->player, stopped_onvif_stream, app);
     RtspPlayer__set_start_callback(app->player, start_onvif_stream, app);
+
+    app->profiles_dialog = ProfilesDialog__create(app->queue, OnvifApp__profile_selected);
+    app->add_dialog = AddDeviceDialog__create();
+    app->cred_dialog = CredentialsDialog__create();
+    app->msg_dialog = MsgDialog__create();
     
     create_ui (app);
 
@@ -838,22 +850,34 @@ void OnvifApp__destroy(OnvifApp* self){
         OnvifDetails__destroy(self->details);
         AppSettings__destroy(self->settings);
         TaskMgr__destroy(self->taskmgr);
+        CObject__destroy((CObject*)self->profiles_dialog);
         CObject__destroy((CObject*)self->add_dialog);
         CObject__destroy((CObject*)self->cred_dialog);
         CObject__destroy((CObject*)self->msg_dialog);
-        //Destroying the player will cause it to hang until its state changed to NULL
-        RtspPlayer__destroy(self->player);
         //Destroying the queue will hang until all threads are stopped
         CObject__destroy((CObject*)self->queue);
         CObject__destroy((CObject *)self->device_list);
+        //Destroying the player will cause it to hang until its state changed to NULL
+        //Destroying the player after the queue because the queue could dispatch retry call
+        RtspPlayer__destroy(self->player);
         safely_destroy_widget(self->window);
         free(self);
     }
 }
 void _profile_callback (void * user_data){
     struct DeviceInput * event = (struct DeviceInput *) user_data;
-    RtspPlayer__stop(event->app->player);
+    if(!CObject__addref((CObject*)event->device)){
+        C_WARN("_onvif_authentication_reload - invalid device\n");
+        free(event);
+        return;
+    }
+    
+    if(Device__is_selected(event->device)){
+        RtspPlayer__stop(event->app->player);
+    }
     onvif_reload_device(event);
+
+    CObject__unref((CObject*)event->device);
     free(event);
 }
     
@@ -862,12 +886,11 @@ void profile_callback(Device * device, void * user_data){
     struct DeviceInput * input = malloc(sizeof(struct DeviceInput));
     input->app = (OnvifApp *) user_data;
     input->device = device;
-    input->skip_profiles = 1;
     EventQueue__insert(input->app->queue,_profile_callback,input);
 }
 
 void add_device(OnvifApp * self, OnvifDevice * onvif_dev, char* name, char * hardware, char * location){
-    Device * device = Device__create(onvif_dev);
+    Device * device = Device__create(self, onvif_dev);
     Device__set_profile_callback(device,profile_callback,self);
 
     CListTS__add(self->device_list,(CObject*)device);
@@ -891,7 +914,7 @@ void add_device(OnvifApp * self, OnvifDevice * onvif_dev, char* name, char * har
     gtk_list_box_insert (GTK_LIST_BOX (self->listbox), row, -1);
     gtk_widget_show_all (row);
 
-    onvif_display_device_row(self,device, 0);
+    onvif_display_device_row(self,device);
 }
 
 RtspPlayer * OnvifApp__get_player(OnvifApp* self){
@@ -900,4 +923,8 @@ RtspPlayer * OnvifApp__get_player(OnvifApp* self){
 
 MsgDialog * OnvifApp__get_msg_dialog(OnvifApp * self){
     return self->msg_dialog;
+}
+
+ProfilesDialog * OnvifApp__get_profiles_dialog(OnvifApp * self){
+    return self->profiles_dialog;
 }

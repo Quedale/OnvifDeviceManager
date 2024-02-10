@@ -22,6 +22,8 @@ struct _AppDialog {
     int visible;
     int action_visible;
     int closable;
+    int cancellable;
+    int submittable;
     char * title;
     char * submit_label;
     GtkWidget * root;
@@ -54,6 +56,8 @@ void AppDialog__hide_actions(AppDialog * self);
 void AppDialog__show_actions(AppDialog * self);
 void AppDialog__set_closable(AppDialog * self, int closable);
 void AppDialog__set_cancellable(AppDialog * self, int cancellable);
+void AppDialog__set_submitable(AppDialog * self, int submitable);
+void * AppDialog__get_user_data(AppDialog * self);
 
 AppDialogEvent * AppDialogEvent_copy(AppDialogEvent * original);
 

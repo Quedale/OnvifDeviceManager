@@ -21,12 +21,12 @@ typedef struct _GtkDottedSliderClass  GtkDottedSliderClass;
 
 struct _GtkDottedSlider
 {
-    GtkHBox vbox;
+    GtkBox vbox;
 };
 
 struct _GtkDottedSliderClass
 {
-    GtkHBoxClass parent_class;
+    GtkBoxClass parent_class;
 
 };
 

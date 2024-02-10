@@ -6,6 +6,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include "clogger.h"
+#include "dialog/profiles_dialog.h"
 
 extern char _binary_prohibited_icon_png_size[];
 extern char _binary_prohibited_icon_png_start[];
@@ -19,112 +20,38 @@ extern char _binary_warning_png_size[];
 extern char _binary_warning_png_start[];
 extern char _binary_warning_png_end[];
 
+extern char _binary_save_png_size[];
+extern char _binary_save_png_start[];
+extern char _binary_save_png_end[];
+
 struct _Device {
     CObject parent;
-
+    
+    OnvifApp * app;
     OnvifDevice * onvif_device;
     GtkWidget * image_handle;
-    GtkWidget * profile_dropdown;
+    GtkWidget * profile_btn;
 
     P_MUTEX_TYPE ref_lock;
-    int profile_index;
+    OnvifProfile * selected_profile;
     int selected;
 
     void (*profile_callback)(Device *, void *);
     void * profile_userdata;
 };
 
-typedef struct {
-    Device * device;
-    OnvifProfiles * profiles;
-} GUIProfileEvent;
 
 void priv_Device__destroy(CObject * self);
 void priv_Device__profile_changed(GtkComboBox* self, Device * device);
-// void _priv_Device__lookup_hostname(void * user_data);
 void _priv_Device__load_thumbnail(void * user_data);
-void _priv_Device__load_profiles(void * user_data);
-gboolean * gui_Device__display_profiles (void * user_data);
+
+gboolean * gui_Device__display_profile (void * user_data);
 
 void priv_Device__destroy(CObject * self){
     OnvifDevice__destroy(((Device*)self)->onvif_device);
+    OnvifProfile__destroy(((Device*)self)->selected_profile);
     P_MUTEX_CLEANUP(self->ref_lock);
 }
-// int _priv_Device__lookup_hostname_netbios(Device * device, char * hostname){
-//     char * dev_ip = OnvifDevice__get_ip(device->onvif_device);
-//     C_INFO("NetBIOS Lookup ... %s",dev_ip);
-//     int ret;
-//     //Lookup hostname
-//     struct in_addr in_a;
-//     memset(&in_a,0,sizeof(in_a));
-
-//     inet_pton(AF_INET, dev_ip, &in_a);
-//     struct hostent* host;
-//     host = gethostbyaddr( (const void*)&in_a, 
-//                         sizeof(struct in_addr), 
-//                         AF_INET );
-//     if(host){
-//         strcpy(hostname,host->h_name);
-//         ret = 1;
-//     } else {
-//         C_WARN("Failed to get hostname ...");
-//         strcpy(hostname,"");
-//     }
-
-//     C_INFO("Retrieved hostname : %s",hostname);
-//     free(dev_ip);
-//     return ret;
-// }
-
-// int _priv_Device__lookup_hostname_dns(Device * device, char * hostname){
-//     int ret = 0;
-//     char servInfo[NI_MAXSERV];
-//     memset(&servInfo,0,sizeof(servInfo));
-
-//     char * dev_ip = OnvifDevice__get_ip(device->onvif_device);
-//     C_INFO("DNS Lookup ... %s",dev_ip);
-
-//     struct sockaddr_in sa_in;
-//     sa_in.sin_family = AF_INET;
-//     sa_in.sin_addr.s_addr = inet_addr(dev_ip);
-//     sa_in.sin_port = htons(25);
-
-//     if (getnameinfo((struct sockaddr*) &sa_in, sizeof(struct sockaddr), hostname, sizeof(hostname),
-//                 servInfo, NI_MAXSERV, NI_NAMEREQD)){
-//         C_WARN("Failed to get hostname ...");
-//     } else {
-//         C_INFO("Retrieved host=%s, serv=%s\n", hostname, servInfo);
-//         ret = 1;
-//     }
-
-//     free(dev_ip);
-//     return ret;
-// }
-
-// void _priv_Device__lookup_hostname(void * user_data){
-//     Device * device = (Device *) user_data;
-//     char hostname[NI_MAXHOST];
-//     memset(&hostname,0,sizeof(hostname));
-    
-//     C_DEBUG("_priv_Device__lookup_hostname\n");
-//     if(!CObject__addref((CObject*)device)){
-//         C_WARN("_priv_Device__lookup_hostname - invalid device");
-//         return;
-//     }
-
-//     // char * dev_ip = OnvifDevice__get_ip(device->onvif_device);
-//     // if(dev_ip == NULL){ //Retrieve ip by hostname
-//     //     OnvifDevice__lookup_ip(device->onvif_device);
-//     // }
-//     // free(dev_ip);
-
-//     // if(!_priv_Device__lookup_hostname_dns(device,hostname)){
-//     //     _priv_Device__lookup_hostname_netbios(device,hostname);
-//     // }
-
-//     C_TRACE("_priv_Device__lookup_hostname - done");
-//     CObject__unref((CObject*)device);
-// }
 
 void _priv_Device__load_thumbnail(void * user_data){
     C_DEBUG("_priv_Device__load_thumbnail");
@@ -147,7 +74,7 @@ void _priv_Device__load_thumbnail(void * user_data){
     OnvifErrorTypes oerror = OnvifDevice__get_last_error(device->onvif_device);
     if(oerror == ONVIF_ERROR_NONE){
         OnvifMediaService * media_service = OnvifDevice__get_media_service(device->onvif_device);
-        snapshot = OnvifMediaService__getSnapshot(media_service,Device__get_selected_profile(device));
+        snapshot = OnvifMediaService__getSnapshot(media_service,OnvifProfile__get_index(Device__get_selected_profile(device)));
         if(!snapshot){
             C_ERROR("_priv_Device__load_thumbnail- Error retrieve snapshot.");
             goto warning;
@@ -237,116 +164,156 @@ exit:
     CObject__unref((CObject*)device);
 } 
 
-void priv_Device__profile_changed(GtkComboBox* self, Device * device){
-    P_MUTEX_LOCK(device->ref_lock);
-    int new_index = gtk_combo_box_get_active(self);
-    if(new_index == -1){
-        new_index = 0; //Default to the first profile if nothing is available
-    }
-    P_MUTEX_UNLOCK(device->ref_lock);
-    if(new_index != device->profile_index){
-        device->profile_index = new_index;
-        if(device->profile_callback){
-            device->profile_callback(device,device->profile_userdata);
-        }
-    }
-}
+gboolean * gui_Device__display_profile (void * user_data){
+    Device * device = (Device *) user_data;
+    C_DEBUG("gui_Device__display_profile");
 
-gboolean * gui_Device__display_profiles (void * user_data){
-    GUIProfileEvent * evt = (GUIProfileEvent *) user_data;
-    C_DEBUG("gui_Device__display_profiles");
-
-    if(!CObject__addref((CObject*)evt->device)){
-        C_WARN("gui_Device__display_profiles - invalid device");
+    if(!CObject__addref((CObject*)device)){
+        C_WARN("gui_Device__display_profile - invalid device");
         return FALSE;
     }
 
-    if(OnvifDevice__get_last_error(evt->device->onvif_device) == ONVIF_ERROR_NOT_AUTHORIZED){
-        C_WARN("gui_Device__display_profiles - unauthorized");
-        goto exit;
+    if(!device->selected_profile){
+        gtk_button_set_label(GTK_BUTTON(device->profile_btn),"");
+        gtk_widget_set_sensitive (device->profile_btn, FALSE);
+    } else {
+        gtk_button_set_label(GTK_BUTTON(device->profile_btn),OnvifProfile__get_name(device->selected_profile));
+        gtk_widget_set_sensitive (device->profile_btn, TRUE);
     }
-    
-    GtkListStore *liststore = GTK_LIST_STORE(gtk_combo_box_get_model(GTK_COMBO_BOX(evt->device->profile_dropdown)));
-    for (int i = 0; i < OnvifProfiles__get_size(evt->profiles); i++){
-        OnvifProfile * profile = OnvifProfiles__get_profile(evt->profiles,i);
-        char * name = OnvifProfile__get_name(profile);
-        char * token = OnvifProfile__get_token(profile);
-        C_TRACE("Profile name: %s", name);
-        C_TRACE("Profile token: %s", token);
 
-        gtk_list_store_insert_with_values(liststore, NULL, -1,
-                                        // 0, "red",
-                                        1, name,
-                                        -1);
-    }
-    gtk_combo_box_set_active(GTK_COMBO_BOX(evt->device->profile_dropdown),0);
-    gtk_widget_set_sensitive (evt->device->profile_dropdown, TRUE);
-
-exit:
-    OnvifProfiles__destroy(evt->profiles);
-    CObject__unref((CObject*)evt->device);
-    free(evt);
+    CObject__unref((CObject*)device);
     return FALSE;
 }
 
-//WIP Profile selection
-void _priv_Device__load_profiles(void * user_data){
-    Device * device = (Device *) user_data;
-    C_DEBUG("_priv_Device__load_profiles");
-
-    if(!CObject__addref((CObject*)device)){
-        C_TRACE("_priv_Device__load_profiles - invalid object");
-        return;
+int Device__set_selected_profile(Device * self, OnvifProfile * profile){
+    P_MUTEX_LOCK(self->ref_lock);
+    if(OnvifProfile__equals(self->selected_profile,profile)){
+        P_MUTEX_UNLOCK(self->ref_lock);
+        return 0;
     }
-
-    if(OnvifDevice__get_last_error(device->onvif_device) == ONVIF_ERROR_NOT_AUTHORIZED){
-        C_TRACE("_priv_Device__load_profiles - unauthorized");
-        goto exit;
+    
+    if(self->selected_profile){
+        OnvifProfile__destroy(self->selected_profile);
     }
-
-    OnvifMediaService * media_service = OnvifDevice__get_media_service(device->onvif_device);
-    OnvifProfiles * profiles = OnvifMediaService__get_profiles(media_service);
-    if(CObject__is_valid((CObject*)device) && OnvifDevice__get_last_error(device->onvif_device) == ONVIF_ERROR_NONE){
-        GUIProfileEvent * evt = malloc(sizeof(GUIProfileEvent));
-        evt->device = device;
-        evt->profiles = profiles;
-        gdk_threads_add_idle(G_SOURCE_FUNC(gui_Device__display_profiles),evt);
-    } else {
-        OnvifProfiles__destroy(profiles);
-    }
-
-exit:
-    C_TRACE("_priv_Device__load_profiles - Done");
-    CObject__unref((CObject*)device);
+    self->selected_profile = OnvifProfile__copy(profile);
+    P_MUTEX_UNLOCK(self->ref_lock);
+    gdk_threads_add_idle(G_SOURCE_FUNC(gui_Device__display_profile),self);
+    return 1;
 }
 
-void Device__init(Device* self, OnvifDevice * onvif_device) {
+void Device__init(Device* self, OnvifDevice * onvif_device, OnvifApp * app) {
     CObject__init((CObject*)self);
     CObject__set_destroy_callback((CObject*)self,priv_Device__destroy);
     self->onvif_device = onvif_device;
+    self->app = app;
     self->selected=0;
-    self->profile_index=0;
     self->profile_callback = NULL;
     self->profile_userdata = NULL;
+    self->selected_profile = NULL;
     P_MUTEX_SETUP(self->ref_lock);
 }
 
-Device * Device__create(OnvifDevice * onvif_device){
+Device * Device__create(OnvifApp * app, OnvifDevice * onvif_device){
     Device* result = (Device*) malloc(sizeof(Device));
-    Device__init(result, onvif_device);
+    Device__init(result, onvif_device, app);
     CObject__set_allocated((CObject *) result);
     return result;
 }
 
-// void Device__lookup_hostname(Device* device, EventQueue * queue){
-//     C_DEBUG("Device__lookup_hostname");
-//     EventQueue__insert(queue,_priv_Device__lookup_hostname,device);
-// }
+OnvifApp * Device__get_app(Device * self){
+    return self->app;
+}
 
 void Device__load_thumbnail(Device* device, EventQueue * queue){
     C_DEBUG("Device__load_thumbnail");
     EventQueue__insert(queue,_priv_Device__load_thumbnail,device);
 }
+
+void Device_popup_profiles (GtkWidget *widget, Device * device) {
+    ProfilesDialog * dialog = OnvifApp__get_profiles_dialog(device->app);
+    ProfilesDialog__set_device(dialog,device);
+
+    AppDialog__show((AppDialog *) dialog,NULL,NULL,device);
+}
+
+GtkWidget * Device__create_save_btn(Device * device){
+    GError *error = NULL;
+    GtkWidget *image = NULL;
+    GdkPixbuf *pixbuf = NULL;
+    GdkPixbuf *scaled_pixbuf = NULL;
+    GtkWidget *button = gtk_button_new();
+
+    gtk_widget_set_sensitive(button,FALSE);
+    gtk_button_set_always_show_image(GTK_BUTTON(button),TRUE);
+
+    GdkPixbufLoader *loader = gdk_pixbuf_loader_new ();
+    if(gdk_pixbuf_loader_write (loader, (unsigned char *)_binary_save_png_start, _binary_save_png_end - _binary_save_png_start,&error)){
+        pixbuf = gdk_pixbuf_loader_get_pixbuf (loader);
+    } else {
+        if(error->message){
+            C_ERROR("Error writing warning png to GtkPixbufLoader : %s",error->message);
+        } else {
+            C_ERROR("Error writing warning png to GtkPixbufLoader : [null]");
+        }
+    }
+
+    if(pixbuf){
+        int scale = 1;
+        scaled_pixbuf = gdk_pixbuf_scale_simple (pixbuf,15*scale,15*scale,GDK_INTERP_NEAREST);
+        image = gtk_image_new_from_pixbuf (scaled_pixbuf);
+    }
+
+    if(image){
+        gtk_button_set_image(GTK_BUTTON(button), image);
+    } else {
+        C_ERROR("Save icon not created.");
+    }
+
+    gdk_pixbuf_loader_close(loader,NULL);
+    g_object_unref(loader);
+    if(scaled_pixbuf){
+        g_object_unref(scaled_pixbuf);
+    }
+
+    gtk_widget_set_halign(button, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(button, GTK_ALIGN_CENTER);
+
+    GtkCssProvider * cssProvider = gtk_css_provider_new();
+    gtk_css_provider_load_from_data(cssProvider, "* { padding: 2px; }",-1,NULL); 
+    GtkStyleContext * context = gtk_widget_get_style_context(button);
+    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    g_object_unref (cssProvider);  
+
+    // gtk_button_set_relief(GTK_BUTTON(button),GTK_RELIEF_NONE);
+
+    return button;
+}
+
+GtkWidget * Device__create_row_profile(Device * device){
+    GtkWidget* hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    GtkWidget* vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+
+    GtkWidget * save_btn = Device__create_save_btn(device);
+    g_object_set (save_btn, "margin-end", 3, NULL);
+    gtk_box_pack_start(GTK_BOX(hbox), save_btn,     FALSE, FALSE, 0);
+
+    device->profile_btn = gtk_button_new_with_label("");
+
+    GtkCssProvider * cssProvider = gtk_css_provider_new();
+    gtk_css_provider_load_from_data(cssProvider, "* { min-height: 15px; padding: 0px; padding-bottom: 2px; }",-1,NULL); 
+    GtkStyleContext * context = gtk_widget_get_style_context(device->profile_btn);
+    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    g_object_unref (cssProvider);  
+
+    gtk_widget_set_sensitive (device->profile_btn, FALSE);
+    gtk_box_pack_start(GTK_BOX(hbox), device->profile_btn,     TRUE, TRUE, 0);
+
+    g_signal_connect (device->profile_btn, "clicked", G_CALLBACK (Device_popup_profiles), device);
+
+    gtk_box_pack_start(GTK_BOX(vbox), hbox,     FALSE, FALSE, 0);
+    return vbox;
+}
+
 
 GtkWidget * Device__create_row (Device * device, char * uri, char* name, char * hardware, char * location){
     GtkWidget *row;
@@ -357,7 +324,7 @@ GtkWidget * Device__create_row (Device * device, char * uri, char* name, char * 
     row = gtk_list_box_row_new ();
 
     grid = gtk_grid_new ();
-    g_object_set (grid, "margin", 5, NULL);
+    // g_object_set (grid, "margin", 5, NULL);
 
     image = gtk_spinner_new ();
     gtk_spinner_start (GTK_SPINNER (image));
@@ -365,7 +332,6 @@ GtkWidget * Device__create_row (Device * device, char * uri, char* name, char * 
     GtkWidget * thumbnail_handle = gtk_event_box_new ();
     device->image_handle = thumbnail_handle;
     gtk_container_add (GTK_CONTAINER (thumbnail_handle), image);
-    g_object_set (thumbnail_handle, "margin-end", 10, NULL);
     gtk_grid_attach (GTK_GRID (grid), thumbnail_handle, 0, 1, 1, 3);
 
     if(!name){
@@ -399,23 +365,8 @@ GtkWidget * Device__create_row (Device * device, char * uri, char* name, char * 
     gtk_widget_set_hexpand (label, TRUE);
     gtk_grid_attach (GTK_GRID (grid), label, 1, 3, 1, 1);
 
-    //Create profile dropdown placeholder
-    GtkListStore *liststore = gtk_list_store_new(2, G_TYPE_STRING, G_TYPE_STRING);
-    device->profile_dropdown = gtk_combo_box_new_with_model(GTK_TREE_MODEL(liststore));
-    g_object_unref(liststore);
-
-    GtkCellRenderer  * column = gtk_cell_renderer_text_new();
-    gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(device->profile_dropdown), column, TRUE);
-
-    gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(device->profile_dropdown), column,
-                                    "cell-background", 0,
-                                    "text", 1,
-                                    NULL);
-                                    
-    gtk_widget_set_sensitive (device->profile_dropdown, FALSE);
-    gtk_grid_attach (GTK_GRID (grid), device->profile_dropdown, 0, 4, 2, 1);
-
-    g_signal_connect (G_OBJECT (device->profile_dropdown), "changed", G_CALLBACK (priv_Device__profile_changed), device);
+    GtkWidget * widget = Device__create_row_profile(device);
+    gtk_grid_attach (GTK_GRID (grid), widget, 0, 4, 2, 1);
 
     gtk_container_add (GTK_CONTAINER (row), grid);
   
@@ -431,9 +382,26 @@ void Device__set_profile_callback(Device * self, void (*profile_callback)(Device
     self->profile_userdata = profile_userdata;
 }
 
-void Device__load_profiles(Device* device, EventQueue * queue){
-    C_DEBUG("Device__load_profiles");
-    EventQueue__insert(queue,_priv_Device__load_profiles,device);
+void Device__select_default_profile(Device* device){
+    C_DEBUG("Device__select_default_profile");
+    if(device->selected_profile){
+        C_DEBUG("Device__select_default_profile - profile already selected\n");
+        return;
+    }
+    if(OnvifDevice__get_last_error(device->onvif_device) != ONVIF_ERROR_NONE){
+        C_WARN("_priv_Device__load_profiles - Unable to load profiles");
+        return;
+    }
+
+    OnvifMediaService * media_service = OnvifDevice__get_media_service(device->onvif_device);
+    OnvifProfiles * profiles = OnvifMediaService__get_profiles(media_service);
+    if(CObject__is_valid((CObject*)device) && OnvifDevice__get_last_error(device->onvif_device) == ONVIF_ERROR_NONE){
+        if(profiles && OnvifProfiles__get_size(profiles) > 0){
+            //Select index 0 by default TODO Remember previous selection?
+            Device__set_selected_profile(device, OnvifProfiles__get_profile(profiles,0));
+        }
+    }
+    OnvifProfiles__destroy(profiles);
 }
 
 OnvifDevice * Device__get_device(Device * self){
@@ -448,10 +416,10 @@ void Device__set_selected(Device * self, int selected){
     self->selected = selected;
 }
 
-int Device__get_selected_profile(Device * self){
-    int ret = 0;
+OnvifProfile * Device__get_selected_profile(Device * self){
+    OnvifProfile * ret = NULL;
     P_MUTEX_LOCK(self->ref_lock);
-    ret = self->profile_index;
+    ret = self->selected_profile;
     P_MUTEX_UNLOCK(self->ref_lock);
     return ret;
 }

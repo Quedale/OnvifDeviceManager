@@ -14,10 +14,11 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Support system and static libraries. (static recommended)
 - Support Multiple ONVIF Profiles
 - Tested H264, H265 and MJPEG stream
+- Logging framework
 
 # TODO
 - EventQueue : Interupt pending events when needed
-- Implement Logging framework
+- GObject rollout
 - Credential Storage 
 - Edit Onvif device identification
 - Display Onvif network information
@@ -86,9 +87,6 @@ make install
 # Note
 I have very little spare time to work on any personal project, so this might take a while.
 This is my very first C project, so I'm learning as I go. 
- 
-# Known issues
-1. GTKComboBox intercept scroll event meant for the camera list. (Fixed in MR [!4405](https://gitlab.gnome.org/GNOME/gtk/-/merge_requests/4405/diffs#1b2782cecf88934dfff50b3eadda7a2b036acfe1))
 
 # 
 # Feedback is more than welcome
