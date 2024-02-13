@@ -1,4 +1,4 @@
-#include "gtk_dotted_slider.h"
+#include "css_dotted_slider.h"
 #include "custom_gtk_revealer.h"
 
 
@@ -24,7 +24,7 @@ void dotted_map_event (GtkWidget* self, gpointer user_data){
     custom_gtk_revealer_set_reveal_child(CUSTOM_GTK_REVEALER(self),TRUE);
 }
 
-GtkWidget * gtk_dotted_slider_animation_new(int item_count,unsigned int animation_time){
+GtkWidget * css_dotted_slider_animation_new(int item_count,unsigned int animation_time){
     GtkCssProvider * cssProvider;
     GtkStyleContext * context;
     GtkWidget* vbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);

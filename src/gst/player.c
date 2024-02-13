@@ -8,14 +8,8 @@ typedef struct _RtspPlayer {
   GstElement *pipeline;
   GstElement *src;  /* RtspSrc to support backchannel */
   GstElement *sink;  /* Video Sink */
-  int pad_found;
-  GstElement * video_bin;
-  int no_video;
-  int video_done;
-  GstElement * audio_bin;
-  int no_audio;
-  int audio_done;
-  
+  GList * dynamic_elements;
+
   //Backpipe related properties
   int enable_backchannel;
   RtspBackchannel * backchannel;
@@ -38,8 +32,8 @@ typedef struct _RtspPlayer {
   void (*stopped_callback)(RtspPlayer *, void * user_data);
   void * stopped_user_data;
 
-  void (*start_callback)(RtspPlayer *, void * user_data);
-  void * start_user_data;
+  void (*started_callback)(RtspPlayer *, void * user_data);
+  void * started_user_data;
 
   //Grid holding the canvas
   GtkWidget *canvas_handle;
@@ -57,7 +51,7 @@ typedef struct _RtspPlayer {
   char * port_fallback;
 } RtspPlayer;
 
-void _RtspPlayer__stop(RtspPlayer* self, int notify);
+void _RtspPlayer__inner_stop(RtspPlayer* self);
 
 static void warning_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
   GError *err;
@@ -110,9 +104,8 @@ static void error_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
   C_DEBUG("retry[%d] playing[%d]", data->retry, data->playing);
   if(data->retry < 3 && data->playing == 1 && data->retry_callback){
     //Stopping player after if condition because "playing" gets reset
-    _RtspPlayer__stop(data,0);
     P_MUTEX_LOCK(data->player_lock);
-    data->playing = 1; //Restore playing flag after calling stop to allow retry
+    _RtspPlayer__inner_stop(data);
     data->retry++; 
     P_MUTEX_UNLOCK(data->player_lock);
     C_WARN("****************************************************");
@@ -136,6 +129,34 @@ static void eos_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
   RtspPlayer__stop(data);
 }
 
+int RtspPlayer__is_dynamic_pad(RtspPlayer * player, GstElement * element){
+  if(!player || g_list_length(player->dynamic_elements) == 0){
+    return FALSE;
+  }
+  GList *node_itr = player->dynamic_elements;
+  while (node_itr != NULL)
+  {
+    GstElement * bin = (GstElement *) node_itr->data;
+    if(bin == element){
+      return TRUE;
+    }
+    node_itr = g_list_next(node_itr);
+  }
+  return FALSE;
+}
+
+int RtspPlayer__is_video_bin(RtspPlayer * player, GstElement * element){
+  if(!player){
+    return FALSE;
+  }
+
+  if(GST_IS_OBJECT(element) && strcmp(GST_OBJECT_NAME(element),"video_bin") == 0){
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
 /* This function is called when the pipeline changes states. We use it to
  * keep track of the current state. */
 static void
@@ -146,45 +167,27 @@ state_changed_cb (GstBus * bus, GstMessage * msg, RtspPlayer * data)
   gst_message_parse_state_changed (msg, &old_state, &new_state, &pending_state);
   /* Using video_bin for state change since the pipeline is PLAYING before the videosink */
   
-  //Check if video exists and pad is linked
-  if(data && (data->no_video ||
-        (data->video_bin != NULL
-        && GST_IS_OBJECT(data->video_bin) 
-        &&  GST_MESSAGE_SRC (msg) == GST_OBJECT (data->video_bin)))){
-      if(new_state == GST_STATE_PLAYING) {
-        data->video_done=1;
-      } else {
-        if(GTK_IS_WIDGET (data->canvas))
-          gtk_widget_set_visible(data->canvas, FALSE);
-      }
-  }
+  GstElement * element = GST_ELEMENT(GST_MESSAGE_SRC (msg));
+  if(RtspPlayer__is_video_bin(data,element) && new_state != GST_STATE_PLAYING && GTK_IS_WIDGET (data->canvas)){
+    gtk_widget_set_visible(data->canvas, FALSE);
+  } else if(RtspPlayer__is_video_bin(data,element) && new_state == GST_STATE_PLAYING && GTK_IS_WIDGET (data->canvas)){
+    gtk_widget_set_visible(data->canvas, TRUE);
 
-  //Check if audio exists and pad is linked
-  if(data && (data->no_audio ||
-        (data->audio_bin != NULL 
-        && GST_IS_OBJECT(data->audio_bin) 
-        &&  GST_MESSAGE_SRC (msg) == GST_OBJECT (data->audio_bin))) &&
-      new_state == GST_STATE_PLAYING) {
-    data->audio_done=1;
-  }
-
-  //Check that all streams are ready before hiding loading
-  if(data && data->video_done && data->audio_done && data->pad_found == 1 &&
-      data->pipeline != NULL && GST_MESSAGE_SRC(msg) == GST_OBJECT(data->pipeline)){
-    if(GTK_IS_WIDGET (data->canvas))
-      gtk_widget_set_visible(data->canvas, TRUE);
-    //Stopped changing state signal
-    if(data->stopped_callback){
-      (*(data->stopped_callback))(data, data->stopped_user_data);
+    /*
+    * Waiting for fix https://gitlab.freedesktop.org/gstreamer/gst-plugins-good/-/issues/245
+    * Until This issue is fixed, "no-more-pads" is unreliable to determine if all stream states are ready.
+    * Until then, we only rely on the video stream state to fired the started signal
+    * Funny enough, a gstreamer generated onvif rtsp stream causes this issue
+    * 
+    * "select-stream" might be an alternative, although I don't know if the first stream could be play before the last one is shown
+    */
+    if(data->started_callback){
+      (*(data->started_callback))(data, data->started_user_data);
     }
   }
 
-  if(data &&
-      ((data->video_bin && GST_MESSAGE_SRC (msg) == (GstObject*) data->video_bin) ||
-      (data->audio_bin && GST_MESSAGE_SRC (msg) == (GstObject*) data->audio_bin) ||
-      (data->pipeline && GST_MESSAGE_SRC (msg) == (GstObject*) data->pipeline))){
+  if(RtspPlayer__is_dynamic_pad(data,element)){
     C_TRACE ("State set to %s for %s\n", gst_element_state_get_name (new_state), GST_OBJECT_NAME (msg->src));
-    // printf("[no_audio:%i][no_video:%i][audio_done:%i][video_done:%i][pad_found:%i][pipe:%i]\n",data->no_audio,data->no_video,data->audio_done,data->video_done,data->pad_found,GST_MESSAGE_SRC(msg) == GST_OBJECT(data->pipeline));
   }
 }
 
@@ -360,15 +363,15 @@ static void on_pad_added (GstElement *element, GstPad *new_pad, gpointer data){
 
 static GstElement * create_audio_bin(RtspPlayer * self){
   GstPad *pad, *ghostpad;
-  GstElement *decoder, *convert, *level, *sink;
+  GstElement *decoder, *convert, *level, *sink, *audio_bin;
 
-  self->audio_bin = gst_bin_new("audiobin");
+  audio_bin = gst_bin_new("audiobin");
   decoder = gst_element_factory_make ("decodebin3", NULL);
   convert = gst_element_factory_make ("audioconvert", NULL);
   level = gst_element_factory_make("level",NULL);
   sink = gst_element_factory_make ("autoaudiosink", NULL);
   g_object_set (G_OBJECT (sink), "sync", FALSE, NULL);
-  if (!self->audio_bin ||
+  if (!audio_bin ||
       !decoder ||
       !convert ||
       !level ||
@@ -378,7 +381,7 @@ static GstElement * create_audio_bin(RtspPlayer * self){
   }
 
   // Add Elements to the Bin
-  gst_bin_add_many (GST_BIN (self->audio_bin),
+  gst_bin_add_many (GST_BIN (audio_bin),
     decoder,
     convert,
     level,
@@ -407,17 +410,17 @@ static GstElement * create_audio_bin(RtspPlayer * self){
   }
 
   ghostpad = gst_ghost_pad_new ("bin_sink", pad);
-  gst_element_add_pad (self->audio_bin, ghostpad);
+  gst_element_add_pad (audio_bin, ghostpad);
   gst_object_unref (pad);
 
-  return self->audio_bin;
+  return audio_bin;
 }
 
 static GstElement * create_video_bin(RtspPlayer * self){
-  GstElement *vdecoder, *videoconvert, *overlay_comp;
+  GstElement *vdecoder, *videoconvert, *overlay_comp, *video_bin;
   GstPad *pad, *ghostpad;
 
-  self->video_bin = gst_bin_new("video_bin");
+  video_bin = gst_bin_new("video_bin");
   vdecoder = gst_element_factory_make ("decodebin3", NULL);
   videoconvert = gst_element_factory_make ("videoconvert", NULL);
   overlay_comp = gst_element_factory_make ("overlaycomposition", NULL);
@@ -426,7 +429,7 @@ static GstElement * create_video_bin(RtspPlayer * self){
   gst_base_sink_set_sync(GST_BASE_SINK_CAST(self->sink),FALSE);
   gst_gtk_base_custom_sink_set_expand(GST_GTK_BASE_CUSTOM_SINK(self->sink),self->allow_overscale);
 
-  if (!self->video_bin ||
+  if (!video_bin ||
       !vdecoder ||
       !videoconvert ||
       !overlay_comp ||
@@ -436,7 +439,7 @@ static GstElement * create_video_bin(RtspPlayer * self){
   }
 
   // Add Elements to the Bin
-  gst_bin_add_many (GST_BIN (self->video_bin),
+  gst_bin_add_many (GST_BIN (video_bin),
     vdecoder,
     videoconvert,
     overlay_comp,
@@ -473,7 +476,7 @@ static GstElement * create_video_bin(RtspPlayer * self){
   }
 
   ghostpad = gst_ghost_pad_new ("bin_sink", pad);
-  gst_element_add_pad (self->video_bin, ghostpad);
+  gst_element_add_pad (video_bin, ghostpad);
   gst_object_unref (pad);
 
   if(!self->canvas){
@@ -483,7 +486,7 @@ static GstElement * create_video_bin(RtspPlayer * self){
   }
   gst_gtk_base_custom_sink_set_parent(GST_GTK_BASE_CUSTOM_SINK(self->sink),self->canvas_handle);
 
-  return self->video_bin;
+  return video_bin;
 }
 
 /* Dynamically link */
@@ -510,10 +513,6 @@ static void on_rtsp_pad_added (GstElement *element, GstPad *new_pad, RtspPlayer 
 
   //TODO perform stream selection by stream codec not payload
   if (g_strrstr(capsName, "video")){
-    data->pad_found = 1;
-    data->no_video = 0;
-    data->video_done = 0;
-    gst_event_new_flush_stop(0);
     GstElement * video_bin = create_video_bin(data);
 
     gst_bin_add_many (GST_BIN (data->pipeline), video_bin, NULL);
@@ -524,15 +523,11 @@ static void on_rtsp_pad_added (GstElement *element, GstPad *new_pad, RtspPlayer 
     if (GST_PAD_LINK_FAILED (pad_ret)) {
       C_ERROR ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(video_bin));
       //TODO Show error on canvas
-      data->no_video = 1;
       goto exit;
     }
-
+    data->dynamic_elements = g_list_append(data->dynamic_elements, video_bin);
     gst_element_sync_state_with_parent(video_bin);
   } else if (g_strrstr(capsName,"audio")){
-    data->pad_found = 1;
-    data->no_audio = 0;
-    data->audio_done = 0;
     GstElement * audio_bin = create_audio_bin(data);
 
     gst_bin_add_many (GST_BIN (data->pipeline), audio_bin, NULL);
@@ -541,10 +536,9 @@ static void on_rtsp_pad_added (GstElement *element, GstPad *new_pad, RtspPlayer 
     pad_ret = gst_pad_link (new_pad, sink_pad);
     if (GST_PAD_LINK_FAILED (pad_ret)) {
       C_ERROR ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(audio_bin));
-      data->no_audio = 1;
       goto exit;
     }
-
+    data->dynamic_elements = g_list_append(data->dynamic_elements, audio_bin);
     gst_element_sync_state_with_parent(audio_bin);
   } else {
     C_ERROR("Support other payload formats %i\n",payload_v);
@@ -561,11 +555,6 @@ exit:
 void create_pipeline(RtspPlayer *self){
 
   self->playing = 0;
-  self->audio_done = 0;
-  self->no_audio = 1;
-  self->video_done = 0;
-  self->no_video = 1;
-  self->pad_found = 0;
 
   /* Create the empty pipeline */
   self->pipeline = gst_pipeline_new ("onvif-pipeline");
@@ -623,8 +612,8 @@ void RtspPlayer__init(RtspPlayer* self) {
   self->error_callback = NULL;
   self->stopped_user_data = NULL;
   self->stopped_callback = NULL;
-  self->start_user_data = NULL;
-  self->start_callback = NULL;
+  self->started_user_data = NULL;
+  self->started_callback = NULL;
   self->enable_backchannel = 1;
   self->retry = 0;
   self->playing = 0;
@@ -632,8 +621,7 @@ void RtspPlayer__init(RtspPlayer* self) {
   self->overlay_state = OverlayState__create();
   self->canvas_handle = NULL;
   self->canvas = NULL;
-  self->video_bin = NULL;
-  self->audio_bin = NULL;
+  self->dynamic_elements = NULL;
   self->sink = NULL;
   self->src = NULL;
 
@@ -697,9 +685,9 @@ void RtspPlayer__destroy(RtspPlayer* self) {
   }
 }
 
-void RtspPlayer__set_start_callback(RtspPlayer* self, void (*start_callback)(RtspPlayer *, void *), void * user_data){
-  self->start_user_data = user_data;
-  self->start_callback = start_callback;
+void RtspPlayer__set_started_callback(RtspPlayer* self, void (*started_callback)(RtspPlayer *, void *), void * user_data){
+  self->started_user_data = user_data;
+  self->started_callback = started_callback;
 }
 
 void RtspPlayer__set_stopped_callback(RtspPlayer* self, void (*stopped_callback)(RtspPlayer *, void *), void * user_data){
@@ -789,22 +777,12 @@ void RtspPlayer__set_credentials(RtspPlayer * self, char * user, char * pass){
     P_MUTEX_UNLOCK(self->prop_lock);
   }
 }
-
-void _RtspPlayer__stop(RtspPlayer* self, int notify){
-    C_INFO("RtspPlayer__stop\n");
-    if(!self || !self->playing){
-      return;
-    }
-
-    P_MUTEX_LOCK(self->player_lock);
-
-    self->playing = 0;
-
+void _RtspPlayer__inner_stop(RtspPlayer* self){
     GstStateChangeReturn ret;
 
     //Pause backchannel
     if(!RtspBackchannel__pause(self->backchannel)){
-      goto stop_out;
+      return;
     }
 
     //Set NULL state to clear buffers
@@ -812,10 +790,28 @@ void _RtspPlayer__stop(RtspPlayer* self, int notify){
       ret = gst_element_set_state (self->pipeline, GST_STATE_NULL);
       if (ret == GST_STATE_CHANGE_FAILURE) {
           C_ERROR ("Unable to set the pipeline to the ready state.\n");
-          goto stop_out;
+          return;
       }
     }
-stop_out: 
+
+    return;
+}
+
+void RtspPlayer__stop(RtspPlayer* self){
+  C_DEBUG("RtspPlayer__stop\n");
+  if(!self || !self->playing){
+    return;
+  }
+
+  P_MUTEX_LOCK(self->player_lock);
+
+  self->playing = 0;
+
+  _RtspPlayer__inner_stop(self);
+
+  g_list_free(self->dynamic_elements);
+  self->dynamic_elements = NULL;
+
   //Destroy old pipeline
   if(GST_IS_ELEMENT(self->pipeline))
     gst_object_unref (self->pipeline);
@@ -827,16 +823,13 @@ stop_out:
   //Force hide the previous stream
   if(GTK_IS_WIDGET (self->canvas))
     gtk_widget_set_visible(self->canvas, FALSE);
-  //Send stopped signal
-  if(notify && self->stopped_callback){
+
+  if(self->stopped_callback){
     (*(self->stopped_callback))(self, self->stopped_user_data);
   }
   P_MUTEX_UNLOCK(self->player_lock);
 }
 
-void RtspPlayer__stop(RtspPlayer* self){
-  _RtspPlayer__stop(self,1);
-}
 
 void _RtspPlayer__play(RtspPlayer* self, int retry){
   P_MUTEX_LOCK(self->player_lock);
@@ -851,16 +844,11 @@ void _RtspPlayer__play(RtspPlayer* self, int retry){
     g_object_set (G_OBJECT (self->src), "location", self->location, NULL);
   P_MUTEX_UNLOCK(self->prop_lock);
 
-  C_INFO("RtspPlayer__play retry[%i] - playing[%i]\n",retry,self->playing);
+  C_DEBUG("RtspPlayer__play retry[%i] - playing[%i]\n",retry,self->playing);
   if(retry && self->playing == 0){//Retry signal after stop requested
     goto exit;
   } else {
     self->playing = 1;
-  }
-  
-  //Send start signal
-  if(self->start_callback){
-    (*(self->start_callback))(self, self->start_user_data);
   }
 
   GstStateChangeReturn ret;
@@ -896,7 +884,7 @@ void RtspPlayer__retry(RtspPlayer* self){
   _RtspPlayer__play(self,self->retry);
 }
 
-GtkWidget * OnvifDevice__createCanvas(RtspPlayer *self){
+GtkWidget * RtspPlayer__createCanvas(RtspPlayer *self){
 
   self->canvas_handle = gtk_grid_new ();
   return self->canvas_handle;

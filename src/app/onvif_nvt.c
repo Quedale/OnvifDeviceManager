@@ -48,7 +48,7 @@ GtkWidget * OnvifNVT__create_ui (RtspPlayer * player){
     GtkWidget *widget;
 
     grid = gtk_grid_new ();
-    widget = OnvifDevice__createCanvas(player);
+    widget = RtspPlayer__createCanvas(player);
     gtk_widget_set_vexpand (widget, TRUE);
     gtk_widget_set_hexpand (widget, TRUE);
 

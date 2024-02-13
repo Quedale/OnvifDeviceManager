@@ -11,12 +11,16 @@ void gui_widget_destroy(GtkWidget * widget, gpointer user_data){
     gtk_widget_destroy(widget);
 }
 
+void gui_container_remove(GtkWidget * widget, gpointer user_data){
+    gtk_container_remove(GTK_CONTAINER(user_data),widget);
+}
+
 gboolean * gui_update_widget_image_priv(void * user_data){
     ImageGUIUpdate * iguiu = (ImageGUIUpdate *) user_data;
 
     if(GTK_IS_WIDGET(iguiu->handle)){
         gtk_container_foreach (GTK_CONTAINER (iguiu->handle), (GtkCallback)gui_widget_destroy, NULL);
-        if(iguiu->image){
+        if(GTK_IS_WIDGET(iguiu->image)){
             gtk_container_add (GTK_CONTAINER (iguiu->handle), iguiu->image);
             gtk_widget_show (iguiu->image);
             if(GTK_IS_SPINNER(iguiu->image)){
@@ -32,6 +36,7 @@ gboolean * gui_update_widget_image_priv(void * user_data){
 }
 
 void gui_update_widget_image(GtkWidget * image, GtkWidget * handle){
+    if(!G_IS_OBJECT(image) || !G_IS_OBJECT(handle)) return;
     ImageGUIUpdate * iguiu = malloc(sizeof(ImageGUIUpdate));
     iguiu->image = image;
     iguiu->handle = handle;

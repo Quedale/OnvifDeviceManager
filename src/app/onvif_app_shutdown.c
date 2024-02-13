@@ -3,6 +3,9 @@
 #include "../gst/player.h"
 #include "clogger.h"
 
+void safely_quit_gtk_main(void * user_data){
+    gtk_main_quit();
+}
 void * _thread_destruction(void * event){
     C_INFO("Starting clean up thread...\n");
     OnvifApp * app = (OnvifApp *) event;
@@ -10,8 +13,9 @@ void * _thread_destruction(void * event){
     //This what may take a long time.
     //Destroying the EventQueue will hang until all threads are finished
     OnvifApp__destroy(app);
-
-    gtk_main_quit();
+    
+    //Quitting from idle thread allows the windows and OnvifMgrDeviceRow (and nested OnvifDevice) to destroy properly
+    gdk_threads_add_idle(G_SOURCE_FUNC(safely_quit_gtk_main),NULL);
 
     pthread_exit(0);
 }

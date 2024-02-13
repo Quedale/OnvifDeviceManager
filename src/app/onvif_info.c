@@ -8,6 +8,7 @@
 #define ONVIF_GET_NETWORK_ERROR "Error retreiving network details."
 
 typedef struct _OnvifInfo {
+    OnvifApp * app;
     GtkWidget * info_page;
     GtkWidget * name_lbl;
     GtkWidget * hostname_lbl;
@@ -22,9 +23,7 @@ typedef struct _OnvifInfo {
     GtkWidget * version_lbl;
     GtkWidget * uri_lbl;
 
-    EventQueue * queue;
     GtkWidget * widget;
-    Device * device;
 
     void (*done_callback)(OnvifInfo *, void * user_data);
     void * done_user_data;
@@ -32,6 +31,7 @@ typedef struct _OnvifInfo {
 
 
 typedef struct {
+    OnvifMgrDeviceRow * device;
     OnvifInfo * info;
     char * name;
     char * hostname;
@@ -48,6 +48,11 @@ typedef struct {
     char * uri;
 
 } InfoGUIUpdate;
+
+typedef struct {
+    OnvifInfo * info;
+    OnvifMgrDeviceRow * device;
+} InfoDataUpdate;
 
 void OnvifInfo__create_ui(OnvifInfo * self){
     self->widget = gtk_scrolled_window_new (NULL, NULL);
@@ -83,10 +88,9 @@ void OnvifInfo__create_ui(OnvifInfo * self){
     gtk_container_add(GTK_CONTAINER(self->widget),grid);
 }
 
-OnvifInfo * OnvifInfo__create(EventQueue * queue){
+OnvifInfo * OnvifInfo__create(OnvifApp * app){
     OnvifInfo *info  =  malloc(sizeof(OnvifInfo));
-    info->queue = queue;
-    info->device = NULL;
+    info->app = app;
     info->done_callback = NULL;
     info->done_user_data = NULL;
     OnvifInfo__create_ui(info);
@@ -102,6 +106,14 @@ void OnvifInfo__destroy(OnvifInfo* self){
 gboolean * onvif_info_gui_update (void * user_data){
     InfoGUIUpdate * update = (InfoGUIUpdate *) user_data;
 
+    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(update->device)){
+        C_TRAIL("onvif_info_gui_update - invalid device.");
+        goto exit;
+    }
+
+    if(!OnvifMgrDeviceRow__is_selected(update->device)){
+        goto exit;
+    }
     if(update->name) gtk_entry_set_text(GTK_ENTRY(update->info->name_lbl),update->name);
     gtk_editable_set_editable  ((GtkEditable*)update->info->name_lbl, FALSE);
 
@@ -157,6 +169,7 @@ gboolean * onvif_info_gui_update (void * user_data){
     if(update->info->done_callback)
         (*(update->info->done_callback))(update->info, update->info->done_user_data);
 
+exit:
     free(update->name);
     free(update->hostname);
     free(update->location);
@@ -172,6 +185,7 @@ gboolean * onvif_info_gui_update (void * user_data){
     free(update->macs);
     free(update->version);
     free(update->uri);
+    g_object_unref(update->device);
     free(update);
     return FALSE;
 }
@@ -182,42 +196,45 @@ void _update_details_page(void * user_data){
     OnvifInterfaces * interfaces = NULL;
     OnvifScopes * scopes = NULL;
 
-    OnvifInfo * self = (OnvifInfo *) user_data;
-    if(!CObject__addref((CObject*)self->device)){
+    InfoDataUpdate * input = (InfoDataUpdate *) user_data;
+
+    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(input->device)){
+        C_TRAIL("_update_details_page - invalid device.");
         return;
     }
 
-    if(!Device__is_selected(self->device)){
+    if(!OnvifMgrDeviceRow__is_selected(input->device)){
         goto exit;
     }
 
     int ginfo_success = 0;
     int gnetwork_success = 0;
     int gscopes_success = 0;
-    OnvifDevice * onvif_device = Device__get_device(self->device);
+    OnvifDevice * onvif_device = OnvifMgrDeviceRow__get_device(input->device);
     OnvifDeviceService * devserv = OnvifDevice__get_device_service(onvif_device);
 
     hostname = OnvifDeviceService__getHostname(devserv);
-    if(!CObject__is_valid((CObject*)self->device) || !Device__is_selected(self->device))
+    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
         goto exit;
 
     dev_info = OnvifDeviceService__getDeviceInformation(devserv);
     if(OnvifDevice__get_last_error(onvif_device) == ONVIF_ERROR_NONE) ginfo_success = 1;
-    if(!CObject__is_valid((CObject*)self->device) || !Device__is_selected(self->device))
+    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
         goto exit;
 
     interfaces = OnvifDeviceService__getNetworkInterfaces(devserv);
     if(OnvifDevice__get_last_error(onvif_device) == ONVIF_ERROR_NONE) gnetwork_success = 1;
-    if(!CObject__is_valid((CObject*)self->device) || !Device__is_selected(self->device))
+    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
         goto exit;
 
     scopes = OnvifDeviceService__getScopes(devserv);
     if(OnvifDevice__get_last_error(onvif_device) == ONVIF_ERROR_NONE) gscopes_success = 1;
-    if(!CObject__is_valid((CObject*)self->device) || !Device__is_selected(self->device))
+    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
         goto exit;
 
     InfoGUIUpdate * gui_update = malloc(sizeof(InfoGUIUpdate));
-    gui_update->info = self;
+    gui_update->info = input->info;
+    gui_update->device = input->device;
     gui_update->mac_count = 0;
     gui_update->macs= malloc(0);
     gui_update->hostname = hostname; //No need to copy since OnvifDevice__device_getHostname returns malloc pointer
@@ -288,18 +305,22 @@ void _update_details_page(void * user_data){
     strcpy(gui_update->version,"SomeName");
 
     gui_update->uri = OnvifDeviceService__get_endpoint(devserv);
-
+    g_object_ref(gui_update->device);
     gdk_threads_add_idle(G_SOURCE_FUNC(onvif_info_gui_update),gui_update);
 exit:
     OnvifDeviceInformation__destroy(dev_info);
     OnvifInterfaces__destroy(interfaces);
     OnvifScopes__destroy(scopes);
-    CObject__unref((CObject*)self->device);
+    g_object_unref(input->device);
+    free(input);
 }
 
-void OnvifInfo_update_details(OnvifInfo * self, Device * device){
-    self->device = device;
-    EventQueue__insert(self->queue,_update_details_page,self);
+void OnvifInfo_update_details(OnvifInfo * self, OnvifMgrDeviceRow * device){
+    InfoDataUpdate * input = malloc(sizeof(InfoDataUpdate));
+    input->device = device;
+    input->info = self;
+    g_object_ref(device);
+    OnvifApp__dispatch(self->app,_update_details_page,input);
 }
 
 void OnvifInfo_clear_details(OnvifInfo * self){

@@ -4,13 +4,12 @@
 #include "clogger.h"
 
 typedef struct _OnvifDetails {
+    OnvifApp * app;
     GtkWidget * details_loading_handle;
     GtkWidget *details_notebook;
     OnvifInfo * info;
     OnvifNetwork * network;
 
-    Device * device;
-    EventQueue * queue;
     int current_page;
 } OnvifDetails;
 
@@ -29,27 +28,27 @@ void info_hide_loading_cb(OnvifInfo * self, void * user_data){
     hide_loading_cb(user_data);
 }
 
-void update_details_priv(OnvifDetails * self){
-    if(!CObject__is_valid((CObject*)self->device)){
+void update_details_priv(OnvifDetails * self, OnvifMgrDeviceRow * device){
+    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(device)){
+        C_TRAIL("update_details_priv - invalid device.");
         return;
     }
 
-    OnvifDevice * odev = Device__get_device(self->device);
+    OnvifDevice * odev = OnvifMgrDeviceRow__get_device(device);
     if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NOT_AUTHORIZED){
         return;
     }
     gtk_spinner_start (GTK_SPINNER (self->details_loading_handle));
 
     if(self->current_page == 0){
-        OnvifInfo_update_details(self->info,self->device);
+        OnvifInfo_update_details(self->info,device);
     } else if(self->current_page == 1){
-        OnvifNetwork_update_details(self->network,self->device);
+        OnvifNetwork_update_details(self->network,device);
     }
 }
 
-void OnvifDetails__update_details(OnvifDetails * self, Device * device){
-    self->device = device;
-    update_details_priv(self);
+void OnvifDetails__update_details(OnvifDetails * self, OnvifMgrDeviceRow * device){
+    update_details_priv(self,device);
 }
 
 
@@ -57,7 +56,7 @@ static void details_switch_page (GtkNotebook* self, GtkWidget* page, guint page_
     OnvifDetails__clear_details(details);
 
     details->current_page = page_num;
-    update_details_priv(details);
+    update_details_priv(details, OnvifApp__get_device(details->app));
 }
 
 void OnvifDetails__create_ui(OnvifDetails *self){
@@ -81,13 +80,12 @@ void OnvifDetails__create_ui(OnvifDetails *self){
     g_signal_connect (G_OBJECT (self->details_notebook), "switch-page", G_CALLBACK (details_switch_page), self);
 }
 
-OnvifDetails * OnvifDetails__create(EventQueue * queue){
+OnvifDetails * OnvifDetails__create(OnvifApp * app){
     OnvifDetails *info  =  malloc(sizeof(OnvifDetails));
-    info->info = OnvifInfo__create(queue);
-    info->network = OnvifNetwork__create(queue);
+    info->info = OnvifInfo__create(app);
+    info->network = OnvifNetwork__create(app);
     info->current_page = 0;
-    info->queue = queue;
-    info->device = NULL;
+    info->app = app;
     OnvifDetails__create_ui(info);
     OnvifInfo__set_done_callback(info->info,info_hide_loading_cb,info);
     OnvifNetwork__set_done_callback(info->network,network_hide_loading_cb,info);
@@ -107,7 +105,7 @@ void OnvifDetails__set_details_loading_handle(OnvifDetails * self, GtkWidget * w
 }
 
 void OnvifDetails__clear_details(OnvifDetails * self){
-    C_DEBUG("clear_details");
+    C_TRACE("clear_details");
     if(self->current_page == 0){
         OnvifInfo_clear_details(self->info);
     } else if(self->current_page == 1){

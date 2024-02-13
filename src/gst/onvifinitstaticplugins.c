@@ -220,12 +220,12 @@ onvif_init_static_plugins (void)
   static gsize initialization_value = 0;
   if (g_once_init_enter (&initialization_value)) {
 
-    C_DEBUG("Initializing Gstreamer plugins...");
+    C_INFO("Initializing Gstreamer plugins...");
     GST_PLUGIN_STATIC_REGISTER(gtknew);
 
 #ifdef STATIC_BUILD
     
-    C_DEBUG("Loading static plugins...");
+    C_INFO("Loading static plugins...");
     GST_PLUGIN_STATIC_REGISTER(coreelements);
     // GST_PLUGIN_STATIC_REGISTER(coretracers);
     // GST_PLUGIN_STATIC_REGISTER(adder); gstadder

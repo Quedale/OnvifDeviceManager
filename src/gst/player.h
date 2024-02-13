@@ -14,7 +14,7 @@ void RtspPlayer__destroy(RtspPlayer* self);  // equivalent to "delete point"
 void RtspPlayer__set_retry_callback(RtspPlayer* self, void (*retry_callback)(RtspPlayer *, void *), void * user_data);
 void RtspPlayer__set_error_callback(RtspPlayer* self, void (*error_callback)(RtspPlayer *, void *), void * user_data);
 void RtspPlayer__set_stopped_callback(RtspPlayer* self, void (*stopped_callback)(RtspPlayer *, void *), void * user_data);
-void RtspPlayer__set_start_callback(RtspPlayer* self, void (*start_callback)(RtspPlayer *, void *), void * user_data);
+void RtspPlayer__set_started_callback(RtspPlayer* self, void (*started_callback)(RtspPlayer *, void *), void * user_data);
 void RtspPlayer__set_port_fallback(RtspPlayer* self, char * port);
 void RtspPlayer__allow_overscale(RtspPlayer * self, int allow_overscale);
 void RtspPlayer__set_playback_url(RtspPlayer* self, char *url);
@@ -28,7 +28,7 @@ Compared to play, retry is design to work after a stream failure.
 Stopping will essentially break the retry method and stop the loop.
 */
 void RtspPlayer__retry(RtspPlayer* self);
-GtkWidget * OnvifDevice__createCanvas(RtspPlayer *self);
+GtkWidget * RtspPlayer__createCanvas(RtspPlayer *self);
 gboolean RtspPlayer__is_mic_mute(RtspPlayer* self);
 void RtspPlayer__mic_mute(RtspPlayer* self, gboolean mute);
 

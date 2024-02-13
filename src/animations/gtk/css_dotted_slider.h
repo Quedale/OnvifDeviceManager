@@ -3,6 +3,6 @@
 
 #include <gtk/gtk.h>
 
-GtkWidget * gtk_dotted_slider_animation_new(int item_count, unsigned int animation_time);
+GtkWidget * css_dotted_slider_animation_new(int item_count, unsigned int animation_time);
 
 #endif

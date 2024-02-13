@@ -1,5 +1,4 @@
 #include "profiles_dialog.h"
-#include "../../queue/event_queue.h"
 #include "clogger.h"
 #include "../gui_utils.h"
 #include "app_dialog.h"
@@ -23,7 +22,7 @@ typedef struct {
 } GUIProfileEvent;
 
 GtkWidget * priv_ProfilesDialog__create_ui(AppDialogEvent * event){
-    C_DEBUG("priv_ProfilesDialog__create_ui");
+    C_TRACE("priv_ProfilesDialog__create_ui");
     ProfilesDialog * dialog = (ProfilesDialog *) event->dialog; 
     DialogElements * elements = (DialogElements *) dialog->elements;
 
@@ -65,7 +64,7 @@ gboolean gui_ProfilesDialog__show_profiles(void * user_data){
 
 void _priv_ProfilesDialog__load_profiles(void * user_data){
     ProfilesDialog* cdialog = (ProfilesDialog*)user_data;
-    OnvifMediaService * mserv = OnvifDevice__get_media_service(Device__get_device(cdialog->device));
+    OnvifMediaService * mserv = OnvifDevice__get_media_service(OnvifMgrDeviceRow__get_device(cdialog->device));
     OnvifProfiles * profiles = OnvifMediaService__get_profiles(mserv);
 
     GUIProfilesEvent * evt = malloc(sizeof(GUIProfilesEvent));
@@ -100,8 +99,12 @@ void priv_ProfilesDialog__show_cb(AppDialogEvent * event){
     EventQueue__insert(dialog->queue,_priv_ProfilesDialog__load_profiles,dialog);
 }
 
-void ProfilesDialog__set_device(ProfilesDialog * self, Device * device){
+void ProfilesDialog__set_device(ProfilesDialog * self, OnvifMgrDeviceRow * device){
     self->device = device;
+}
+
+OnvifMgrDeviceRow * ProfilesDialog__get_device(ProfilesDialog * self){
+    return self->device;
 }
 
 ProfilesDialog * ProfilesDialog__create(EventQueue * queue, void (* clicked)  (ProfilesDialog * dialog, OnvifProfile * profile)){
@@ -113,7 +116,7 @@ ProfilesDialog * ProfilesDialog__create(EventQueue * queue, void (* clicked)  (P
     dialog->queue = queue;
     dialog->device = NULL;
     dialog->profile_selected = clicked;
-    C_DEBUG("create");
+    C_TRACE("create");
     AppDialog__init((AppDialog *)dialog, priv_ProfilesDialog__create_ui);
     CObject__set_allocated((CObject *) dialog);
     AppDialog__set_destroy_callback((AppDialog*)dialog,priv_ProfilesDialog__destroy);

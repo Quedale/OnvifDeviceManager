@@ -46,7 +46,7 @@ void print_elements_by_type(char * type){
   GList * factories;
   GList *tmp;
 
-  C_DEBUG("*** %s decoders ***",type);
+  C_INFO("*** %s decoders ***",type);
   GstCaps * caps = gst_caps_new_empty_simple(type);
   factories = gst_element_factory_list_get_elements (GST_ELEMENT_FACTORY_TYPE_DECODER || GST_ELEMENT_FACTORY_TYPE_MEDIA_VIDEO, GST_RANK_MARGINAL);
   factories = gst_element_factory_list_filter (factories, caps, GST_PAD_SINK, FALSE);
@@ -54,10 +54,10 @@ void print_elements_by_type(char * type){
       GstElementFactory *fact = (GstElementFactory *) tmp->data;
       int rank = gst_plugin_feature_get_rank(GST_PLUGIN_FEATURE_CAST(fact));
       char * name = gst_plugin_feature_get_name(GST_PLUGIN_FEATURE_CAST(fact));
-      C_DEBUG("*    %s[%d]",name,rank);
+      C_INFO("*    %s[%d]",name,rank);
   }
   g_list_free (factories);
-  C_DEBUG("****************************");
+  C_INFO("****************************");
 }
 
 /*
@@ -85,7 +85,7 @@ void set_element_priority(char * element_name, int priority){
 }
 
 int main(int argc, char *argv[]) {
-  // signal(SIGSEGV, handler);   // install our handler
+  signal(SIGSEGV, handler);   // install our handler
 
   // make OpenSSL MT-safe with mutex
   // CRYPTO_thread_setup();
@@ -98,6 +98,9 @@ int main(int argc, char *argv[]) {
 
   /* Initialize GStreamer */
   gst_init (&argc, &argv);
+  
+  C_INFO("Using Gstreamer Version : %i.%i.%i.%i",GST_PLUGINS_BASE_VERSION_MAJOR,GST_PLUGINS_BASE_VERSION_MINOR,GST_PLUGINS_BASE_VERSION_MICRO,GST_PLUGINS_BASE_VERSION_NANO);
+
   onvif_init_static_plugins();
 
   //TODO Support setting priority from settings
@@ -109,8 +112,6 @@ int main(int argc, char *argv[]) {
   print_elements_by_type("video/x-h265");
   print_elements_by_type("image/jpeg");
   print_elements_by_type("video/x-av1");
-  
-  C_INFO("Using Gstreamer Version : %i.%i.%i.%i",GST_PLUGINS_BASE_VERSION_MAJOR,GST_PLUGINS_BASE_VERSION_MINOR,GST_PLUGINS_BASE_VERSION_MICRO,GST_PLUGINS_BASE_VERSION_NANO);
   
   /* Initialize Application */
   OnvifApp__create();

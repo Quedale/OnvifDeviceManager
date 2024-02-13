@@ -183,13 +183,16 @@ int priv_AppDialog__has_focus(GtkWidget * widget){
     }
 
     GList * children = gtk_container_get_children(GTK_CONTAINER(widget));
-    while (children != NULL){
-        GtkWidget * child = children->data;
+    GList * tmp = children;
+    while (tmp != NULL){
+        GtkWidget * child = tmp->data;
         if(priv_AppDialog__has_focus(child)){
+            g_list_free (children);
             return 1;
         }
-        children = children->next;
+        tmp = tmp->next;
     }
+    g_list_free (children);
     return 0;
 }
 

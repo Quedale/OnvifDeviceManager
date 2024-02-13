@@ -1,7 +1,9 @@
 #include "onvif_network.h"
 #include "gui_utils.h"
+#include "clogger.h"
 
 typedef struct _OnvifNetwork {
+    OnvifApp * app;
     GtkWidget * dhcp_dd;
     GtkWidget * ip_lbl;
     GtkWidget * mask_lbl;
@@ -10,14 +12,19 @@ typedef struct _OnvifNetwork {
     void (*done_callback)(OnvifNetwork *, void * user_data);
     void * done_user_data;
 
-    Device * device;
-    EventQueue * queue;
     GtkWidget * widget;
 } OnvifNetwork;
 
 typedef struct {
     OnvifNetwork * network;
+    OnvifMgrDeviceRow * device;
+    //Retrieved data field will be here
 } NetworkGUIUpdate;
+
+typedef struct {
+    OnvifNetwork * network;
+    OnvifMgrDeviceRow * device;
+} NetworkDataUpdate;
 
 gboolean * onvif_network_gui_update (void * user_data){
     NetworkGUIUpdate * update = (NetworkGUIUpdate *) user_data;
@@ -37,34 +44,43 @@ gboolean * onvif_network_gui_update (void * user_data){
     if(update->network->done_callback)
         (*(update->network->done_callback))(update->network, update->network->done_user_data);
 
+    g_object_unref(update->device);
     free(update);
 
     return FALSE;
 }
 
 void _update_network_page(void * user_data){
-    OnvifNetwork * self = (OnvifNetwork *) user_data;
-    if(!CObject__addref((CObject*)self->device)){
+    NetworkDataUpdate * input = (NetworkDataUpdate *) user_data;
+
+    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(input->device)){
+        C_TRAIL("_update_network_page - invalid device.");
         return;
     }
 
-    if(!Device__is_selected(self->device)){
+    if(!OnvifMgrDeviceRow__is_selected(input->device)){
         goto exit;
     }
 
     NetworkGUIUpdate * gui_update = malloc(sizeof(NetworkGUIUpdate));
-    gui_update->network = self;
+    gui_update->network = input->network;
+    gui_update->device = input->device;
     //TODO Fetch networking details
 
+    g_object_ref(input->device);
     gdk_threads_add_idle(G_SOURCE_FUNC(onvif_network_gui_update),gui_update);
 
 exit:
-    CObject__unref((CObject*)self->device);
+    g_object_unref(input->device);
+    free(input);
 }
 
-void OnvifNetwork_update_details(OnvifNetwork * self, Device * device){
-    self->device = device;
-    EventQueue__insert(self->queue,_update_network_page,self);
+void OnvifNetwork_update_details(OnvifNetwork * self, OnvifMgrDeviceRow * device){
+    NetworkDataUpdate * input = malloc(sizeof(NetworkDataUpdate));
+    input->device = device;
+    input->network = self;
+    g_object_ref(device);
+    OnvifApp__dispatch(self->app,_update_network_page,input);
 }
 
 void OnvifNetwork_clear_details(OnvifNetwork * self){
@@ -109,10 +125,9 @@ void OnvifNetwork__create_ui (OnvifNetwork * self){
     gtk_container_add(GTK_CONTAINER(self->widget),grid);
 }
 
-OnvifNetwork * OnvifNetwork__create(EventQueue * queue){
+OnvifNetwork * OnvifNetwork__create(OnvifApp * app){
     OnvifNetwork * ret = malloc(sizeof(OnvifNetwork));
-    ret->queue = queue;
-    ret->device = NULL;
+    ret->app = app;
     ret->done_callback = NULL;
     ret->done_user_data = NULL;
     OnvifNetwork__create_ui(ret);

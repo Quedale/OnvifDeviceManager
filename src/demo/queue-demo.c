@@ -1,6 +1,7 @@
 #include "../queue/event_queue.h"
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
 
 void evt_callback(void * user_data){
     printf("evt_callback\n");
@@ -10,9 +11,20 @@ void evt_callback(void * user_data){
 
 }
 
+void eventqueue_dispatch_cb(QueueThread * thread, EventQueueType type, void * user_data){
+    EventQueue * queue = QueueThread__get_queue(thread);
+    int running = EventQueue__get_running_event_count(queue);
+    int pending = EventQueue__get_pending_event_count(queue);
+    int total = EventQueue__get_thread_count(queue);
+
+    char str[10];
+    memset(&str,'\0',sizeof(str));
+    sprintf(str, "[%d/%d]", running + pending,total);
+}
+
 int main()
 {
-    EventQueue * queue = EventQueue__create();
+    EventQueue * queue = EventQueue__create(eventqueue_dispatch_cb,NULL);
 
     EventQueue__insert(queue,evt_callback,"Data 1");
     EventQueue__insert(queue,evt_callback,"Data 2");
@@ -33,4 +45,4 @@ int main()
         // printf("buff %s\n",numstr);
         EventQueue__insert(queue,evt_callback,"Data 6");
     }
-};
+}
