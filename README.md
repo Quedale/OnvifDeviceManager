@@ -23,11 +23,13 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Edit Onvif device identification
 - Display Onvif network information
 - Display Media information
+- Add PTZ controls
 - Better Look&Feel
 - Testing with a variety of camera
 - Record video
 - JPEG Snapshot
 - Check for better backchannel audio support. (PCMU@8000 might be Onvif's spec limit)
+- Support casting (Chromecast, Onvif NVD, Mircast, etc..)
 - And a lot more...
 
 # Use-case

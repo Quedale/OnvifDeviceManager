@@ -262,7 +262,16 @@ void priv_AppDialog__create_ui(AppDialog * self){
     context = gtk_widget_get_style_context(empty);
     gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
     
-    gtk_grid_attach (GTK_GRID (self->root), priv_AppDialog__create_panel(self), 1, 1, 1, 1);
+    empty = priv_AppDialog__create_panel(self);
+    gtk_grid_attach (GTK_GRID (self->root), empty, 1, 1, 1, 1);
+
+    //Creating empty panel, to create opacity background behind corners
+    cssProvider = gtk_css_provider_new();
+    gtk_css_provider_load_from_data(cssProvider, "* { background-image:none; background-color:black; opacity:0.3;}",-1,NULL); 
+    empty = gtk_label_new("");
+    context = gtk_widget_get_style_context(empty);
+    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
+    gtk_grid_attach (GTK_GRID (self->root), empty, 1, 1, 1, 1);
 
     g_object_unref (cssProvider);  
     
