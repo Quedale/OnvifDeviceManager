@@ -383,7 +383,7 @@ void OnvifMgrDeviceRow__set_location(OnvifMgrDeviceRow * self, char * location){
     g_return_if_fail (self != NULL);
     g_return_if_fail (ONVIFMGR_IS_DEVICEROW (self));
     OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
-    gtk_label_set_text(GTK_LABEL(priv->lbl_location),"test");
+    gtk_label_set_text(GTK_LABEL(priv->lbl_location),location);
 }
 
 gboolean * OnvifMgrDeviceRow__update_profile_btn(void * user_data){
