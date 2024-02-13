@@ -106,7 +106,7 @@ void OnvifInfo__destroy(OnvifInfo* self){
 gboolean * onvif_info_gui_update (void * user_data){
     InfoGUIUpdate * update = (InfoGUIUpdate *) user_data;
 
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(update->device)){
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(update->device)){
         C_TRAIL("onvif_info_gui_update - invalid device.");
         goto exit;
     }
@@ -198,7 +198,7 @@ void _update_details_page(void * user_data){
 
     InfoDataUpdate * input = (InfoDataUpdate *) user_data;
 
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(input->device)){
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device)){
         C_TRAIL("_update_details_page - invalid device.");
         return;
     }
@@ -214,22 +214,22 @@ void _update_details_page(void * user_data){
     OnvifDeviceService * devserv = OnvifDevice__get_device_service(onvif_device);
 
     hostname = OnvifDeviceService__getHostname(devserv);
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
         goto exit;
 
     dev_info = OnvifDeviceService__getDeviceInformation(devserv);
     if(OnvifDevice__get_last_error(onvif_device) == ONVIF_ERROR_NONE) ginfo_success = 1;
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
         goto exit;
 
     interfaces = OnvifDeviceService__getNetworkInterfaces(devserv);
     if(OnvifDevice__get_last_error(onvif_device) == ONVIF_ERROR_NONE) gnetwork_success = 1;
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
         goto exit;
 
     scopes = OnvifDeviceService__getScopes(devserv);
     if(OnvifDevice__get_last_error(onvif_device) == ONVIF_ERROR_NONE) gscopes_success = 1;
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
         goto exit;
 
     InfoGUIUpdate * gui_update = malloc(sizeof(InfoGUIUpdate));

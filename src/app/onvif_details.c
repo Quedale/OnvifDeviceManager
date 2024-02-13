@@ -29,7 +29,7 @@ void info_hide_loading_cb(OnvifInfo * self, void * user_data){
 }
 
 void update_details_priv(OnvifDetails * self, OnvifMgrDeviceRow * device){
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(device)){
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device)){
         C_TRAIL("update_details_priv - invalid device.");
         return;
     }

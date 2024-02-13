@@ -202,7 +202,7 @@ void _display_onvif_device(void * user_data){
     C_TRACE("_display_onvif_device");
     OnvifMgrDeviceRow * omgr_device = (OnvifMgrDeviceRow *) user_data;
     COwnableObject__has_owner(COWNABLE_OBJECT(omgr_device));
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(omgr_device)){
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(omgr_device)){
         C_TRAIL("_display_onvif_device - invalid device.");
         goto exit;
     }
@@ -213,7 +213,7 @@ void _display_onvif_device(void * user_data){
     OnvifDevice__authenticate(odev);
         
 
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(omgr_device)){
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(omgr_device)){
         C_TRAIL("_display_onvif_device - invalid device.");
         goto exit;
     } else if (OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NOT_AUTHORIZED){
@@ -248,7 +248,7 @@ void _play_onvif_stream(void * user_data){
     OnvifMgrDeviceRow * device = ONVIFMGR_DEVICEROW(user_data);
 
     //Check if device is still valid. (User performed scan before thread started)
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(device) || !OnvifMgrDeviceRow__is_selected(device)){
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) || !OnvifMgrDeviceRow__is_selected(device)){
         C_TRAIL("_play_onvif_stream - invalid device.");
         goto exit;
     }
@@ -259,7 +259,7 @@ void _play_onvif_stream(void * user_data){
     /* Authentication check */
     OnvifDevice__authenticate(odev);
 
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(device)) {
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device)) {
         C_TRAIL("_play_onvif_stream - invalid device.");
         goto exit;
     }
@@ -271,7 +271,7 @@ void _play_onvif_stream(void * user_data){
     /* Set the URI to play */
     char * uri = OnvifMediaService__getStreamUri(OnvifDevice__get_media_service(odev),OnvifProfile__get_index(OnvifMgrDeviceRow__get_profile(device)));
     
-    if(ONVIFMGR_IS_DEVICEROWROW_VALID(device) && OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NONE){
+    if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) && OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NONE){
         RtspPlayer__set_playback_url(app->player,uri);
         char * port = OnvifDevice__get_port(OnvifMgrDeviceRow__get_device(device));
         RtspPlayer__set_port_fallback(app->player,port);
@@ -280,7 +280,7 @@ void _play_onvif_stream(void * user_data){
         RtspPlayer__set_credentials(app->player, OnvifCredentials__get_username(ocreds), OnvifCredentials__get_password(ocreds));
 
         RtspPlayer__play(app->player);
-    } else if(!ONVIFMGR_IS_DEVICEROWROW_VALID(device)) {
+    } else if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device)) {
         C_TRAIL("_play_onvif_stream - invalid device.");
     }
     free(uri);
@@ -290,21 +290,22 @@ exit:
     g_object_unref(device);
 }
 
-
-void update_pages(OnvifApp * self){
+//On the odd chance the by the time update_pages is invoked, the selection changed
+//We use device as input parameters carried through the idle dispatch. Not from the app pointer
+void update_pages(OnvifApp * self, OnvifMgrDeviceRow * device){
     //#0 NVT page already loaded
     //#2 Settings page already loaded
     //Details page is dynamically loaded
     if(self->current_page == 1){
         OnvifDetails__clear_details(self->details);
-        OnvifDetails__update_details(self->details,self->device);
+        OnvifDetails__update_details(self->details,device);
     }
 }
 
 gboolean * idle_update_pages(void * user_data){
     OnvifMgrDeviceRow * device = ONVIFMGR_DEVICEROW(user_data);
     OnvifApp * app = OnvifMgrDeviceRow__get_app(device);
-    update_pages(app);
+    update_pages(app,device);
     g_object_unref(device);
     return FALSE;
 }
@@ -316,7 +317,7 @@ int onvif_reload_device(OnvifMgrDeviceRow * device){
     OnvifDevice__authenticate(odev);
     
     //Check if device is valid and authorized (User performed scan before auth finished)
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(device)) {
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device)) {
         C_TRAIL("onvif_reload_device - invalid device.");
         return 0;
     }
@@ -349,7 +350,7 @@ void _onvif_authentication_reload(void * user_data){
 
     C_DEBUG("_onvif_authentication_reload\n");
     //Check device is still valid before adding ref (User performed scan before thread started)
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(device)){
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device)){
         C_TRAIL("_onvif_authentication_reload - invalid device\n");
         free(event);
         return;
@@ -406,7 +407,7 @@ void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
     EventQueue__insert(app->queue,_play_onvif_stream,app->device);
 
 exit:
-    update_pages(app);
+    update_pages(app, app->device);
 }
 
 void row_selected_cb (GtkWidget *widget,   GtkListBoxRow* row, OnvifApp* app){
@@ -416,7 +417,7 @@ void row_selected_cb (GtkWidget *widget,   GtkListBoxRow* row, OnvifApp* app){
 static void switch_page (GtkNotebook* self, GtkWidget* page, guint page_num, OnvifApp * app) {
     C_DEBUG("switch_page");
     app->current_page = page_num;
-    update_pages(app);
+    update_pages(app, app->device);
 }
 
 gboolean idle_add_device(void * user_data){
@@ -826,7 +827,7 @@ void OnvifApp__destroy(OnvifApp* self){
 void _profile_callback (void * user_data){
     C_TRACE("_profile_callback");
     OnvifMgrDeviceRow * device = ONVIFMGR_DEVICEROW(user_data);
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(device)){
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device)){
         C_TRAIL("_profile_callback - invalid device.");
         return;
     }

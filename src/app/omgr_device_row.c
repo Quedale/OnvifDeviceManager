@@ -445,7 +445,7 @@ void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
     OnvifSnapshot * snapshot = NULL;
     GdkPixbufLoader *loader = gdk_pixbuf_loader_new ();
 
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(self)){
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
         C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
         return;
     }
@@ -470,7 +470,7 @@ void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
     }
 
     //Check is device is still valid. (User performed scan before snapshot finished)
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(self)){
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
         C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
         goto exit;
     }
@@ -488,7 +488,7 @@ void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
 
 warning:
     //Check is device is still valid. (User performed scan before snapshot finished)
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(self)){
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
         C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
         goto exit;
     }
@@ -507,7 +507,7 @@ warning:
     }
 
     //Check is device is still valid. (User performed scan before spinner showed)
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(self)){
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
         C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
         goto exit;
     }
@@ -520,12 +520,12 @@ warning:
         scaled_pixbuf = gdk_pixbuf_scale_simple (pixbuf,newpw,40,GDK_INTERP_NEAREST);
         image = gtk_image_new_from_pixbuf (scaled_pixbuf);
         //Check is device is still valid. (User performed scan before scale finished)
-        if(!ONVIFMGR_IS_DEVICEROWROW_VALID(self)){
+        if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
             C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
             goto exit;
         }
 
-        if(ONVIFMGR_IS_DEVICEROWROW_VALID(self)) gui_update_widget_image(image,priv->image_handle);
+        if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)) gui_update_widget_image(image,priv->image_handle);
     } else {
         C_ERROR("Failed all thumbnail creation.");
     }
@@ -545,7 +545,7 @@ exit:
 
 void OnvifMgrDeviceRow__set_thumbnail(OnvifMgrDeviceRow * self, GtkWidget * image){
     g_return_if_fail (self != NULL);
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID (self)) C_TRAIL("OnvifMgrDeviceRow__set_thumbnail - invalid device.");
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER (self)) C_TRAIL("OnvifMgrDeviceRow__set_thumbnail - invalid device.");
     OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
     gui_update_widget_image(image,priv->image_handle);
 }

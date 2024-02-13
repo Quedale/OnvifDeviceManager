@@ -53,7 +53,7 @@ gboolean * onvif_network_gui_update (void * user_data){
 void _update_network_page(void * user_data){
     NetworkDataUpdate * input = (NetworkDataUpdate *) user_data;
 
-    if(!ONVIFMGR_IS_DEVICEROWROW_VALID(input->device)){
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device)){
         C_TRAIL("_update_network_page - invalid device.");
         return;
     }
