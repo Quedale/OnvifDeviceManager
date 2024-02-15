@@ -2,6 +2,7 @@
 #include "onvif_device.h"
 #include "clogger.h"
 #include "gui_utils.h"
+#include "gtkstyledimage.h"
 
 #define OMGR_DEVICE_PARAM_READWRITE G_PARAM_READWRITE|G_PARAM_STATIC_NAME|G_PARAM_STATIC_NICK|G_PARAM_STATIC_BLURB
 
@@ -81,41 +82,20 @@ OnvifMgrDeviceRow__ownable_interface_init (COwnableObjectInterface *iface)
 static GtkWidget * 
 OnvifMgrDeviceRow__create_save_btn(OnvifMgrDeviceRow * self){
     GError *error = NULL;
-    GtkWidget *image = NULL;
-    GdkPixbuf *pixbuf = NULL;
-    GdkPixbuf *scaled_pixbuf = NULL;
     GtkWidget *button = gtk_button_new();
+    GtkWidget * image = GtkStyledImage__new((unsigned char *)_binary_save_png_start, _binary_save_png_end - _binary_save_png_start, 20, 20, error);
 
     gtk_widget_set_sensitive(button,FALSE);
     gtk_button_set_always_show_image(GTK_BUTTON(button),TRUE);
 
-    GdkPixbufLoader *loader = gdk_pixbuf_loader_new ();
-    if(gdk_pixbuf_loader_write (loader, (unsigned char *)_binary_save_png_start, _binary_save_png_end - _binary_save_png_start,&error)){
-        pixbuf = gdk_pixbuf_loader_get_pixbuf (loader);
+    if(image){
+        gtk_button_set_image(GTK_BUTTON(button), image);
     } else {
         if(error->message){
             C_ERROR("Error writing warning png to GtkPixbufLoader : %s",error->message);
         } else {
             C_ERROR("Error writing warning png to GtkPixbufLoader : [null]");
         }
-    }
-
-    if(pixbuf){
-        int scale = 1;
-        scaled_pixbuf = gdk_pixbuf_scale_simple (pixbuf,15*scale,15*scale,GDK_INTERP_NEAREST);
-        image = gtk_image_new_from_pixbuf (scaled_pixbuf);
-    }
-
-    if(image){
-        gtk_button_set_image(GTK_BUTTON(button), image);
-    } else {
-        C_ERROR("Save icon not created.");
-    }
-
-    gdk_pixbuf_loader_close(loader,NULL);
-    g_object_unref(loader);
-    if(scaled_pixbuf){
-        g_object_unref(scaled_pixbuf);
     }
 
     gtk_widget_set_halign(button, GTK_ALIGN_CENTER);
@@ -436,14 +416,9 @@ void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
     g_return_if_fail (self != NULL);
     g_return_if_fail (ONVIFMGR_IS_DEVICEROW (self));
     C_TRACE("OnvifMgrDeviceRow__load_thumbnail");
-    GtkWidget *image;
-    GError *error = NULL;
-    GdkPixbuf *pixbuf = NULL;
-    GdkPixbuf *scaled_pixbuf = NULL;
-    double size = -1;
-    char * imgdata = NULL;
+    GtkWidget *image = NULL;
+    GError * error = NULL;
     OnvifSnapshot * snapshot = NULL;
-    GdkPixbufLoader *loader = gdk_pixbuf_loader_new ();
 
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
         C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
@@ -460,11 +435,9 @@ void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
             C_ERROR("_priv_Device__load_thumbnail- Error retrieve snapshot.");
             goto warning;
         }
-        imgdata = OnvifSnapshot__get_buffer(snapshot);
-        size = OnvifSnapshot__get_size(snapshot);
+        image = GtkBinaryImage__new((unsigned char *)OnvifSnapshot__get_buffer(snapshot),OnvifSnapshot__get_size(snapshot), -1, 40, error);
     } else if(oerror == ONVIF_ERROR_NOT_AUTHORIZED){
-        imgdata = _binary_locked_icon_png_start;
-        size = _binary_locked_icon_png_end - _binary_locked_icon_png_start;
+        image = GtkStyledImage__new((unsigned char *)_binary_locked_icon_png_start,_binary_locked_icon_png_end - _binary_locked_icon_png_start, 40, 40, error);
     } else {
         goto warning;
     }
@@ -476,9 +449,7 @@ void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
     }
 
     //Attempt to get downloaded pixbuf or locked icon
-    if(gdk_pixbuf_loader_write (loader, (unsigned char *)imgdata, size,&error)){
-        pixbuf = gdk_pixbuf_loader_get_pixbuf (loader);
-    } else {
+    if(!image){
         if(error->message){
             C_ERROR("Error writing png to GtkPixbufLoader : %s",error->message);
         } else {
@@ -494,50 +465,26 @@ warning:
     }
 
     //Show warning icon in case of failure
-    if(!pixbuf){
-        if(gdk_pixbuf_loader_write (loader, (unsigned char *)_binary_warning_png_start, _binary_warning_png_end - _binary_warning_png_start,&error)){
-            pixbuf = gdk_pixbuf_loader_get_pixbuf (loader);
-        } else {
+    if(!image){
+        image = GtkStyledImage__new((unsigned char *)_binary_warning_png_start, _binary_warning_png_end - _binary_warning_png_start, 40, 40, error);
+        if(!image){
             if(error->message){
                 C_ERROR("Error writing warning png to GtkPixbufLoader : %s",error->message);
             } else {
                 C_ERROR("Error writing warning png to GtkPixbufLoader : [null]");
             }
-        }
-    }
-
-    //Check is device is still valid. (User performed scan before spinner showed)
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
-        C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
-        goto exit;
-    }
-
-    //Display pixbuf
-    if(pixbuf){
-        double ph = gdk_pixbuf_get_height (pixbuf);
-        double pw = gdk_pixbuf_get_width (pixbuf);
-        double newpw = 40 / ph * pw;
-        scaled_pixbuf = gdk_pixbuf_scale_simple (pixbuf,newpw,40,GDK_INTERP_NEAREST);
-        image = gtk_image_new_from_pixbuf (scaled_pixbuf);
-        //Check is device is still valid. (User performed scan before scale finished)
-        if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
-            C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
             goto exit;
         }
+    }
+    
 
-        if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)) gui_update_widget_image(image,priv->image_handle);
+    if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
+        gui_update_widget_image(image,priv->image_handle);
     } else {
-        C_ERROR("Failed all thumbnail creation.");
+        C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
     }
 
 exit:
-    if(loader){
-        gdk_pixbuf_loader_close(loader,NULL);
-        g_object_unref(loader);
-    }
-    if(scaled_pixbuf){
-        g_object_unref(scaled_pixbuf);
-    }
     OnvifSnapshot__destroy(snapshot);
 
     C_TRACE("OnvifMgrDeviceRow__load_thumbnail done.");

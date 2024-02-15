@@ -11,7 +11,7 @@ TAB  := $(NULL)<tab>$(NULL)
 AUTOMAKE_OPTIONS = foreign subdir-objects
 
 bin_PROGRAMS = onvifmgr 
-EXTRA_PROGRAMS = gifdemo overlaytest queuedemo csssliderdemo playerdemo cssfilesliderdemo gtksliderdemo omgrdevicedemo
+EXTRA_PROGRAMS = gifdemo overlaytest queuedemo csssliderdemo playerdemo cssfilesliderdemo gtksliderdemo omgrdevicedemo gtkstyledimagedemo
 
 playerdemo_SOURCES = $(top_srcdir)/src/demo/player-demo.c \
 					$(top_srcdir)/src/alsa/alsa_devices.c \
@@ -56,6 +56,8 @@ onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c \
 					$(top_srcdir)/src/app/settings/app_settings_stream.c \
 					$(top_srcdir)/src/app/settings/app_settings.c \
 					$(top_srcdir)/src/app/c_ownable_interface.c \
+					$(top_srcdir)/src/app/gtkbinaryimage.c \
+					$(top_srcdir)/src/app/gtkstyledimage.c \
 					$(top_srcdir)/src/gst/onvifinitstaticplugins.c \
 					$(top_srcdir)/src/gst/overlay.c \
 					$(top_srcdir)/src/gst/player.c \
@@ -82,6 +84,14 @@ gifdemo_SOURCES = $(top_srcdir)/src/demo/gtk-gif.c
 gifdemo_CFLAGS = -Wall -Wextra -Wpedantic -Wno-unused-parameter `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags gtk+-3.0`
 gifdemo_LDFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs gtk+-3.0`
 gifdemo_LDADD = loading.o
+
+gtkstyledimagedemo_SOURCES = $(top_srcdir)/src/demo/gtkstyledimagedemo.c \
+							$(top_srcdir)/src/app/gtkstyledimage.c \
+							$(top_srcdir)/src/app/gtkbinaryimage.c \
+							$(top_srcdir)/src/app/gui_utils.c
+gtkstyledimagedemo_CFLAGS = -Wall -Wextra -Wpedantic -Wno-unused-parameter `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags gtk+-3.0 cutils`
+gtkstyledimagedemo_LDFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs gtk+-3.0 cutils`
+gtkstyledimagedemo_LDADD = microphone.o
 
 overlaytest_SOURCES = $(top_srcdir)/src/demo/overlay-demo.c
 overlaytest_CFLAGS = -Wall -Wextra -Wpedantic -Wno-unused-parameter `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS)`

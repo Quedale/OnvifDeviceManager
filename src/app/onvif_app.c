@@ -563,8 +563,8 @@ void create_ui (OnvifApp * app) {
     hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0);
     gtk_grid_attach (GTK_GRID (left_grid), hbox, 0, 0, 1, 1);
 
-    GtkCssProvider * cssProvider = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(cssProvider, "* { padding: 0px; font-size: 1.5em; }",-1,NULL);  //font-size: 25px; 
+    char * btn_css = "* { padding: 0px; font-size: 1.5em; }";
+    GtkCssProvider * btn_css_provider = NULL;
 
     app->btn_scan = gtk_button_new ();
     label = gtk_label_new("");
@@ -577,18 +577,16 @@ void create_ui (OnvifApp * app) {
     gtk_container_add (GTK_CONTAINER (app->btn_scan), label);
     gtk_box_pack_start (GTK_BOX(hbox),app->btn_scan,TRUE,TRUE,0);
     g_signal_connect (app->btn_scan, "clicked", G_CALLBACK (onvif_scan), app);
-    GtkStyleContext * context = gtk_widget_get_style_context(app->btn_scan);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    btn_css_provider = gui_widget_set_css(app->btn_scan, btn_css, btn_css_provider);
 
 
     GtkWidget * add_btn = gtk_button_new ();
+    gui_widget_make_square(add_btn);
     label = gtk_label_new("");
     // gtk_label_set_markup (GTK_LABEL (label), "&#x2795;"); //Heavy
     gtk_label_set_markup (GTK_LABEL (label), "&#xFF0B;"); //Full width
     gtk_container_add (GTK_CONTAINER (add_btn), label);
-
-    context = gtk_widget_get_style_context(add_btn);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    btn_css_provider = gui_widget_set_css(add_btn, btn_css, btn_css_provider);
 
     gtk_box_pack_start (GTK_BOX(hbox),add_btn,FALSE,TRUE,0);
 
@@ -599,18 +597,13 @@ void create_ui (OnvifApp * app) {
     gtk_widget_set_hexpand (widget, TRUE);
     app->listbox = gtk_list_box_new ();
     //TODO Calculate preferred width to display IP without scrollbar
-    gtk_widget_set_size_request(widget,100,-1);
+    gtk_widget_set_size_request(widget,135,-1);
     gtk_widget_set_vexpand (app->listbox, TRUE);
     gtk_list_box_set_selection_mode (GTK_LIST_BOX (app->listbox), GTK_SELECTION_SINGLE);
     gtk_container_add(GTK_CONTAINER(widget),app->listbox);
     gtk_grid_attach (GTK_GRID (left_grid), widget, 0, 2, 1, 1);
     g_signal_connect (app->listbox, "row-selected", G_CALLBACK (row_selected_cb), app);
-
-    GtkCssProvider * cssProvider2 = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(cssProvider2, "* { padding-bottom: 3px; padding-top: 3px; padding-right: 3px; }",-1,NULL); 
-    GtkStyleContext * context2 = gtk_widget_get_style_context(widget);
-    gtk_style_context_add_provider(context2, GTK_STYLE_PROVIDER(cssProvider2),GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-    g_object_unref (cssProvider2);  
+    g_object_unref(gui_widget_set_css(widget, "* { padding-bottom: 3px; padding-top: 3px; padding-right: 3px; }", NULL)); 
 
     widget = gtk_button_new ();
     label = gtk_label_new("");
@@ -620,26 +613,12 @@ void create_ui (OnvifApp * app) {
     gtk_widget_set_hexpand (widget, FALSE);
     g_signal_connect (G_OBJECT(widget), "clicked", G_CALLBACK (quit_cb), app);
     gtk_grid_attach (GTK_GRID (left_grid), widget, 0, 3, 1, 1);
-    context = gtk_widget_get_style_context(widget);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-    g_object_unref (cssProvider);  
+    g_object_unref(gui_widget_set_css(widget, btn_css, btn_css_provider)); 
     
     GtkWidget *hpaned = gtk_paned_new (GTK_ORIENTATION_HORIZONTAL);
     gtk_widget_set_vexpand (hpaned, TRUE);
     gtk_widget_set_hexpand (hpaned, TRUE);
-
-    cssProvider = gtk_css_provider_new();
-    context = gtk_widget_get_style_context (hpaned);
-    gtk_css_provider_load_from_data (cssProvider,
-                                    "paned separator{"
-                                    //    "background-size:4px;"
-                                    "min-width: 10px;"
-                                    "}",
-                                    -1,NULL);
-
-    gtk_style_context_add_provider (context, GTK_STYLE_PROVIDER(cssProvider), 
-                        GTK_STYLE_PROVIDER_PRIORITY_USER);
-
+    g_object_unref(gui_widget_set_css(hpaned, "paned separator{min-width: 10px;}", NULL));
     gtk_paned_pack1 (GTK_PANED (hpaned), left_grid, FALSE, FALSE);
 
     /* Create a new notebook, place the position of the tabs */
@@ -739,15 +718,6 @@ void create_ui (OnvifApp * app) {
 
     app->window = main_window;
     gtk_widget_show_all (main_window);
-
-    //Set add button square
-    GtkRequisition max_size;
-    gtk_widget_get_preferred_size(add_btn,&max_size,NULL);
-    if(max_size.height > max_size.width){
-        gtk_widget_set_size_request(add_btn,max_size.height,max_size.height);
-    } else if(max_size.height < max_size.width){
-        gtk_widget_set_size_request(add_btn,max_size.width,max_size.width);
-    }
 
     g_signal_connect (G_OBJECT (app->main_notebook), "switch-page", G_CALLBACK (switch_page), app);
 
@@ -921,8 +891,9 @@ gboolean OnvifApp__set_device(OnvifApp * app, GtkListBoxRow * row){
     app->device = ONVIFMGR_DEVICEROW(row);
 
     //If changing device, trade reference
-    if(ONVIFMGR_DEVICEROW(row) != app->device) {
-        g_object_unref(old);
+    if(ONVIFMGR_DEVICEROW(old) != app->device) {
+        if(G_IS_OBJECT(old))
+            g_object_unref(old);
         g_object_ref(app->device);
     }
 

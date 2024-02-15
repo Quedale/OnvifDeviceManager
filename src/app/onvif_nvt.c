@@ -1,12 +1,11 @@
 #include "onvif_nvt.h"
+#include "gtkstyledimage.h"
 
 extern char _binary_microphone_png_size[];
 extern char _binary_microphone_png_start[];
 extern char _binary_microphone_png_end[];
 
-
-gboolean toggle_mic_cb (GtkWidget *widget, gpointer * p, gpointer * p2){
-    RtspPlayer * player = (RtspPlayer *) p2;
+gboolean toggle_mic_cb (GtkWidget *widget, gpointer * p, RtspPlayer * player){
     if(RtspPlayer__is_mic_mute(player)){
         RtspPlayer__mic_mute(player,FALSE);
     } else {
@@ -15,30 +14,16 @@ gboolean toggle_mic_cb (GtkWidget *widget, gpointer * p, gpointer * p2){
     return FALSE;
 }
 
-GtkWidget * create_controls_overlay(RtspPlayer *player){
-
-    GdkPixbufLoader *loader = gdk_pixbuf_loader_new ();
-    gdk_pixbuf_loader_write (loader, (unsigned char *)_binary_microphone_png_start, _binary_microphone_png_end - _binary_microphone_png_start, NULL);
-
-    GdkPixbuf *pixbuf = gdk_pixbuf_loader_get_pixbuf (loader);
-    double ph = gdk_pixbuf_get_height (pixbuf);
-    double pw = gdk_pixbuf_get_width (pixbuf);
-    double newpw = 30 / ph * pw;
-    pixbuf = gdk_pixbuf_scale_simple (pixbuf,newpw,30,GDK_INTERP_NEAREST);
-    GtkWidget * image = gtk_image_new_from_pixbuf (pixbuf); 
+GtkWidget * create_controls_overlay(RtspPlayer *player){ 
+    GtkWidget * image = GtkStyledImage__new((unsigned char *)_binary_microphone_png_start, _binary_microphone_png_end - _binary_microphone_png_start, 20, 20, NULL);
 
     GtkWidget * widget = gtk_button_new ();
     g_signal_connect (widget, "button-press-event", G_CALLBACK (toggle_mic_cb), player);
     g_signal_connect (widget, "button-release-event", G_CALLBACK (toggle_mic_cb), player);
-
     gtk_button_set_image (GTK_BUTTON (widget), image);
 
     GtkWidget * fixed = gtk_fixed_new();
     gtk_fixed_put(GTK_FIXED(fixed),widget,10,10); 
-
-    g_object_unref(pixbuf);
-    gdk_pixbuf_loader_close(loader,NULL);
-    g_object_unref(loader);
 
     return fixed;
 }
