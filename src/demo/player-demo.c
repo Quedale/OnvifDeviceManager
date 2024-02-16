@@ -1,9 +1,9 @@
-#include "../src/gst/player.h"
-#include "../src/gst/onvifinitstaticplugins.h"
+#include "../gst/gstrtspplayer.h"
+#include "../gst/onvifinitstaticplugins.h"
 #include "clogger.h"
 
 struct PlayerAndButtons {
-    RtspPlayer * player;
+    GstRtspPlayer * player;
     GtkWidget * play_btn;
     GtkWidget * stop_btn;
 };
@@ -12,15 +12,13 @@ static void delete_event_cb (GtkWidget *widget, GdkEvent *event, gpointer data) 
     gtk_main_quit();
 }
 
-void stopped_stream(RtspPlayer * player, void * user_data){
+void stopped_stream(GstRtspPlayer * player, struct PlayerAndButtons * data){
     C_WARN("Stream stopped callback\n");
-    struct PlayerAndButtons * data = (struct PlayerAndButtons *) user_data;
     gtk_widget_set_sensitive(GTK_WIDGET(data->play_btn),TRUE);
 }
 
-void start_stream(RtspPlayer * player, void * user_data){
+void start_stream(GstRtspPlayer * player, struct PlayerAndButtons * data){
     C_WARN("Stream started callback\n");
-    struct PlayerAndButtons * data = (struct PlayerAndButtons *) user_data;
     gtk_widget_set_sensitive(GTK_WIDGET(data->stop_btn),TRUE);
 }
 
@@ -28,10 +26,10 @@ void start_stream(RtspPlayer * player, void * user_data){
 static void state_btn_cb (GtkButton *button, struct PlayerAndButtons * data) {
     if(strcmp(gtk_button_get_label(button),"Play") == 0){
         gtk_widget_set_sensitive(GTK_WIDGET(data->play_btn),FALSE);
-        RtspPlayer__play(data->player); //Causes big hang. should be called asynchroniously
+        GstRtspPlayer__play(data->player); //Causes big hang. should be called asynchroniously
     } else {
         gtk_widget_set_sensitive(GTK_WIDGET(data->stop_btn),FALSE);
-        RtspPlayer__stop(data->player); //Causes minimal hang. should be called asynchroniously
+        GstRtspPlayer__stop(data->player); //Causes minimal hang. should be called asynchroniously
     }
 }
 
@@ -57,13 +55,12 @@ int main(int argc, char *argv[])
     data.stop_btn = gtk_button_new_with_label("Stop");
     gtk_widget_set_sensitive(GTK_WIDGET(data.stop_btn),FALSE);
 
-    data.player = RtspPlayer__create();
-    RtspPlayer__set_playback_url(data.player,"rtsp://61.216.97.157:16887/stream1");
-    RtspPlayer__set_credentials(data.player,"demo","demo");
-    RtspPlayer__set_stopped_callback(data.player,stopped_stream,&data);
-    RtspPlayer__set_started_callback(data.player,start_stream,&data);
-    gtk_box_pack_start(GTK_BOX(vbox), RtspPlayer__createCanvas(data.player), TRUE, FALSE, 0);
-
+    data.player = GstRtspPlayer__new();
+    GstRtspPlayer__set_playback_url(data.player,"rtsp://61.216.97.157:16887/stream1");
+    GstRtspPlayer__set_credentials(data.player,"demo","demo");
+    g_signal_connect (G_OBJECT(data.player), "stopped", G_CALLBACK (stopped_stream), &data);
+    g_signal_connect (G_OBJECT(data.player), "started", G_CALLBACK (start_stream), &data);
+    gtk_box_pack_start(GTK_BOX(vbox), GstRtspPlayer__createCanvas(data.player), TRUE, FALSE, 0);
 
     GtkWidget * hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0);
     gtk_box_pack_start(GTK_BOX(vbox), hbox, TRUE, FALSE, 0);

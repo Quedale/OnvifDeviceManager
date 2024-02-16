@@ -5,14 +5,14 @@
 
 typedef struct _OnvifApp OnvifApp;
 
-#include "../gst/player.h"
+#include "../gst/gstrtspplayer.h"
 #include "dialog/msg_dialog.h"
 #include "dialog/profiles_dialog.h"
 #include "onvif_app_shutdown.h"
 
 OnvifApp * OnvifApp__create();
 void OnvifApp__destroy(OnvifApp* self);
-RtspPlayer * OnvifApp__get_player(OnvifApp* self);
+GstRtspPlayer * OnvifApp__get_player(OnvifApp* self);
 MsgDialog * OnvifApp__get_msg_dialog(OnvifApp * self);
 ProfilesDialog * OnvifApp__get_profiles_dialog(OnvifApp * self);
 OnvifMgrDeviceRow * OnvifApp__get_device(OnvifApp * self);

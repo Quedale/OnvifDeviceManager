@@ -34,10 +34,10 @@ typedef struct _OnvifApp {
     TaskMgr * taskmgr;
 
     EventQueue * queue;
-    RtspPlayer * player;
+    GstRtspPlayer * player;
 } OnvifApp;
 
-void stopped_onvif_stream(RtspPlayer * player, void * user_data);
+void stopped_onvif_stream(GstRtspPlayer * player, void * user_data);
 void _profile_callback (void * user_data);
 void add_device(OnvifMgrDeviceRow * device);
 gboolean OnvifApp__set_device(OnvifApp * app, GtkListBoxRow * row);
@@ -63,6 +63,7 @@ static void delete_event_cb (GtkWidget *widget, GdkEvent *event, OnvifApp *data)
 static int device_already_found(OnvifApp * app, char * xaddr){
     int ret = 0;
     GList * childs = gtk_container_get_children(GTK_CONTAINER(app->listbox));
+    GList * tmp = childs;
     OnvifMgrDeviceRow * device;
     GLIST_FOREACH(device, childs) {
         OnvifDevice * odev = OnvifMgrDeviceRow__get_device(device);
@@ -75,7 +76,7 @@ static int device_already_found(OnvifApp * app, char * xaddr){
         free(endpoint);
         childs = childs->next;
     }
-    g_list_free(childs);
+    g_list_free(tmp);
     return ret;
 }
 
@@ -151,7 +152,7 @@ void onvif_scan (GtkWidget *widget, OnvifApp * app) {
     EventQueue__insert(app->queue,_start_onvif_discovery,app);
 }
 
-void error_onvif_stream(RtspPlayer * player, void * user_data){
+void error_onvif_stream(GstRtspPlayer * player, void * user_data){
     C_ERROR("Stream encountered an error\n");
     OnvifApp * app = (OnvifApp *) user_data;
     //On shutdown, the player may dispatch this event after the window is destroyed
@@ -160,12 +161,12 @@ void error_onvif_stream(RtspPlayer * player, void * user_data){
     }
 }
 
-void stopped_onvif_stream(RtspPlayer * player, void * user_data){
+void stopped_onvif_stream(GstRtspPlayer * player, void * user_data){
     C_INFO("Stream stopped\n");
     //TODO Show placeholder on canvas
 }
 
-void started_onvif_stream(RtspPlayer * player, void * user_data){
+void started_onvif_stream(GstRtspPlayer * player, void * user_data){
     C_INFO("Stream playing\n");
     OnvifApp * app = (OnvifApp *) user_data;
     if(GTK_IS_SPINNER(app->player_loading_handle)){
@@ -182,13 +183,13 @@ void _retry_onvif_stream(void * user_data){
         sleep(2);//Wait to avoid spamming the camera
         //Check again if the device is valid and selected after waiting
         if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) && OnvifMgrDeviceRow__is_selected(device)){
-            RtspPlayer__retry(app->player);
+            GstRtspPlayer__retry(app->player);
         }
     }
     g_object_unref(device);
 }
 
-void retry_onvif_stream(RtspPlayer * player, void * user_data){
+void retry_onvif_stream(GstRtspPlayer * player, void * user_data){
     C_TRACE("retry_onvif_stream");
     OnvifApp * app = (OnvifApp *) user_data;
     g_object_ref(app->device);
@@ -198,7 +199,7 @@ void retry_onvif_stream(RtspPlayer * player, void * user_data){
 void _stop_onvif_stream(void * user_data){
     C_TRACE("_stop_onvif_stream");
     OnvifApp * app = (OnvifApp *) user_data;
-    RtspPlayer__stop(app->player);
+    GstRtspPlayer__stop(app->player);
 }
 
 static void device_profile_changed (OnvifMgrDeviceRow *device){
@@ -279,14 +280,14 @@ void _play_onvif_stream(void * user_data){
     char * uri = OnvifMediaService__getStreamUri(OnvifDevice__get_media_service(odev),OnvifProfile__get_index(OnvifMgrDeviceRow__get_profile(device)));
     
     if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) && OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NONE){
-        RtspPlayer__set_playback_url(app->player,uri);
+        GstRtspPlayer__set_playback_url(app->player,uri);
         char * port = OnvifDevice__get_port(OnvifMgrDeviceRow__get_device(device));
-        RtspPlayer__set_port_fallback(app->player,port);
+        GstRtspPlayer__set_port_fallback(app->player,port);
         free(port);
         OnvifCredentials * ocreds = OnvifDevice__get_credentials(odev);
-        RtspPlayer__set_credentials(app->player, OnvifCredentials__get_username(ocreds), OnvifCredentials__get_password(ocreds));
+        GstRtspPlayer__set_credentials(app->player, OnvifCredentials__get_username(ocreds), OnvifCredentials__get_password(ocreds));
 
-        RtspPlayer__play(app->player);
+        GstRtspPlayer__play(app->player);
     } else if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device)) {
         C_TRAIL("_play_onvif_stream - invalid device.");
     }
@@ -736,7 +737,7 @@ void create_ui (OnvifApp * app) {
 
 void _overscale_cb(AppSettingsStream * settings, int allow_overscale, void * user_data){
     OnvifApp * app = (OnvifApp *) user_data;
-    RtspPlayer__allow_overscale(app->player,allow_overscale);
+    GstRtspPlayer__set_allow_overscale(app->player,allow_overscale);
 }
 
 struct GUILabelUpdate {
@@ -791,8 +792,8 @@ OnvifApp * OnvifApp__create(){
 
     AppSettingsStream__set_overscale_callback(app->settings->stream,_overscale_cb,app);
     app->current_page = 0;
-    app->player = RtspPlayer__create();
-    RtspPlayer__allow_overscale(app->player,AppSettingsStream__get_allow_overscale(app->settings->stream));
+    app->player = GstRtspPlayer__new();
+    GstRtspPlayer__set_allow_overscale(app->player,AppSettingsStream__get_allow_overscale(app->settings->stream));
 
     //Defaults 8 paralell event threads.
     //TODO support configuration to modify this
@@ -805,10 +806,10 @@ OnvifApp * OnvifApp__create(){
     EventQueue__start(app->queue);
     EventQueue__start(app->queue);
 
-    RtspPlayer__set_retry_callback(app->player, retry_onvif_stream, app);
-    RtspPlayer__set_error_callback(app->player, error_onvif_stream, app);
-    RtspPlayer__set_stopped_callback(app->player, stopped_onvif_stream, app);
-    RtspPlayer__set_started_callback(app->player, started_onvif_stream, app);
+    g_signal_connect (G_OBJECT(app->player), "retry", G_CALLBACK (retry_onvif_stream), app);
+    g_signal_connect (G_OBJECT(app->player), "error", G_CALLBACK (error_onvif_stream), app);
+    g_signal_connect (G_OBJECT(app->player), "stopped", G_CALLBACK (stopped_onvif_stream), app);
+    g_signal_connect (G_OBJECT(app->player), "started", G_CALLBACK (started_onvif_stream), app);
 
     app->profiles_dialog = ProfilesDialog__create(app->queue, OnvifApp__profile_selected);
     app->add_dialog = AddDeviceDialog__create();
@@ -833,7 +834,7 @@ void OnvifApp__destroy(OnvifApp* self){
         CObject__destroy((CObject*)self->queue);
         //Destroying the player will cause it to hang until its state changed to NULL
         //Destroying the player after the queue because the queue could dispatch retry call
-        RtspPlayer__destroy(self->player);
+        g_object_unref(self->player);
         
         //Using idle destruction to allow pending idles to execute
         safely_destroy_widget(self->window);
@@ -850,7 +851,7 @@ void _profile_callback (void * user_data){
     }
     
     if(OnvifMgrDeviceRow__is_selected(device)){
-        RtspPlayer__stop(OnvifMgrDeviceRow__get_app(device)->player);
+        GstRtspPlayer__stop(OnvifMgrDeviceRow__get_app(device)->player);
     }
     onvif_reload_device(device);
 
@@ -872,7 +873,7 @@ void add_device(OnvifMgrDeviceRow * omgr_device){
     onvif_display_device_row(app,omgr_device);
 }
 
-RtspPlayer * OnvifApp__get_player(OnvifApp* self){
+GstRtspPlayer * OnvifApp__get_player(OnvifApp* self){
     return self->player;
 }
 

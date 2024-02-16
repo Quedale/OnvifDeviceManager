@@ -1,6 +1,5 @@
 #include "onvif_app_shutdown.h"
 #include "../animations/gtk/gtk_dotted_slider_widget.h"
-#include "../gst/player.h"
 #include "clogger.h"
 
 void safely_quit_gtk_main(void * user_data){

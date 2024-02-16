@@ -43,19 +43,20 @@ int version_compare(int major, int minor, int micro){
 }
 
 void print_elements_by_type(char * type){
-  GList * factories;
-  GList *tmp;
+  GList * factories, *filtered, *tmp;
 
   C_INFO("*** %s decoders ***",type);
   GstCaps * caps = gst_caps_new_empty_simple(type);
   factories = gst_element_factory_list_get_elements (GST_ELEMENT_FACTORY_TYPE_DECODER || GST_ELEMENT_FACTORY_TYPE_MEDIA_VIDEO, GST_RANK_MARGINAL);
-  factories = gst_element_factory_list_filter (factories, caps, GST_PAD_SINK, FALSE);
-  for (tmp = factories; tmp; tmp = tmp->next) {
+  filtered = gst_element_factory_list_filter (factories, caps, GST_PAD_SINK, FALSE);
+  for (tmp = filtered; tmp; tmp = tmp->next) {
       GstElementFactory *fact = (GstElementFactory *) tmp->data;
       int rank = gst_plugin_feature_get_rank(GST_PLUGIN_FEATURE_CAST(fact));
       char * name = gst_plugin_feature_get_name(GST_PLUGIN_FEATURE_CAST(fact));
       C_INFO("*    %s[%d]",name,rank);
   }
+  gst_caps_unref (caps);
+  g_list_free(filtered);
   g_list_free (factories);
   C_INFO("****************************");
 }

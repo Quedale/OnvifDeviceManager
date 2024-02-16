@@ -5,21 +5,22 @@ extern char _binary_microphone_png_size[];
 extern char _binary_microphone_png_start[];
 extern char _binary_microphone_png_end[];
 
-gboolean toggle_mic_cb (GtkWidget *widget, gpointer * p, RtspPlayer * player){
-    if(RtspPlayer__is_mic_mute(player)){
-        RtspPlayer__mic_mute(player,FALSE);
-    } else {
-        RtspPlayer__mic_mute(player,TRUE);
-    }
+gboolean toggle_mic_release_cb (GtkWidget *widget, gpointer * p, GstRtspPlayer * player){
+    GstRtspPlayer__mic_mute(player,TRUE);
     return FALSE;
 }
 
-GtkWidget * create_controls_overlay(RtspPlayer *player){ 
+gboolean toggle_mic_press_cb (GtkWidget *widget, gpointer * p, GstRtspPlayer * player){
+    GstRtspPlayer__mic_mute(player,FALSE);
+    return FALSE;
+}
+
+GtkWidget * create_controls_overlay(GstRtspPlayer *player){ 
     GtkWidget * image = GtkStyledImage__new((unsigned char *)_binary_microphone_png_start, _binary_microphone_png_end - _binary_microphone_png_start, 20, 20, NULL);
 
     GtkWidget * widget = gtk_button_new ();
-    g_signal_connect (widget, "button-press-event", G_CALLBACK (toggle_mic_cb), player);
-    g_signal_connect (widget, "button-release-event", G_CALLBACK (toggle_mic_cb), player);
+    g_signal_connect (widget, "button-press-event", G_CALLBACK (toggle_mic_press_cb), player);
+    g_signal_connect (widget, "button-release-event", G_CALLBACK (toggle_mic_release_cb), player);
     gtk_button_set_image (GTK_BUTTON (widget), image);
 
     GtkWidget * fixed = gtk_fixed_new();
@@ -28,12 +29,12 @@ GtkWidget * create_controls_overlay(RtspPlayer *player){
     return fixed;
 }
 
-GtkWidget * OnvifNVT__create_ui (RtspPlayer * player){
+GtkWidget * OnvifNVT__create_ui (GstRtspPlayer * player){
     GtkWidget *grid;
     GtkWidget *widget;
 
     grid = gtk_grid_new ();
-    widget = RtspPlayer__createCanvas(player);
+    widget = GstRtspPlayer__createCanvas(player);
     gtk_widget_set_vexpand (widget, TRUE);
     gtk_widget_set_hexpand (widget, TRUE);
 

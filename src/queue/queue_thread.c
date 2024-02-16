@@ -54,8 +54,9 @@ void * priv_QueueThread_call(void * data){
     }
 
 exit:
-    C_INFO("Finished...");
+    CObject__unref((CObject*)qt);
     EventQueue__remove_thread(qt->queue,qt);
+    C_INFO("Finished...");
     P_THREAD_EXIT;
 }
 

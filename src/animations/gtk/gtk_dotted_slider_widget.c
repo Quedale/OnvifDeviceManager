@@ -207,12 +207,26 @@ gtk_dotted_slider_set_property (GObject      *object,
     }
 }
 
+static void
+gtk_dotted_slider_dispose(GObject * gobject){
+  GtkDottedSliderPrivate *priv = gtk_dotted_slider_get_instance_private (GTK_DOTTED_SLIDER(gobject));
+
+  if(priv->dots){
+    g_list_free (priv->dots);
+    priv->dots = NULL;
+  }
+
+
+  G_OBJECT_CLASS (gtk_dotted_slider_parent_class)->dispose (gobject);
+}
+
 static void 
 gtk_dotted_slider_class_init (GtkDottedSliderClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
     GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(klass);
 
+    object_class->dispose = gtk_dotted_slider_dispose;
     object_class->get_property = gtk_dotted_slider_get_property;
     object_class->set_property = gtk_dotted_slider_set_property;
 
