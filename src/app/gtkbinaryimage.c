@@ -76,6 +76,6 @@ GtkWidget* GtkBinaryImage__new(unsigned char * data_start, unsigned int data_siz
     image = g_object_new (GTK_TYPE_BINARYIMAGE, NULL);
 
     GtkBinaryImage__set_image(GTK_BINARYIMAGE(image), pixbuf, width, height);
-    g_object_unref()
+    g_object_unref(pixbuf);
     return GTK_WIDGET (image);
 }
