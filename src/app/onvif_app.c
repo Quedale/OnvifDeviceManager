@@ -209,7 +209,7 @@ static void device_profile_changed (OnvifMgrDeviceRow *device){
 void _display_onvif_device(void * user_data){
     C_TRACE("_display_onvif_device");
     OnvifMgrDeviceRow * omgr_device = (OnvifMgrDeviceRow *) user_data;
-    COwnableObject__has_owner(COWNABLE_OBJECT(omgr_device));
+
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(omgr_device)){
         C_TRAIL("_display_onvif_device - invalid device.");
         goto exit;
