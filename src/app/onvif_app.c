@@ -41,6 +41,7 @@ void stopped_onvif_stream(RtspPlayer * player, void * user_data);
 void _profile_callback (void * user_data);
 void add_device(OnvifMgrDeviceRow * device);
 gboolean OnvifApp__set_device(OnvifApp * app, GtkListBoxRow * row);
+gboolean * idle_hide_dialog (void * user_data);
 
 /*
  *
@@ -141,9 +142,6 @@ void _start_onvif_discovery(void * user_data){
 void onvif_scan (GtkWidget *widget, OnvifApp * app) {
     C_INFO("Starting ONVIF Devices Network Discovery...");
     gtk_widget_set_sensitive(widget,FALSE);
-    //Between retries, player may not send stopped event since the state didn't stop
-    //Forcing hiding the loading indicator
-    stopped_onvif_stream(app->player,app);
 
     //Clearing the list
     gtk_container_foreach (GTK_CONTAINER (app->listbox), (GtkCallback)gui_container_remove, app->listbox);
@@ -154,7 +152,7 @@ void onvif_scan (GtkWidget *widget, OnvifApp * app) {
 }
 
 void error_onvif_stream(RtspPlayer * player, void * user_data){
-    C_INFO("Stream encountered an error\n");
+    C_ERROR("Stream encountered an error\n");
     OnvifApp * app = (OnvifApp *) user_data;
     //On shutdown, the player may dispatch this event after the window is destroyed
     if(GTK_IS_SPINNER(app->player_loading_handle)){
@@ -177,14 +175,24 @@ void started_onvif_stream(RtspPlayer * player, void * user_data){
 
 void _retry_onvif_stream(void * user_data){
     C_TRACE("_retry_onvif_stream");
-    OnvifApp * app = (OnvifApp *) user_data;
-    sleep(2);
-    RtspPlayer__retry(app->player);
+    OnvifMgrDeviceRow * device = ONVIFMGR_DEVICEROW(user_data);
+    OnvifApp * app = OnvifMgrDeviceRow__get_app(device);
+    //Check if the device is valid and selected
+    if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) && OnvifMgrDeviceRow__is_selected(device)){
+        sleep(2);//Wait to avoid spamming the camera
+        //Check again if the device is valid and selected after waiting
+        if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) && OnvifMgrDeviceRow__is_selected(device)){
+            RtspPlayer__retry(app->player);
+        }
+    }
+    g_object_unref(device);
 }
 
 void retry_onvif_stream(RtspPlayer * player, void * user_data){
+    C_TRACE("retry_onvif_stream");
     OnvifApp * app = (OnvifApp *) user_data;
-    EventQueue__insert(app->queue,_retry_onvif_stream,app);
+    g_object_ref(app->device);
+    EventQueue__insert(app->queue,_retry_onvif_stream,app->device);
 }
 
 void _stop_onvif_stream(void * user_data){
@@ -264,7 +272,6 @@ void _play_onvif_stream(void * user_data){
         goto exit;
     }
     if(OnvifDevice__get_last_error(odev) != ONVIF_ERROR_NONE && OnvifMgrDeviceRow__is_selected(device)){
-        stopped_onvif_stream(app->player,app);
         goto exit;
     }
 
@@ -336,9 +343,9 @@ int onvif_reload_device(OnvifMgrDeviceRow * device){
     g_object_ref(device);
     gdk_threads_add_idle(G_SOURCE_FUNC(idle_update_pages),device);
     if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NONE && OnvifMgrDeviceRow__is_selected(device)){
-        gtk_spinner_start (GTK_SPINNER (app->player_loading_handle));
+        safely_start_spinner(app->player_loading_handle);
         g_object_ref(device);
-        EventQueue__insert(app->queue,_play_onvif_stream,device);
+        _play_onvif_stream(device);
     }
 
     return 1;
@@ -357,7 +364,7 @@ void _onvif_authentication_reload(void * user_data){
     }
 
     if(onvif_reload_device(device)){
-        AppDialog__hide((AppDialog*)OnvifMgrDeviceRow__get_app(device)->cred_dialog);
+        gdk_threads_add_idle(G_SOURCE_FUNC(idle_hide_dialog),OnvifMgrDeviceRow__get_app(device)->cred_dialog);
         g_object_unref(device);
     }
 }
@@ -390,12 +397,16 @@ void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
     OnvifDetails__clear_details(app->details);
 
     if(!OnvifApp__set_device(app,row)){
+        //In case the previous stream was in a retry cycle, force hide loading
+        gtk_spinner_stop (GTK_SPINNER (app->player_loading_handle));
         goto exit;
     }
 
     OnvifDevice * odev = OnvifMgrDeviceRow__get_device(app->device);
     //Prompt for authentication
     if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NOT_AUTHORIZED){
+        //In case the previous stream was in a retry cycle, force hide loading
+        gtk_spinner_stop (GTK_SPINNER (app->player_loading_handle));
         //Re-dispatched to allow proper focus handling
         g_object_ref(app->device);
         gdk_threads_add_idle(G_SOURCE_FUNC(idle_show_credentialsdialog),app->device);

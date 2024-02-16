@@ -56,6 +56,17 @@ void safely_destroy_widget(GtkWidget * widget){
     gdk_threads_add_idle(G_SOURCE_FUNC(gui_widget_destroy_cb),widget);
 }
 
+void idle_start_spinner(void * user_data){
+    GtkWidget * widget = (GtkWidget *) user_data;
+    if(GTK_IS_SPINNER(widget)){
+        gtk_spinner_start (GTK_SPINNER (widget));
+    }
+}
+
+void safely_start_spinner(GtkWidget * widget){
+    gdk_threads_add_idle(G_SOURCE_FUNC(idle_start_spinner),widget);
+}
+
 GtkCssProvider * gui_widget_set_css(GtkWidget * widget, char * css, GtkCssProvider * cssProvider){
     if(!cssProvider){
         cssProvider = gtk_css_provider_new();

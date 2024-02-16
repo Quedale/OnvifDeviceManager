@@ -89,10 +89,7 @@ static void error_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
     C_INFO("Stream Correction : '%s' --> '%s'\n",oldloc, data->location);
     free(oldloc);
 
-  } else if(err->code == GST_RESOURCE_ERROR_READ){
-    data->retry--; //This doesn't count as a try (After this, will generate GST_RESOURCE_ERROR_OPEN_)
   }
-  P_MUTEX_UNLOCK(data->player_lock);
 
   C_ERROR ("Error received from element %s: %s", GST_OBJECT_NAME (msg->src), err->message);
   C_ERROR ("Debugging information: %s", debug_info ? debug_info : "none");
@@ -104,21 +101,23 @@ static void error_cb (GstBus *bus, GstMessage *msg, RtspPlayer *data) {
   C_DEBUG("retry[%d] playing[%d]", data->retry, data->playing);
   if(data->retry < 3 && data->playing == 1 && data->retry_callback){
     //Stopping player after if condition because "playing" gets reset
-    P_MUTEX_LOCK(data->player_lock);
     _RtspPlayer__inner_stop(data);
-    data->retry++; 
-    P_MUTEX_UNLOCK(data->player_lock);
     C_WARN("****************************************************");
     C_WARN("Retry attempt #%i",data->retry);
     C_WARN("****************************************************");
-    //Retry signal
+    P_MUTEX_UNLOCK(data->player_lock);
+    //Retry signal - The player doesn't invoke retry on its own to allow the invoker to dispatch it asynchroniously
     (*(data->retry_callback))(data, data->retry_user_data);
-  } else {
-    RtspPlayer__stop(data);
+  } else if(data->playing == 1) { //Ignoring error after the player requested to stop (gst_rtspsrc_try_send)
+    data->playing = 0;
+    _RtspPlayer__inner_stop(data);
+      P_MUTEX_UNLOCK(data->player_lock);
     //Error signal
     if(data->error_callback){
       (*(data->error_callback))(data, data->error_user_data);
     }
+  } else {
+    P_MUTEX_UNLOCK(data->player_lock);
   }
 }
 
@@ -778,36 +777,21 @@ void RtspPlayer__set_credentials(RtspPlayer * self, char * user, char * pass){
   }
 }
 void _RtspPlayer__inner_stop(RtspPlayer* self){
-    GstStateChangeReturn ret;
+  GstStateChangeReturn ret;
 
-    //Pause backchannel
-    if(!RtspBackchannel__pause(self->backchannel)){
-      return;
-    }
-
-    //Set NULL state to clear buffers
-    if(GST_IS_ELEMENT(self->pipeline)){
-      ret = gst_element_set_state (self->pipeline, GST_STATE_NULL);
-      if (ret == GST_STATE_CHANGE_FAILURE) {
-          C_ERROR ("Unable to set the pipeline to the ready state.\n");
-          return;
-      }
-    }
-
-    return;
-}
-
-void RtspPlayer__stop(RtspPlayer* self){
-  C_DEBUG("RtspPlayer__stop\n");
-  if(!self || !self->playing){
+  //Pause backchannel
+  if(!RtspBackchannel__pause(self->backchannel)){
     return;
   }
 
-  P_MUTEX_LOCK(self->player_lock);
-
-  self->playing = 0;
-
-  _RtspPlayer__inner_stop(self);
+  //Set NULL state to clear buffers
+  if(GST_IS_ELEMENT(self->pipeline)){
+    ret = gst_element_set_state (self->pipeline, GST_STATE_NULL);
+    if (ret == GST_STATE_CHANGE_FAILURE) {
+        C_ERROR ("Unable to set the pipeline to the ready state.\n");
+        return;
+    }
+  }
 
   g_list_free(self->dynamic_elements);
   self->dynamic_elements = NULL;
@@ -824,6 +808,20 @@ void RtspPlayer__stop(RtspPlayer* self){
   if(GTK_IS_WIDGET (self->canvas))
     gtk_widget_set_visible(self->canvas, FALSE);
 
+}
+
+void RtspPlayer__stop(RtspPlayer* self){
+  C_DEBUG("RtspPlayer__stop\n");
+  if(!self){
+    return;
+  }
+  
+  P_MUTEX_LOCK(self->player_lock);
+
+  self->playing = 0;
+
+  _RtspPlayer__inner_stop(self);
+
   if(self->stopped_callback){
     (*(self->stopped_callback))(self, self->stopped_user_data);
   }
@@ -831,7 +829,7 @@ void RtspPlayer__stop(RtspPlayer* self){
 }
 
 
-void _RtspPlayer__play(RtspPlayer* self, int retry){
+void _RtspPlayer__play(RtspPlayer* self){
   P_MUTEX_LOCK(self->player_lock);
 
   //Restore previous session's properties
@@ -844,12 +842,8 @@ void _RtspPlayer__play(RtspPlayer* self, int retry){
     g_object_set (G_OBJECT (self->src), "location", self->location, NULL);
   P_MUTEX_UNLOCK(self->prop_lock);
 
-  C_DEBUG("RtspPlayer__play retry[%i] - playing[%i]\n",retry,self->playing);
-  if(retry && self->playing == 0){//Retry signal after stop requested
-    goto exit;
-  } else {
-    self->playing = 1;
-  }
+  C_DEBUG("RtspPlayer__play retry[%i] - playing[%i]\n",self->retry,self->playing);
+  self->playing = 1;
 
   GstStateChangeReturn ret;
   ret = gst_element_set_state (self->pipeline, GST_STATE_PLAYING);
@@ -866,7 +860,7 @@ exit:
 void RtspPlayer__play(RtspPlayer* self){
   self->retry = 0;
   self->enable_backchannel = 1;//TODO Handle parameter input...
-  _RtspPlayer__play(self,self->retry);
+  _RtspPlayer__play(self);
 }
 
 void RtspPlayer__allow_overscale(RtspPlayer * self, int allow_overscale){
@@ -881,7 +875,8 @@ Compared to play, retry is design to work after a stream failure.
 Stopping will essentially break the retry method and stop the loop.
 */
 void RtspPlayer__retry(RtspPlayer* self){
-  _RtspPlayer__play(self,self->retry);
+  self->retry++;
+  _RtspPlayer__play(self);
 }
 
 GtkWidget * RtspPlayer__createCanvas(RtspPlayer *self){
