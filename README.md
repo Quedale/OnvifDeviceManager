@@ -92,7 +92,7 @@ At this point, you should be able to execute the application without installing 
 Under debian, I recommend using the package manager:
 ```
 make deb
-sudo dpkg -i onvifmgr_0.0.1.deb
+sudo dpkg -i onvifmgr_0.0.deb
 ```
 #### other
 For the time being, other distros can use the following
