@@ -1,4 +1,11 @@
-AC_INIT([helloworld], [0.1], [maintainer@example.com])
+m4_define([onvifmgr_major_version], [0])
+m4_define([onvifmgr_minor_version], [0])
+...
+m4_define([onvifmgr_version],[onvifmgr_major_version.onvifmgr_minor_version])
+
+AC_INIT([onvifmgr], [onvifmgr_version], [maintainer@example.com])
+AC_SUBST(APP_VERSION, [onvifmgr_version])
+
 AC_CONFIG_MACRO_DIRS([m4])
 AC_PROG_CC
 AM_SILENT_RULES([yes])

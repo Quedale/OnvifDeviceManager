@@ -27,7 +27,7 @@ GdkPixbuf * GtkBinaryImage__create_pixbuf(unsigned char* data_start, unsigned in
         return NULL;
     }
 
-    pixbuf = gdk_pixbuf_copy(pixbuf); //TODO Create virtual method to override with styledimage
+    g_object_ref(pixbuf);
 
     gdk_pixbuf_loader_close(loader,NULL);
     g_object_unref(loader);

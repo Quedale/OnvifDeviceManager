@@ -72,8 +72,8 @@ onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c \
 					$(top_srcdir)/src/queue/event_queue.c \
 					$(top_srcdir)/src/queue/queue_event.c \
 					$(top_srcdir)/src/queue/queue_thread.c
-onvifmgr_CFLAGS = $(DEBUG_FLAG) -Wall -Wextra -Wpedantic -Wno-unused-parameter $(DEBUG_FLAG) -DHAVE_CONFIG_H $(GST_STATIC_FLAG) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap onvifdisco` $(EXT_CFLAGS)
-onvifmgr_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap onvifdisco` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
+onvifmgr_CFLAGS = $(DEBUG_FLAG) -Wall -Wextra -Wpedantic -Wno-unused-parameter $(DEBUG_FLAG) -DHAVE_CONFIG_H $(GST_STATIC_FLAG) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap` $(EXT_CFLAGS)
+onvifmgr_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
 onvifmgr_LDADD = locked-icon.o microphone.o warning.o save.o
 
 queuedemo_SOURCES = $(top_srcdir)/src/demo/queue-demo.c $(top_srcdir)/src/queue/event_queue.c $(top_srcdir)/src/queue/queue_event.c $(top_srcdir)/src/queue/queue_thread.c
@@ -126,6 +126,32 @@ gtksliderdemo_SOURCES = $(top_srcdir)/src/demo/widget-demo.c \
 gtksliderdemo_CFLAGS = -Wall -Wextra -Wpedantic -Wno-unused-parameter $(DEBUG_FLAG) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags gtk+-3.0 cutils`
 gtksliderdemo_LDFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs gtk+-3.0 cutils` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
 
+deb$(EXEEXT):
+	@echo "Creating debian packge definition..."
+	@rm -rf onvifmgr_$(APP_VERSION)
+	@mkdir onvifmgr_$(APP_VERSION)
+	@mkdir onvifmgr_$(APP_VERSION)/usr
+	@mkdir onvifmgr_$(APP_VERSION)/usr/local
+	@mkdir onvifmgr_$(APP_VERSION)/usr/local/bin
+	@cp "/home/quedale/git/OnvifDeviceManager/build/onvifmgr" onvifmgr_$(APP_VERSION)/usr/local/bin
+	@mkdir onvifmgr_$(APP_VERSION)/DEBIAN
+	@echo "Package: onvifmgr" > onvifmgr_$(APP_VERSION)/DEBIAN/control
+	@echo "Version: 0.0-1" >> onvifmgr_$(APP_VERSION)/DEBIAN/control
+	@echo "Section: base"  >> onvifmgr_$(APP_VERSION)/DEBIAN/control
+	@echo "Priority: optional" >> onvifmgr_$(APP_VERSION)/DEBIAN/control
+	@echo "Architecture: i386" >> onvifmgr_$(APP_VERSION)/DEBIAN/control
+	@echo "Maintainer: Your Name <you@email.com>" >> onvifmgr_$(APP_VERSION)/DEBIAN/control
+	@echo "Description: Onvif Device Manager for Linux" >> onvifmgr_$(APP_VERSION)/DEBIAN/control
+	@dpkg-deb --build onvifmgr_$(APP_VERSION)
+	@echo ""
+	@echo "*******************************************"
+	@echo  "*"
+	@echo  "* WARNING: This package is tailored for this computer"
+	@echo  "*          Distro package dependencies are not yet properly configured"
+	@echo  "*"
+	@echo  "* To install, run 'sudo dpkg -i onvifmgr_$(APP_VERSION).deb'"
+	@echo  "*"
+	@echo "*******************************************"
 
 paths$(EXEEXT):
 	@echo "PKG_FULL_PATH : $(PKG_FULL_PATH)"
@@ -173,22 +199,6 @@ clean-onvifsoaplib$(EXEEXT):
 onvifsoaplib$(EXEEXT):
 	echo "soap dir : " $(GSOAP_SRC_DIR)
 	cd $(abs_top_srcdir)/subprojects/OnvifSoapLib && $(MAKE) $(JOB_FLAG) GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd ..
-
-uninstall-discolib$(EXEEXT):
-	echo "soap dir : " $(GSOAP_SRC_DIR)
-	cd $(abs_top_srcdir)/subprojects/OnvifDiscoveryLib && $(MAKE) $(JOB_FLAG) uninstall GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd .. 
-
-install-discolib$(EXEEXT):
-	echo "soap dir : " $(GSOAP_SRC_DIR)
-	cd $(abs_top_srcdir)/subprojects/OnvifDiscoveryLib && $(MAKE) $(JOB_FLAG) install GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd .. 
-	
-clean-discolib$(EXEEXT):
-	echo "soap dir : " $(GSOAP_SRC_DIR)
-	cd $(abs_top_srcdir)/subprojects/OnvifDiscoveryLib && $(MAKE) $(JOB_FLAG) clean GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd .. 
-
-discolib$(EXEEXT):
-	echo "soap dir : " $(GSOAP_SRC_DIR)
-	cd $(abs_top_srcdir)/subprojects/OnvifDiscoveryLib && $(MAKE) $(JOB_FLAG) GSOAP_SRC_DIR=$(GSOAP_SRC_DIR) && cd .. 
 
 clean-gsoaplib$(EXEEXT):
 	cd $(GSOAP_SRC_DIR) && $(MAKE) $(JOB_FLAG) clean && cd .. 

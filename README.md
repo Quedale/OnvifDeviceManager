@@ -79,12 +79,35 @@ If your system already has gstreamer pre-installed, I strongly recommend using `
 Note that autogen will automatically call "./configure".
 ```
 ./autogen.sh --prefix=$(pwd)/dist --enable-latest
+make -j$(nproc)
+```
+At this point, you should be able to execute the application without installing it on the system
+
+```
+./onvifmgr
 ```
 
-### Compile and install GUI App
+### Install
+#### debian
+Under debian, I recommend using the package manager:
 ```
-make
-make install
+make deb
+sudo dpkg -i onvifmgr_0.0.1.deb
+```
+#### other
+For the time being, other distros can use the following
+```
+sudo make install
+```
+
+### Uninstall
+#### debian
+```
+sudo dpkg -r onvifmgr
+```
+#### other
+```
+sudo make uninstall
 ```
 # Note
 I have very little spare time to work on any personal project, so this might take a while.

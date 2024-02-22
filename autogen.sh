@@ -327,10 +327,8 @@ buildMakeProject(){
     if [ ! -z "${cmakeclean}" ]
     then 
       rm ${prefix}/lib/libonvifsoap.*
-      rm ${prefix}/lib/libonvifdisco.*
       rm ${prefix}/lib/libcutils.*
       rm ${prefix}/lib/pkgconfig/onvifsoap.pc
-      rm ${prefix}/lib/pkgconfig/onvifdisco.pc
       rm ${prefix}/lib/pkgconfig/cutils.pc
       cmake --build "${cmakedir}" --target clean
       find . -iwholename '*cmake*' -not -name CMakeLists.txt -delete
@@ -823,7 +821,7 @@ fi
 
 ################################################################
 # 
-#    Build Openssl for gsoap, onvifdisco and onvifsoap
+#    Build Openssl for gsoap and onvifsoap
 #       
 ################################################################
 OPENSSL_PKG=$SUBPROJECT_DIR/openssl/build/dist/lib/pkgconfig
@@ -947,58 +945,6 @@ if [ $ret != 0 ]; then
   if [ $FAILED -eq 1 ]; then exit 1; fi
 else
   echo "CUtils already found."
-fi
-
-################################################################
-# 
-#    Build OnvifDiscoveryLib
-#       
-################################################################
-#Check if new changes needs to be pulled
-git -C OnvifDiscoveryLib remote update 2> /dev/null
-LOCAL=$(git -C OnvifDiscoveryLib rev-parse @)
-REMOTE=$(git -C OnvifDiscoveryLib rev-parse @{u})
-BASE=$(git -C OnvifDiscoveryLib merge-base @ @{u})
-force_rebuild=0
-if [ $LOCAL = $REMOTE ]; then
-    echo "OnvifDiscoveryLib is already up-to-date. Do nothing..."
-elif [ $LOCAL = $BASE ]; then
-    echo "OnvifDiscoveryLib has new changes. Force rebuild..."
-    force_rebuild=1
-    #Temporarely disabled after renaming soapH.h which would fail here
-    # skipwsdl="--skip-wsdl"
-elif [ $REMOTE = $BASE ]; then
-    echo "OnvifDiscoveryLib has local changes. Doing nothing..."
-    #Temporarely disabled after renaming soapH.h which would fail here
-    # skipwsdl="--skip-wsdl"
-else
-    echo "Error OnvifDiscoveryLib is diverged."
-    exit 1
-fi
-
-if [ $force_rebuild -eq 0 ]; then
-  DISCOLIB_PKG=$SUBPROJECT_DIR/OnvifDiscoveryLib/build/dist/lib/pkgconfig
-  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$DISCOLIB_PKG \
-  pkg-config --exists --print-errors "onvifdisco"
-  ret=$?
-else
-  ret=1
-fi
-
-if [ $ret != 0 ]; then
-  echo "-- Bootrap OnvifDiscoveryLib  --"
-  pullOrClone path=https://github.com/Quedale/OnvifDiscoveryLib.git ignorecache="true"
-  if [ $FAILED -eq 1 ]; then exit 1; fi
-  PATH=$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin:$PATH \
-  GSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8 \
-  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$CUTILSLIB_PKG \
-  C_INCLUDE_PATH="$(pkg-config --variable=includedir openssl):$(pkg-config --variable=includedir zlib):$C_INCLUDE_PATH" \
-  buildMakeProject srcdir="OnvifDiscoveryLib" prefix="$SUBPROJECT_DIR/OnvifDiscoveryLib/build/dist" cmakedir=".." cmakeargs="-DGSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8" bootstrap="--skip-gsoap $skipwsdl" outoftree=true cmakeclean=true
-  # buildMakeProject srcdir="OnvifDiscoveryLib" prefix="$SUBPROJECT_DIR/OnvifDiscoveryLib/build/dist" bootstrap="--skip-gsoap $skipwsdl" outoftree=true
-  
-  if [ $FAILED -eq 1 ]; then exit 1; fi
-else
-  echo "onvifdisco already found."
 fi
 
 ################################################################
