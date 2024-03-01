@@ -72,9 +72,9 @@ onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c \
 					$(top_srcdir)/src/queue/event_queue.c \
 					$(top_srcdir)/src/queue/queue_event.c \
 					$(top_srcdir)/src/queue/queue_thread.c
-onvifmgr_CFLAGS = $(DEBUG_FLAG) -Wall -Wextra -Wpedantic -Wno-unused-parameter $(DEBUG_FLAG) -DHAVE_CONFIG_H $(GST_STATIC_FLAG) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap` $(EXT_CFLAGS)
+onvifmgr_CFLAGS = $(DEBUG_FLAG) -Wall -Wextra -Wpedantic -Wno-unused-parameter $(DEBUG_FLAG) -DONVIFMGR_VERSION_MAJ=$(APP_VERSION_MAJ) -DONVIFMGR_VERSION_MIN=$(APP_VERSION_MIN) -DHAVE_CONFIG_H $(GST_STATIC_FLAG) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap` $(EXT_CFLAGS)
 onvifmgr_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
-onvifmgr_LDADD = locked-icon.o microphone.o warning.o save.o
+onvifmgr_LDADD = locked-icon.o microphone.o warning.o save.o tower.o
 
 queuedemo_SOURCES = $(top_srcdir)/src/demo/queue-demo.c $(top_srcdir)/src/queue/event_queue.c $(top_srcdir)/src/queue/queue_event.c $(top_srcdir)/src/queue/queue_thread.c
 queuedemo_LDFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs cutils`
@@ -170,6 +170,10 @@ pkgpath$(EXEEXT):
 loading.o$(EXEEXT):
 	@echo "  CCLD     loading.o"
 	@cd $(abs_top_srcdir)/images && ld -r -b binary -o $(abs_builddir)/loading.o loading.gif && cd ..
+
+tower.o$(EXEEXT):
+	@echo "  CCLD     tower.o"
+	@cd $(abs_top_srcdir)/images && ld -r -b binary -o $(abs_builddir)/tower.o tower.png && cd ..
 
 microphone.o$(EXEEXT):
 	@echo "  CCLD     microphone.o"

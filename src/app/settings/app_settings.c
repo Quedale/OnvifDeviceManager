@@ -1,6 +1,7 @@
 #include "app_settings.h"
 #include "app_settings_discovery.h"
 #include "clogger.h"
+#include <pwd.h>
 
 #define CONFIG_FILE_PATH "onvifmgr_settings.ini"
 
@@ -39,13 +40,70 @@ void save_done(void * user_data){
     gtk_spinner_stop (GTK_SPINNER (settings->loading_handle));
 }
 
+char * AppSettings__get_config_path(){
+
+    char * ret;
+    const char * configdir;
+    if((configdir = getenv("XDG_CONFIG_HOME")) != NULL){
+        ret = malloc(strlen(configdir)+strlen(CONFIG_FILE_PATH)+2);
+        strcpy(ret,configdir);
+        strcat(ret,"/");
+        strcat(ret,CONFIG_FILE_PATH);
+
+        C_TRACE("Using XDG_CONFIG_HOME config directory : %s\n",configdir);
+        return ret;
+    }
+
+    const char *homedir;
+    char *buf = NULL;
+    if ((homedir = getenv("HOME")) == NULL) {
+        struct passwd pwd;
+        struct passwd *result;
+        size_t bufsize;
+        int s;
+        bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+        if (bufsize == (unsigned int) -1)
+            bufsize = 0x4000; // = all zeroes with the 14th bit set (1 << 14)
+        buf = malloc(bufsize);
+        if (buf == NULL) {
+            perror("malloc");
+            exit(EXIT_FAILURE);
+        }
+        s = getpwuid_r(getuid(), &pwd, buf, bufsize, &result);
+        if (result == NULL) {
+            if (s == 0)
+                printf("Not found\n");
+            else {
+                errno = s;
+                perror("getpwnam_r");
+            }
+            exit(EXIT_FAILURE);
+        }
+        homedir = result->pw_dir;
+    }
+
+    C_TRACE("Generating default config path from HOME directory : %s\n",homedir);
+
+    ret = malloc(strlen(homedir)+strlen("/.config/") + strlen(CONFIG_FILE_PATH)+1);
+    strcpy(ret,homedir);
+    strcat(ret,"/.config/");
+    strcat(ret,CONFIG_FILE_PATH);
+
+    if(buf) free(buf);
+
+    return ret;
+}
+
 //Background task to save settings (invokes internal callbacks)
 void _save_settings(void * user_data){
     AppSettings * self = (AppSettings *) user_data;
 
-    //More settings to add here
+    char * path = AppSettings__get_config_path();
 
-    FILE * fptr = fopen(CONFIG_FILE_PATH,"w");
+    C_INFO("Save to setting file : '%s'",path);
+
+    FILE * fptr = fopen(path,"w");
+
     if(fptr != NULL){
         fprintf(fptr,"%s\n\n",AppSettingsStream__save(self->stream));
         fprintf(fptr,"%s\n\n",AppSettingsDiscovery__save(self->discovery));
@@ -57,7 +115,7 @@ void _save_settings(void * user_data){
     }
 
     gdk_threads_add_idle(G_SOURCE_FUNC(save_done),self);
-
+    free(path);
 }
 
 // Apply button GUI callback
@@ -185,9 +243,11 @@ void AppSettings__load_settings(AppSettings * self){
     
     AppSettingsType category = APPSETTING_INVALID;
     
-    C_INFO("Reading Settings file %s",CONFIG_FILE_PATH);
-    if (access(CONFIG_FILE_PATH, F_OK) == 0) {
-        fptr = fopen(CONFIG_FILE_PATH,"r");
+    char * path = AppSettings__get_config_path();
+
+    C_INFO("Reading Settings file %s",path);
+    if (access(path, F_OK) == 0) {
+        fptr = fopen(path,"r");
         if(fptr != NULL){
             char buffer[MAX_LEN];
             while (fgets(buffer, MAX_LEN, fptr)){
@@ -245,6 +305,7 @@ void AppSettings__load_settings(AppSettings * self){
         C_WARN("No config file found. Using default configs. 1");
     }
 
+    free(path);
     if(fptr)
         fclose(fptr);
 }

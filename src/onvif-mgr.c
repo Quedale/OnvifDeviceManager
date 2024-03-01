@@ -100,6 +100,7 @@ int main(int argc, char *argv[]) {
   /* Initialize GStreamer */
   gst_init (&argc, &argv);
   
+  C_INFO("Onvif Device Manager Version : %d.%d", ONVIFMGR_VERSION_MAJ, ONVIFMGR_VERSION_MIN);
   C_INFO("Using Gstreamer Version : %i.%i.%i.%i",GST_PLUGINS_BASE_VERSION_MAJOR,GST_PLUGINS_BASE_VERSION_MINOR,GST_PLUGINS_BASE_VERSION_MICRO,GST_PLUGINS_BASE_VERSION_NANO);
 
   onvif_init_static_plugins();

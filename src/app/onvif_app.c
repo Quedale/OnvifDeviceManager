@@ -11,6 +11,11 @@
 #include "clogger.h"
 #include "../animations/gtk/gtk_dotted_slider_widget.h"
 #include "omgr_device_row.h"
+#include "gtkstyledimage.h"
+
+extern char _binary_tower_png_size[];
+extern char _binary_tower_png_start[];
+extern char _binary_tower_png_end[];
 
 typedef struct _OnvifApp {
     OnvifMgrDeviceRow * device;
@@ -578,15 +583,31 @@ void create_ui (OnvifApp * app) {
     char * btn_css = "* { padding: 0px; font-size: 1.5em; }";
     GtkCssProvider * btn_css_provider = NULL;
 
+    GError *error = NULL;
+    GtkWidget * image = GtkStyledImage__new((unsigned char *)_binary_tower_png_start, _binary_tower_png_end - _binary_tower_png_start, 25, 25, error);
+
     app->btn_scan = gtk_button_new ();
-    label = gtk_label_new("");
+    // label = gtk_label_new("");
     // gtk_label_set_markup (GTK_LABEL (label), "<span><b><b><b>Scan</b></b></b>...</span>");
     // gtk_label_set_markup (GTK_LABEL (label), "&#x1F50D;"); //Magnifying glass (color)
     // gtk_label_set_markup (GTK_LABEL (label), "&#x1f4e1;"); //Antenna arrow (color)
     // gtk_label_set_markup (GTK_LABEL (label), "&#x2609;"); //Dotted circle (called sun)
-    gtk_label_set_markup (GTK_LABEL (label), "&#x27F2;"); //clockwise Circle arrow (Safe icon theme expectation)
+    // gtk_label_set_markup (GTK_LABEL (label), "&#x27F2;"); //clockwise Circle arrow (Safe icon theme expectation)
     // gtk_label_set_markup (GTK_LABEL (label), "&#x1f78b;"); //Target (Not center aligned)
-    gtk_container_add (GTK_CONTAINER (app->btn_scan), label);
+    // gtk_container_add (GTK_CONTAINER (app->btn_scan), label);
+    if(image){
+        gtk_button_set_image(GTK_BUTTON(app->btn_scan), image);
+    } else {
+        if(error->message){
+            C_ERROR("Error creating tower icon : %s",error->message);
+        } else {
+            C_ERROR("Error creating tower icon : [null]");
+        }
+        label = gtk_label_new("");
+        gtk_label_set_markup (GTK_LABEL (label), "&#x27F2;"); //clockwise Circle arrow (Safe icon theme expectation)
+        gtk_container_add (GTK_CONTAINER (app->btn_scan), label);
+    }
+
     gtk_box_pack_start (GTK_BOX(hbox),app->btn_scan,TRUE,TRUE,0);
     g_signal_connect (app->btn_scan, "clicked", G_CALLBACK (onvif_scan), app);
     btn_css_provider = gui_widget_set_css(app->btn_scan, btn_css, btn_css_provider);

@@ -5,6 +5,8 @@ m4_define([onvifmgr_version],[onvifmgr_major_version.onvifmgr_minor_version])
 
 AC_INIT([onvifmgr], [onvifmgr_version], [maintainer@example.com])
 AC_SUBST(APP_VERSION, [onvifmgr_version])
+AC_SUBST(APP_VERSION_MAJ, [onvifmgr_major_version])
+AC_SUBST(APP_VERSION_MIN, [onvifmgr_minor_version])
 
 AC_CONFIG_MACRO_DIRS([m4])
 AC_PROG_CC
