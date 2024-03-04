@@ -27,3 +27,5 @@ test-driver
 onvifmgr
 onvifmgr_settings.ini
 .vscode
+*.deb
+onvifmgr_*/*

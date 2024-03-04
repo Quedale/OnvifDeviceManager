@@ -15,6 +15,7 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Support Multiple ONVIF Profiles
 - Tested H264, H265 and MJPEG stream
 - Logging framework
+- HTTP authentication challenge (Basic, Digest and NTLM)
 
 # TODO
 - EventQueue : Interupt pending events when needed
@@ -24,11 +25,9 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Display Onvif network information
 - Display Media information
 - Add PTZ controls
-- Better Look&Feel
 - Testing with a variety of camera
 - Record video
 - JPEG Snapshot
-- Check for better backchannel audio support. (PCMU@8000 might be Onvif's spec limit)
 - Support casting (Chromecast, Onvif NVD, Mircast, etc..)
 - And a lot more...
 
@@ -74,6 +73,7 @@ sudo apt install libgudev-1.0-dev
 sudo apt install gettext
 sudo apt install libpulse-dev
 sudo apt install nasm
+sudo apt install libntlm
 ```
 If your system already has gstreamer pre-installed, I strongly recommend using `--enable-latest` to download the latest gstreamer release supported.   
 Note that autogen will automatically call "./configure".
