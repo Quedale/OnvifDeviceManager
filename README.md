@@ -73,7 +73,7 @@ sudo apt install libgudev-1.0-dev
 sudo apt install gettext
 sudo apt install libpulse-dev
 sudo apt install nasm
-sudo apt install libntlm
+sudo apt install libntlm0-dev
 ```
 If your system already has gstreamer pre-installed, I strongly recommend using `--enable-latest` to download the latest gstreamer release supported.   
 Note that autogen will automatically call "./configure".
