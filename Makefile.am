@@ -133,7 +133,7 @@ deb$(EXEEXT):
 	@mkdir onvifmgr_$(APP_VERSION)/usr
 	@mkdir onvifmgr_$(APP_VERSION)/usr/local
 	@mkdir onvifmgr_$(APP_VERSION)/usr/local/bin
-	@cp "/home/quedale/git/OnvifDeviceManager/build/onvifmgr" onvifmgr_$(APP_VERSION)/usr/local/bin
+	@cp "$(abs_builddir)/onvifmgr" onvifmgr_$(APP_VERSION)/usr/local/bin
 	@mkdir onvifmgr_$(APP_VERSION)/DEBIAN
 	@echo "Package: onvifmgr" > onvifmgr_$(APP_VERSION)/DEBIAN/control
 	@echo "Version: 0.0-1" >> onvifmgr_$(APP_VERSION)/DEBIAN/control

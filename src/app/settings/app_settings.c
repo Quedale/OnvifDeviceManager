@@ -2,6 +2,7 @@
 #include "app_settings_discovery.h"
 #include "clogger.h"
 #include <pwd.h>
+#include <errno.h>
 
 #define CONFIG_FILE_PATH "onvifmgr_settings.ini"
 

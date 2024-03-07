@@ -326,10 +326,6 @@ buildMakeProject(){
     printf "${ORANGE}*****************************\n${NC}"
     if [ ! -z "${cmakeclean}" ]
     then 
-      rm ${prefix}/lib/libonvifsoap.*
-      rm ${prefix}/lib/libcutils.*
-      rm ${prefix}/lib/pkgconfig/onvifsoap.pc
-      rm ${prefix}/lib/pkgconfig/cutils.pc
       cmake --build "${cmakedir}" --target clean
       find . -iwholename '*cmake*' -not -name CMakeLists.txt -delete
     fi
@@ -941,6 +937,8 @@ fi
 if [ $ret != 0 ]; then
   pullOrClone path=https://github.com/Quedale/CUtils.git ignorecache="true"
   if [ $FAILED -eq 1 ]; then exit 1; fi
+  #Clean up previous build in case of failure. This will prevent from falling back on the old version
+  rm -rf $SUBPROJECT_DIR/CUtils/build/dist/*
   buildMakeProject srcdir="CUtils" prefix="$SUBPROJECT_DIR/CUtils/build/dist" cmakedir=".." outoftree=true cmakeclean=true
   if [ $FAILED -eq 1 ]; then exit 1; fi
 else
@@ -1005,6 +1003,10 @@ if [ $ret != 0 ]; then
   echo "-- Bootstrap OnvifSoapLib  --"
   pullOrClone path=https://github.com/Quedale/OnvifSoapLib.git ignorecache="true"
   if [ $FAILED -eq 1 ]; then exit 1; fi
+
+  #Clean up previous build in case of failure. This will prevent from falling back on the old version
+  rm -rf $SUBPROJECT_DIR/OnvifSoapLib/build/dist/*
+
   PATH=$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin:$PATH \
   GSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8 \
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG:$ZLIB_PKG:$CUTILSLIB_PKG:$NTLM_PKG \
@@ -1044,7 +1046,7 @@ FFMPEG_PKG=$SUBPROJECT_DIR/FFmpeg/dist/lib/pkgconfig
 GST_OMX_PKG_PATH=$SUBPROJECT_DIR/gstreamer/build_omx/dist/lib/gstreamer-1.0/pkgconfig
 GST_PKG_PATH=:$SUBPROJECT_DIR/gstreamer/build/dist/lib/pkgconfig:$SUBPROJECT_DIR/gstreamer/build/dist/lib/gstreamer-1.0/pkgconfig
 gst_ret=0
-GSTREAMER_LATEST=1.22.9
+GSTREAMER_LATEST=1.24.0
 if [ $ENABLE_LATEST == 0 ]; then
   GSTREAMER_VERSION=1.14.4
 else
