@@ -598,7 +598,7 @@ void create_ui (OnvifApp * app) {
     if(image){
         gtk_button_set_image(GTK_BUTTON(app->btn_scan), image);
     } else {
-        if(error->message){
+        if(error && error->message){
             C_ERROR("Error creating tower icon : %s",error->message);
         } else {
             C_ERROR("Error creating tower icon : [null]");

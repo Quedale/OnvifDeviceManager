@@ -91,7 +91,7 @@ OnvifMgrDeviceRow__create_save_btn(OnvifMgrDeviceRow * self){
     if(image){
         gtk_button_set_image(GTK_BUTTON(button), image);
     } else {
-        if(error->message){
+        if(error && error->message){
             C_ERROR("Error writing warning png to GtkPixbufLoader : %s",error->message);
         } else {
             C_ERROR("Error writing warning png to GtkPixbufLoader : [null]");
@@ -450,7 +450,7 @@ void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
 
     //Attempt to get downloaded pixbuf or locked icon
     if(!image){
-        if(error->message){
+        if(error && error->message){
             C_ERROR("Error writing png to GtkPixbufLoader : %s",error->message);
         } else {
             C_ERROR("Error writing png to GtkPixbufLoader : [null]");
@@ -468,7 +468,7 @@ warning:
     if(!image){
         image = GtkStyledImage__new((unsigned char *)_binary_warning_png_start, _binary_warning_png_end - _binary_warning_png_start, 40, 40, error);
         if(!image){
-            if(error->message){
+            if(error && error->message){
                 C_ERROR("Error writing warning png to GtkPixbufLoader : %s",error->message);
             } else {
                 C_ERROR("Error writing warning png to GtkPixbufLoader : [null]");
