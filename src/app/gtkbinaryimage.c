@@ -45,7 +45,12 @@ GtkBinaryImage__init (GtkBinaryImage * self)
 
 GdkPixbuf * GtkBinaryImage__create_pixbuf(unsigned char* data_start, unsigned int data_size, GError * error){
     GdkPixbufLoader *loader = gdk_pixbuf_loader_new ();
-    if(!gdk_pixbuf_loader_write (loader, (unsigned char *)data_start, data_size, &error)){
+    if(!gdk_pixbuf_loader_write (loader, data_start, data_size, &error)){
+        return NULL;
+    }
+
+    gdk_pixbuf_loader_close(loader,&error);
+    if(error){
         return NULL;
     }
 
