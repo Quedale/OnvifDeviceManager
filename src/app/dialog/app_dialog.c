@@ -1,14 +1,20 @@
 #include "app_dialog.h"
 #include "clist.h"
 #include "clogger.h"
+#include "../../animations/gtk/gtk_dotted_slider_widget.h"
 
 typedef struct { 
+    GtkWidget * root;
+    GtkWidget * panel;
+    GtkWidget * panel_decor;
+    GtkWidget * loading_panel;
     GtkWidget * submit_btn;
     GtkWidget * cancel_btn;
     GtkWidget * title_lbl;
     GtkWidget * action_panel;
     GtkWidget * dummy;
     GtkWidget * focusedWidget;
+    GtkWidget * innerFocusedWidget;
     int keysignalid;
 } AppDialogElements;
 
@@ -71,7 +77,6 @@ void AppDialog__init(AppDialog* self, GtkWidget * (*create_ui)(AppDialogEvent *)
     self->submit_label = NULL;
     self->visible = 0;
     self->action_visible = 1;
-    self->root = NULL;
     self->submit_callback = NULL;
     self->cancel_callback = NULL;
     self->show_callback = NULL;
@@ -79,7 +84,15 @@ void AppDialog__init(AppDialog* self, GtkWidget * (*create_ui)(AppDialogEvent *)
     self->closable = 1;
     self->submittable = 1;
     self->cancellable = 1;
-    self->private = malloc(sizeof(AppDialogElements));
+
+    AppDialogElements * elements = malloc(sizeof(AppDialogElements));
+    elements->innerFocusedWidget = NULL;
+    elements->focusedWidget = NULL;
+    elements->root = NULL;
+    elements->panel = NULL;
+    elements->loading_panel = NULL;
+
+    self->private = elements;
     self->create_ui = create_ui;
     priv_AppDialog__create_ui(self);
 }
@@ -104,8 +117,8 @@ void AppDialog__show(AppDialog* dialog, void (*submit_callback)(AppDialogEvent *
     dialog->submit_callback = submit_callback;
 
     //Conncet keyboard handler. ESC = Cancel, Enter/Return = Login
-    GtkWidget *window = gtk_widget_get_toplevel (dialog->root);
-    AppDialogElements * elements = (AppDialogElements *) dialog->private; 
+    AppDialogElements * elements = (AppDialogElements *) dialog->private;
+    GtkWidget *window = gtk_widget_get_toplevel (elements->root);
     if (gtk_widget_is_toplevel (window)){  
         elements->focusedWidget = gtk_window_get_focus(GTK_WINDOW(window));
         gtk_widget_add_events(window, GDK_KEY_PRESS_MASK);
@@ -113,14 +126,27 @@ void AppDialog__show(AppDialog* dialog, void (*submit_callback)(AppDialogEvent *
     }
 
     //Prevent overlayed widget from getting focus
-    GtkWidget *parent = gtk_widget_get_parent(dialog->root);
-    gtk_container_foreach (GTK_CONTAINER (parent), (GtkCallback)priv_AppDialog__set_onlyfocus, dialog->root);
+    GtkWidget *parent = gtk_widget_get_parent(elements->root);
+    gtk_container_foreach (GTK_CONTAINER (parent), (GtkCallback)priv_AppDialog__set_onlyfocus, elements->root);
 
     priv_AppDialog__update_title(dialog);
 
     priv_AppDialog_show_event(dialog);
 
-    gtk_widget_set_visible(dialog->root,TRUE);
+    gtk_widget_set_visible(elements->root,TRUE);
+
+    //Show input panel
+    if(GTK_IS_WIDGET(elements->panel))
+        gtk_widget_show(elements->panel);
+
+    //Show action panel
+    if(GTK_IS_WIDGET(elements->action_panel))
+        gtk_widget_show(elements->action_panel);
+    
+    //Restore stolen focus
+    if(GTK_IS_WIDGET(elements->innerFocusedWidget))
+        gtk_widget_grab_focus(elements->innerFocusedWidget);
+
     gtk_widget_hide(elements->dummy);
 }
 
@@ -132,25 +158,35 @@ void AppDialog__hide(AppDialog* dialog){
     dialog->visible = 0;
 
     //Disconnect keyboard handler.
-    GtkWidget *window = gtk_widget_get_toplevel (dialog->root);
-    AppDialogElements * elements = (AppDialogElements *) dialog->private; 
+    AppDialogElements * elements = (AppDialogElements *) dialog->private;
+    GtkWidget *window = gtk_widget_get_toplevel (elements->root);
     if (gtk_widget_is_toplevel (window)){  
         g_signal_handler_disconnect (G_OBJECT (window), elements->keysignalid);
         elements->keysignalid = 0;
     }
 
     //Restore focus capabilities to previous widget
-    GtkWidget *parent = gtk_widget_get_parent(dialog->root);
-    gtk_container_foreach (GTK_CONTAINER (parent), (GtkCallback)priv_AppDialog__set_nofocus, dialog->root);
+    GtkWidget *parent = gtk_widget_get_parent(elements->root);
+    gtk_container_foreach (GTK_CONTAINER (parent), (GtkCallback)priv_AppDialog__set_nofocus, elements->root);
 
     //Restore stolen focus
-    gtk_widget_grab_focus(elements->focusedWidget);
+    if(GTK_IS_WIDGET(elements->focusedWidget))
+        gtk_widget_grab_focus(elements->focusedWidget);
 
-    gtk_widget_set_visible(dialog->root,FALSE);
+    gtk_widget_set_visible(elements->root,FALSE);
+
+    if(GTK_IS_WIDGET(elements->loading_panel)){
+        gtk_widget_destroy(elements->loading_panel);
+        elements->loading_panel = NULL;
+    }
+
+    //Reset focused widget pointer
+    elements->innerFocusedWidget = NULL;
 }
 
 void AppDialog__add_to_overlay(AppDialog * self, GtkOverlay * overlay){
-    gtk_overlay_add_overlay(overlay,self->root);
+    AppDialogElements * elements = (AppDialogElements *) self->private;
+    gtk_overlay_add_overlay(overlay,elements->root);
 }
 
 void priv_AppDialog__set_nofocus(GtkWidget *widget, GtkWidget * dialog_root){
@@ -170,7 +206,8 @@ void priv_AppDialog__set_onlyfocus (GtkWidget *widget, GtkWidget * dialog_root){
 }
 
 int AppDialog__has_focus(AppDialog* dialog){
-    return priv_AppDialog__has_focus(dialog->root);
+    AppDialogElements * elements = (AppDialogElements *) dialog->private;
+    return priv_AppDialog__has_focus(elements->root);
 }
 
 int priv_AppDialog__has_focus(GtkWidget * widget){
@@ -219,8 +256,9 @@ void priv_AppDialog__create_ui(AppDialog * self){
     GtkWidget * empty;
     GtkCssProvider * cssProvider;
     GtkStyleContext * context;
+    AppDialogElements * elements = (AppDialogElements*) self->private;
 
-    self->root = gtk_grid_new ();
+    elements->root = gtk_grid_new ();
 
    //See-through overlay background
     cssProvider = gtk_css_provider_new();
@@ -230,8 +268,7 @@ void priv_AppDialog__create_ui(AppDialog * self){
     empty = gtk_label_new("");
     gtk_widget_set_vexpand (empty, TRUE);
     gtk_widget_set_hexpand (empty, TRUE);
-    gtk_widget_set_size_request (empty, 20,-1);
-    gtk_grid_attach (GTK_GRID (self->root), empty, 0, 0, 1, 3);
+    gtk_grid_attach (GTK_GRID (elements->root), empty, 0, 0, 1, 3);
     context = gtk_widget_get_style_context(empty);
     gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
 
@@ -239,8 +276,7 @@ void priv_AppDialog__create_ui(AppDialog * self){
     empty = gtk_label_new("");
     gtk_widget_set_vexpand (empty, TRUE);
     gtk_widget_set_hexpand (empty, TRUE);
-    gtk_widget_set_size_request (empty, 20,-1);
-    gtk_grid_attach (GTK_GRID (self->root), empty, 2, 0, 1, 3);
+    gtk_grid_attach (GTK_GRID (elements->root), empty, 2, 0, 1, 3);
     context = gtk_widget_get_style_context(empty);
     gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
 
@@ -248,8 +284,7 @@ void priv_AppDialog__create_ui(AppDialog * self){
     empty = gtk_label_new("");
     gtk_widget_set_vexpand (empty, TRUE);
     gtk_widget_set_hexpand (empty, TRUE);
-    gtk_widget_set_size_request (empty, -1,20);
-    gtk_grid_attach (GTK_GRID (self->root), empty, 1, 0, 1, 1);
+    gtk_grid_attach (GTK_GRID (elements->root), empty, 1, 0, 1, 1);
     context = gtk_widget_get_style_context(empty);
     gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
 
@@ -257,13 +292,12 @@ void priv_AppDialog__create_ui(AppDialog * self){
     empty = gtk_label_new("");
     gtk_widget_set_vexpand (empty, TRUE);
     gtk_widget_set_hexpand (empty, TRUE);
-    gtk_widget_set_size_request (empty, -1,20);
-    gtk_grid_attach (GTK_GRID (self->root), empty, 1, 2, 1, 1);
+    gtk_grid_attach (GTK_GRID (elements->root), empty, 1, 2, 1, 1);
     context = gtk_widget_get_style_context(empty);
     gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
     
     empty = priv_AppDialog__create_panel(self);
-    gtk_grid_attach (GTK_GRID (self->root), empty, 1, 1, 1, 1);
+    gtk_grid_attach (GTK_GRID (elements->root), empty, 1, 1, 1, 1);
 
     //Creating empty panel, to create opacity background behind corners
     cssProvider = gtk_css_provider_new();
@@ -271,51 +305,49 @@ void priv_AppDialog__create_ui(AppDialog * self){
     empty = gtk_label_new("");
     context = gtk_widget_get_style_context(empty);
     gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
-    gtk_grid_attach (GTK_GRID (self->root), empty, 1, 1, 1, 1);
+    gtk_grid_attach (GTK_GRID (elements->root), empty, 1, 1, 1, 1);
 
     g_object_unref (cssProvider);  
     
-    g_signal_connect (G_OBJECT (self->root), "show", G_CALLBACK (priv_AppDialog__root_panel_show_cb), self);
+    g_signal_connect (G_OBJECT (elements->root), "show", G_CALLBACK (priv_AppDialog__root_panel_show_cb), self);
 
 }
 
 GtkWidget * priv_AppDialog__create_panel(AppDialog * dialog){
-    GtkWidget * widget;
-    GtkWidget * grid = gtk_grid_new ();
-
     GtkCssProvider * cssProvider;
     GtkStyleContext * context;
 
     AppDialogElements * elements = (AppDialogElements *) dialog->private; 
+    elements->panel_decor = gtk_grid_new ();
 
     //Add title strip
     elements->title_lbl = gtk_label_new("");
     g_object_set (elements->title_lbl, "margin", 10, NULL);
     gtk_widget_set_hexpand (elements->title_lbl, TRUE);
-    gtk_grid_attach (GTK_GRID (grid), elements->title_lbl, 0, 0, 1, 1);
+    gtk_grid_attach (GTK_GRID (elements->panel_decor), elements->title_lbl, 0, 0, 1, 1);
 
     elements->dummy = gtk_entry_new();
     g_object_set (elements->dummy, "margin-right", 10, NULL);
     gtk_widget_set_hexpand (elements->dummy, TRUE);
-    gtk_grid_attach (GTK_GRID (grid), elements->dummy, 1, 0, 1, 1);
+    gtk_grid_attach (GTK_GRID (elements->panel_decor), elements->dummy, 1, 0, 1, 1);
 
     //Lightgrey background for the title strip
     cssProvider = gtk_css_provider_new();
     gtk_css_provider_load_from_data(cssProvider, "* { background-image:none; border-radius: 10px; background: linear-gradient(to top, @theme_bg_color, @theme_bg_color);}",-1,NULL); 
-    context = gtk_widget_get_style_context(grid);
+    context = gtk_widget_get_style_context(elements->panel_decor);
     gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
 
-    widget = priv_AppDialog_create_parent_ui(dialog);
-    if(widget){
-        gtk_grid_attach (GTK_GRID (grid), widget, 0, 1, 1, 1);
+    elements->panel = priv_AppDialog_create_parent_ui(dialog);
+    if(elements->panel){
+        gtk_grid_attach (GTK_GRID (elements->panel_decor), elements->panel, 0, 1, 1, 1);
     }
 
     priv_AppDialog__create_buttons(dialog);
-    gtk_grid_attach (GTK_GRID (grid), elements->action_panel, 0, 2, 1, 1);
+    gtk_grid_attach (GTK_GRID (elements->panel_decor), elements->action_panel, 0, 2, 1, 1);
 
     g_object_unref (cssProvider);  
 
-    return grid;
+    return elements->panel_decor;
 }
 
 void priv_AppDialog__attach_cancel_button(AppDialog *dialog){
@@ -523,4 +555,82 @@ void AppDialog__set_submit_label(AppDialog* self, char * label){
     }
     strcpy(self->submit_label,label);
     priv_AppDialog__update_submit_label(self);
+}
+
+void AppDialog__show_loading(AppDialog * self, char * message){
+
+    //Save previous focused element
+    AppDialogElements * elements = (AppDialogElements *) self->private;
+    GtkWidget *window = gtk_widget_get_toplevel (elements->root);
+    if (gtk_widget_is_toplevel (window)){  
+        elements->innerFocusedWidget = gtk_window_get_focus(GTK_WINDOW(window));
+    }
+
+    //Create loading panel
+    GtkWidget * widget;
+    elements->loading_panel = gtk_grid_new ();
+    gtk_widget_set_margin_bottom(elements->loading_panel,10);
+    gtk_widget_set_margin_top(elements->loading_panel,10);
+    gtk_widget_set_margin_start(elements->loading_panel,10);
+    gtk_widget_set_margin_end(elements->loading_panel,10);  
+
+    widget = gtk_label_new(message);
+    gtk_widget_set_margin_bottom(widget,10);
+    gtk_widget_set_margin_top(widget,10);
+    gtk_widget_set_margin_start(widget,10);
+    gtk_widget_set_margin_end(widget,10);  
+    gtk_label_set_line_wrap(GTK_LABEL(widget),1);
+    gtk_widget_set_hexpand (widget, TRUE);
+    gtk_widget_set_vexpand (widget, FALSE);
+    gtk_grid_attach (GTK_GRID (elements->loading_panel), widget, 0, 1, 3, 1);
+    gtk_label_set_justify(GTK_LABEL(widget), GTK_JUSTIFY_CENTER);
+
+    widget = gtk_label_new("");
+    gtk_widget_set_hexpand (widget, TRUE);
+    gtk_grid_attach (GTK_GRID (elements->loading_panel), widget, 0, 0, 1, 1);
+
+    widget = gtk_dotted_slider_new(GTK_ORIENTATION_HORIZONTAL, 5,10,1);
+    gtk_widget_set_margin_bottom(widget,10);
+    gtk_widget_set_margin_top(widget,10);
+    gtk_widget_set_margin_start(widget,10);
+    gtk_widget_set_margin_end(widget,10);  
+    gtk_grid_attach (GTK_GRID (elements->loading_panel), widget, 1, 0, 1, 1);
+
+    widget = gtk_label_new("");
+    gtk_widget_set_hexpand (widget, TRUE);
+    gtk_grid_attach (GTK_GRID (elements->loading_panel), widget, 2, 0, 1, 1);
+
+    //Hide input panel
+    if(GTK_IS_WIDGET(elements->panel))
+        gtk_widget_set_visible(elements->panel,FALSE);
+
+    //Hide action panel
+    if(GTK_IS_WIDGET(elements->action_panel))
+        gtk_widget_set_visible(elements->action_panel,FALSE);
+
+    //Attach and show new panel
+    gtk_grid_attach (GTK_GRID (elements->panel_decor), elements->loading_panel, 0, 1, 1, 1);
+    gtk_widget_show_all(elements->loading_panel);
+}
+
+void AppDialog__hide_loading(AppDialog * self){
+    AppDialogElements * elements = (AppDialogElements *) self->private;
+
+    //Destroy loading panel
+    if(GTK_IS_WIDGET(elements->loading_panel)){
+        gtk_widget_destroy(elements->loading_panel);
+        elements->loading_panel = NULL;
+    }
+    
+    //Show input panel
+    if(GTK_IS_WIDGET(elements->panel))
+        gtk_widget_show(elements->panel);
+
+    //Show action panel
+    if(GTK_IS_WIDGET(elements->action_panel))
+        gtk_widget_show(elements->action_panel);
+    
+    //Restore stolen focus
+    if(GTK_IS_WIDGET(elements->innerFocusedWidget))
+        gtk_widget_grab_focus(elements->innerFocusedWidget);
 }

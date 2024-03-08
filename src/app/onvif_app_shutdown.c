@@ -1,5 +1,4 @@
 #include "onvif_app_shutdown.h"
-#include "../animations/gtk/gtk_dotted_slider_widget.h"
 #include "clogger.h"
 
 void safely_quit_gtk_main(void * user_data){
@@ -35,16 +34,14 @@ void onvif_app_shutdown(OnvifApp * data){
         return;
     }
     
-    GtkWidget * slider = gtk_dotted_slider_new(GTK_ORIENTATION_HORIZONTAL, 5,10,1);
     MsgDialog * dialog = OnvifApp__get_msg_dialog(data);
-    MsgDialog__set_icon(dialog, slider);
     AppDialog__set_closable((AppDialog*)dialog, 0);
     AppDialog__set_submit_label((AppDialog*)dialog, "Force Shutdown!");
     AppDialog__set_title((AppDialog*)dialog,"Shutting down...");
     AppDialog__set_cancellable((AppDialog*)dialog,0);
-    MsgDialog__set_message(dialog,"Waiting for running task to finish...");
-    AppDialog__show_actions((AppDialog*)dialog);
     AppDialog__show((AppDialog *) dialog,force_shutdown_cb,NULL,data);
+    AppDialog__show_loading((AppDialog *) dialog,"Waiting for running task to finish...");
+    AppDialog__show_actions((AppDialog*)dialog);
 
     pthread_t pthread;
     pthread_create(&pthread, NULL, _thread_destruction, data);

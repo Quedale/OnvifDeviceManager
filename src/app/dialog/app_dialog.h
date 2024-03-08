@@ -26,7 +26,6 @@ struct _AppDialog {
     int submittable;
     char * title;
     char * submit_label;
-    GtkWidget * root;
     void (*submit_callback)(AppDialogEvent *);
     void (*cancel_callback)(AppDialogEvent *);
     void (*show_callback)(AppDialogEvent *);
@@ -58,6 +57,8 @@ void AppDialog__set_closable(AppDialog * self, int closable);
 void AppDialog__set_cancellable(AppDialog * self, int cancellable);
 void AppDialog__set_submitable(AppDialog * self, int submitable);
 void * AppDialog__get_user_data(AppDialog * self);
+void AppDialog__show_loading(AppDialog * self, char * message);
+void AppDialog__hide_loading(AppDialog * self);
 
 AppDialogEvent * AppDialogEvent_copy(AppDialogEvent * original);
 

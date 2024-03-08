@@ -9,7 +9,6 @@
 #include "discoverer.h"
 #include "task_manager.h"
 #include "clogger.h"
-#include "../animations/gtk/gtk_dotted_slider_widget.h"
 #include "omgr_device_row.h"
 #include "gtkstyledimage.h"
 
@@ -47,6 +46,7 @@ void _profile_callback (void * user_data);
 void add_device(OnvifMgrDeviceRow * device);
 gboolean OnvifApp__set_device(OnvifApp * app, GtkListBoxRow * row);
 gboolean * idle_hide_dialog (void * user_data);
+gboolean * idle_hide_dialog_loading (void * user_data);
 
 /*
  *
@@ -372,12 +372,15 @@ void _onvif_authentication_reload(void * user_data){
     if(onvif_reload_device(device)){
         gdk_threads_add_idle(G_SOURCE_FUNC(idle_hide_dialog),OnvifMgrDeviceRow__get_app(device)->cred_dialog);
         g_object_unref(device);
+    } else {
+        gdk_threads_add_idle(G_SOURCE_FUNC(idle_hide_dialog_loading),OnvifMgrDeviceRow__get_app(device)->cred_dialog);
     }
 }
 
 void dialog_login_cb(AppDialogEvent * event){
     C_INFO("OnvifAuthentication attempt...\n");
     OnvifMgrDeviceRow * device = ONVIFMGR_DEVICEROW(event->user_data);
+    AppDialog__show_loading((AppDialog*)OnvifMgrDeviceRow__get_app(device)->cred_dialog, "ONVIF Authentication attempt...");
     OnvifDevice__set_credentials(OnvifMgrDeviceRow__get_device(device),CredentialsDialog__get_username((CredentialsDialog*)event->dialog),CredentialsDialog__get_password((CredentialsDialog*)event->dialog));
     EventQueue__insert(OnvifMgrDeviceRow__get_app(device)->queue,_onvif_authentication_reload,AppDialogEvent_copy(event));
 }
@@ -448,9 +451,15 @@ gboolean * idle_hide_dialog (void * user_data){
     return FALSE;
 }
 
+gboolean * idle_hide_dialog_loading (void * user_data){
+    AppDialog * dialog = (AppDialog *) user_data;
+    AppDialog__hide_loading(dialog);
+    return FALSE;
+}
+
+
 
 void _onvif_device_add(void * user_data){
-    MsgDialog * msgdialog;
     AppDialogEvent * event = (AppDialogEvent *) user_data;
     AddDeviceDialog * dialog = (AddDeviceDialog *) event->dialog;
     const char * host = AddDeviceDialog__get_host((AddDeviceDialog *)event->dialog);
@@ -507,16 +516,18 @@ void _onvif_device_add(void * user_data){
             AddDeviceDialog__set_error(dialog,"Unexected soap error occured...");
         } else if(oerror == ONVIF_ERROR_CONNECTION){
             AddDeviceDialog__set_error(dialog,"Failed to connect...");
+        } else {
+            C_ERROR("An soap error was encountered %d\n",oerror);
         }
-        C_ERROR("An soap error was encountered %d\n",oerror);
         OnvifDevice__destroy(onvif_dev);
         goto exit;
     }
 
     gdk_threads_add_idle(G_SOURCE_FUNC(idle_hide_dialog),dialog);
+    goto free;
 exit:
-    msgdialog = OnvifApp__get_msg_dialog((OnvifApp *) event->user_data);
-    gdk_threads_add_idle(G_SOURCE_FUNC(idle_hide_dialog),msgdialog);
+    gdk_threads_add_idle(G_SOURCE_FUNC(idle_hide_dialog_loading),dialog);
+free:
     free(event);
 }
 
@@ -528,16 +539,7 @@ void add_device_add_cb(AppDialogEvent * event){
         return;
     }
 
-    GtkWidget * image = gtk_dotted_slider_new(GTK_ORIENTATION_HORIZONTAL, 5,10,1);
-    MsgDialog * dialog = OnvifApp__get_msg_dialog(app);
-    MsgDialog__set_icon(dialog, image);
-    AppDialog__set_closable((AppDialog*)dialog, 0);
-    AppDialog__hide_actions((AppDialog*)dialog);
-    AppDialog__set_title((AppDialog*)dialog,"Working...");
-    AppDialog__set_cancellable((AppDialog*)dialog,0);
-    MsgDialog__set_message(dialog,"Testing ONVIF device configuration...");
-    AppDialog__show((AppDialog *) dialog,NULL,NULL,NULL);
-
+    AppDialog__show_loading((AppDialog*)event->dialog, "Testing ONVIF device configuration...");
     EventQueue__insert(app->queue,_onvif_device_add,AppDialogEvent_copy(event));
 }
 
@@ -844,6 +846,8 @@ OnvifApp * OnvifApp__create(){
 
 void OnvifApp__destroy(OnvifApp* self){
     if (self) {
+        //Destroying the queue will hang until all threads are stopped
+        CObject__destroy((CObject*)self->queue);
         OnvifDetails__destroy(self->details);
         AppSettings__destroy(self->settings);
         TaskMgr__destroy(self->taskmgr);
@@ -851,8 +855,6 @@ void OnvifApp__destroy(OnvifApp* self){
         CObject__destroy((CObject*)self->add_dialog);
         CObject__destroy((CObject*)self->cred_dialog);
         CObject__destroy((CObject*)self->msg_dialog);
-        //Destroying the queue will hang until all threads are stopped
-        CObject__destroy((CObject*)self->queue);
         //Destroying the player will cause it to hang until its state changed to NULL
         //Destroying the player after the queue because the queue could dispatch retry call
         g_object_unref(self->player);

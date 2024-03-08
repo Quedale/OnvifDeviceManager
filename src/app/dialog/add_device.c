@@ -111,6 +111,7 @@ GtkWidget * priv_AddDeviceDialog__create_iu(AppDialogEvent * event){
     gtk_widget_set_vexpand (elements->lblerr, TRUE);
     gtk_grid_attach (GTK_GRID (grid), elements->lblerr, 0, 0, 2, 1);
     gtk_label_set_justify(GTK_LABEL(elements->lblerr), GTK_JUSTIFY_CENTER);
+    gtk_widget_set_no_show_all(elements->lblerr,TRUE);
 
     cssProvider = gtk_css_provider_new();
     gtk_css_provider_load_from_data(cssProvider, "* { background-image:none; color:#DE5E09;}",-1,NULL); 
