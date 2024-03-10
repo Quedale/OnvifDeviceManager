@@ -565,6 +565,62 @@ GstRtspPlayerPrivate__warning_msg (GstBus *bus, GstMessage *msg) {
     g_free (debug_info);
 }
 
+static void GstRtspPlayerPrivate__process_fallback(GstRtspPlayerPrivate * priv){
+    switch(priv->fallback){
+        case RTSP_FALLBACK_NONE:
+            priv->fallback = RTSP_FALLBACK_HOST;
+            char * host_fallback = NULL;
+            if(priv->host_fallback) host_fallback = URL__set_host(priv->location_set, priv->host_fallback);
+            if(host_fallback && strcmp(host_fallback,priv->location_set) != 0){
+                C_WARN("Attempting URL host correction : [%s] --> [%s]",priv->location_set, host_fallback);
+                free(priv->location);
+                priv->location = host_fallback;
+                break;
+            } else {
+                free(host_fallback);
+            }
+            __attribute__ ((fallthrough));
+        case RTSP_FALLBACK_HOST:
+            priv->fallback = RTSP_FALLBACK_PORT;
+            char * port_fallback = NULL;
+            if(priv->port_fallback) port_fallback = URL__set_port(priv->location_set, priv->port_fallback);
+            if(port_fallback && strcmp(port_fallback,priv->location_set) != 0){
+                C_WARN("Attempting URL port correction : [%s] --> [%s]",priv->location_set, port_fallback);
+                free(priv->location);
+                priv->location = port_fallback;
+                break;
+            } else {
+                free(port_fallback);
+            }
+            __attribute__ ((fallthrough));
+        case RTSP_FALLBACK_PORT:
+            priv->fallback = RTSP_FALLBACK_URL;
+            char * tmp_fallback = NULL;
+            char * url_fallback = NULL;
+            if(priv->host_fallback && priv->port_fallback){
+                tmp_fallback = URL__set_port(priv->location_set, priv->port_fallback);
+                url_fallback = URL__set_host(tmp_fallback, priv->host_fallback);
+            }
+            if(url_fallback && strcmp(url_fallback,priv->location_set) != 0){
+                C_WARN("Attempting root URL correction : [%s] --> [%s]",priv->location_set, url_fallback);
+                free(priv->location);
+                priv->location = url_fallback;
+                free(tmp_fallback);
+                break;
+            } else {
+                free(url_fallback);
+                free(tmp_fallback);
+            }
+            __attribute__ ((fallthrough));
+        case RTSP_FALLBACK_URL:
+        default:
+            //Do not retry after connection failure
+            priv->playing = 0;
+            C_ERROR ("Failed to connect to %s", priv->location_set);
+            break;
+    }
+}
+
 /* This function is called when an error message is posted on the bus */
 static void 
 GstRtspPlayerPrivate__error_msg (GstBus *bus, GstMessage *msg, GstRtspPlayerPrivate * priv) {
@@ -576,74 +632,38 @@ GstRtspPlayerPrivate__error_msg (GstBus *bus, GstMessage *msg, GstRtspPlayerPriv
     P_MUTEX_LOCK(priv->player_lock);
 
     gst_message_parse_error (msg, &err, &debug_info);
-    C_ERROR ("Error received from element %s: %s", GST_OBJECT_NAME (msg->src), err->message);
-    C_ERROR ("Debugging information: %s", debug_info ? debug_info : "none");
-    C_ERROR ("Error code : %d",err->code);
 
-    if(err->code == GST_RESOURCE_ERROR_SETTINGS && priv->enable_backchannel){
-        C_WARN ("Backchannel unsupported. Downgrading...");
-        priv->enable_backchannel = 0;
-        priv->retry--; //This doesn't count as a try. Finding out device capabilities count has handshake
-    } else if(err->code == GST_RESOURCE_ERROR_NOT_AUTHORIZED ||
-        err->code == GST_RESOURCE_ERROR_NOT_FOUND){
-        C_ERROR("Non-recoverable error encountered.");
-        priv->playing = 0;
-    } else if((err->code == GST_RESOURCE_ERROR_OPEN_READ ||
-                err->code == GST_RESOURCE_ERROR_OPEN_WRITE ||
-                err->code == GST_RESOURCE_ERROR_OPEN_READ_WRITE) &&
-                (priv->port_fallback || priv->host_fallback)){
-        fallback = 1;
-PUSH_WARNING_IGNORE(-1,-Wimplicit-fallthrough)
-        switch(priv->fallback){
-            case RTSP_FALLBACK_NONE:
-                priv->fallback = RTSP_FALLBACK_PORT;
-                char * port_fallback = NULL;
-                if(priv->port_fallback) port_fallback = URL__set_port(priv->location_set, priv->port_fallback);
-                if(port_fallback && strcmp(port_fallback,priv->location_set) != 0){
-                    C_WARN("Attempting URL port correction : [%s] --> [%s]",priv->location_set, port_fallback);
-                    free(priv->location);
-                    priv->location = port_fallback;
-                    break;
-                } else {
-                    free(port_fallback);
-                }
-            case RTSP_FALLBACK_PORT:
-                priv->fallback = RTSP_FALLBACK_HOST;
-                char * host_fallback = NULL;
-                if(priv->host_fallback) host_fallback = URL__set_host(priv->location_set, priv->host_fallback);
-                if(host_fallback && strcmp(host_fallback,priv->location_set) != 0){
-                    C_WARN("Attempting URL host correction : [%s] --> [%s]",priv->location_set, host_fallback);
-                    free(priv->location);
-                    priv->location = host_fallback;
-                    break;
-                } else {
-                    free(host_fallback);
-                }
-            case RTSP_FALLBACK_HOST:
-                priv->fallback = RTSP_FALLBACK_URL;
-                char * tmp_fallback = NULL;
-                char * url_fallback = NULL;
-                if(priv->host_fallback && priv->port_fallback){
-                    tmp_fallback = URL__set_port(priv->location_set, priv->port_fallback);
-                    url_fallback = URL__set_host(tmp_fallback, priv->host_fallback);
-                }
-                if(url_fallback && strcmp(url_fallback,priv->location_set) != 0){
-                    C_WARN("Attempting root URL correction : [%s] --> [%s]",priv->location_set, url_fallback);
-                    free(priv->location);
-                    priv->location = url_fallback;
-                    free(tmp_fallback);
-                    break;
-                } else {
-                    free(url_fallback);
-                    free(tmp_fallback);
-                }
-            case RTSP_FALLBACK_URL:
-            default:
-                //Do not retry after connection failure
-                priv->playing = 0;
-                break;
-        }
-POP_WARNING_IGNORE(NULL)
+    switch(err->code){
+        case GST_RESOURCE_ERROR_SETTINGS:
+            C_WARN ("Backchannel unsupported. Downgrading...");
+            if(priv->enable_backchannel){
+                priv->enable_backchannel = 0;
+                priv->retry--; //This doesn't count as a try. Finding out device capabilities count has handshake
+            } else {
+                C_ERROR ("Error received from element %s: %s", GST_OBJECT_NAME (msg->src), err->message);
+                C_ERROR ("Debugging information: %s", debug_info ? debug_info : "none");
+                C_ERROR ("Error code : %d",err->code);
+            }
+            break;
+        case GST_RESOURCE_ERROR_OPEN_READ:
+        case GST_RESOURCE_ERROR_OPEN_WRITE:
+        case GST_RESOURCE_ERROR_OPEN_READ_WRITE:
+            if(priv->port_fallback || priv->host_fallback){
+                fallback = 1;
+                GstRtspPlayerPrivate__process_fallback(priv);
+            } else {
+                C_ERROR ("Failed to connect to %s", priv->location_set);
+            }
+            break;
+        case GST_RESOURCE_ERROR_NOT_AUTHORIZED:
+        case GST_RESOURCE_ERROR_NOT_FOUND:
+            C_ERROR("Non-recoverable error encountered.");
+            priv->playing = 0;
+            __attribute__ ((fallthrough));
+        default:
+            C_ERROR ("Error received from element %s: %s", GST_OBJECT_NAME (msg->src), err->message);
+            C_ERROR ("Debugging information: %s", debug_info ? debug_info : "none");
+            C_ERROR ("Error code : %d",err->code);
     }
 
     g_clear_error (&err);
@@ -723,11 +743,13 @@ GstRtspPlayerPrivate__state_changed_msg (GstBus * bus, GstMessage * msg, GstRtsp
         /*
         * Waiting for fix https://gitlab.freedesktop.org/gstreamer/gst-plugins-good/-/issues/245
         * Until This issue is fixed, "no-more-pads" is unreliable to determine if all stream states are ready.
-        * Until then, we only rely on the video stream state to fired the started signal
+        * Until then, we only rely on the video stream state to fire the started signal
         * Funny enough, a gstreamer generated onvif rtsp stream causes this issue
         * 
-        * "select-stream" might be an alternative, although I don't know if the first stream could be play before the last one is shown
+        * "select-stream" might be an alternative, although I don't know if the first stream could play before the last one is shown
         */
+        priv->retry = 0;
+        priv->fallback = RTSP_FALLBACK_NONE;
         g_signal_emit (priv->owner, signals[STARTED], 0 /* details */);
     }
 
