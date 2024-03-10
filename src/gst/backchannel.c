@@ -178,6 +178,7 @@ gboolean RtspBackchannel__find (GstElement * rtspsrc, guint idx, GstCaps * caps,
         g_object_set (G_OBJECT (self->appsink), "caps", caps, NULL);
         C_DEBUG ("Playing backchannel shoveler\n");
         gst_element_set_state (self->pipeline, GST_STATE_PLAYING);
+        gst_caps_unref (caps);
     }
 
 exit:

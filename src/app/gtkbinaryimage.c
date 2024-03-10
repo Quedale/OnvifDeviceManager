@@ -44,27 +44,26 @@ GtkBinaryImage__init (GtkBinaryImage * self)
 }
 
 GdkPixbuf * GtkBinaryImage__create_pixbuf(unsigned char* data_start, unsigned int data_size, GError * error){
+    GdkPixbuf *pixbuf = NULL;
     GdkPixbufLoader *loader = gdk_pixbuf_loader_new ();
     if(!gdk_pixbuf_loader_write (loader, data_start, data_size, &error)){
-        return NULL;
+        goto exit;
     }
 
     gdk_pixbuf_loader_close(loader,&error);
     if(error){
-        return NULL;
+        goto exit;
     }
 
-    GdkPixbuf *pixbuf = gdk_pixbuf_loader_get_pixbuf (loader);
+    pixbuf = gdk_pixbuf_loader_get_pixbuf (loader);
     if(!pixbuf){
-        return NULL;
+        goto exit;
     }
 
-    g_object_ref(pixbuf);
-
-    gdk_pixbuf_loader_close(loader,NULL);
+    g_object_ref(pixbuf); //Replace floating ref
+    g_object_ref(pixbuf); //Unref loader also unref pixbuf. so we double it
+exit:
     g_object_unref(loader);
-
-    g_object_ref(pixbuf);
     return pixbuf;
 }
 
@@ -136,6 +135,7 @@ void GtkBinaryImage__set_data(GtkBinaryImage *  self, unsigned char* data_start,
     priv->data_size = data_size;
 
     GtkBinaryImage__set_image(GTK_BINARYIMAGE(self), pixbuf);
+    g_object_unref(pixbuf);
 }
 
 void GtkBinaryImage__set_width(GtkBinaryImage *  self, int width){

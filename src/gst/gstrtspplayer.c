@@ -7,13 +7,21 @@
 #include "gst/rtsp/gstrtsptransport.h"
 #include "url_parser.h"
 
+typedef enum {
+    RTSP_FALLBACK_NONE,
+    RTSP_FALLBACK_PORT,
+    RTSP_FALLBACK_HOST,
+    RTSP_FALLBACK_URL
+} GstRtspPlayerFallbackType;
+
 typedef struct {
     GstRtspPlayer * owner;
     GstElement *pipeline;
     GstElement *src;  /* RtspSrc to support backchannel */
     GstElement *sink;  /* Video Sink */
     GList * dynamic_elements;
-
+    GstRtspPlayerFallbackType fallback;
+    
     //Backpipe related properties
     int enable_backchannel;
     RtspBackchannel * backchannel;
@@ -21,6 +29,7 @@ typedef struct {
     OverlayState *overlay_state;
 
     //Keep location to used on retry
+    char * location_set;
     char * location;
     //Retry count
     int retry;
@@ -41,6 +50,7 @@ typedef struct {
     char * pass;
 
     char * port_fallback;
+    char * host_fallback;
 } GstRtspPlayerPrivate;
 
 enum {
@@ -89,8 +99,14 @@ GstRtspPlayer__dispose (GObject *gobject)
     if(priv->location){
         free(priv->location);
     }
+    if(priv->location_set){
+        free(priv->location_set);
+    }
     if(priv->port_fallback){
         free(priv->port_fallback);
+    }
+    if(priv->host_fallback){
+        free(priv->host_fallback);
     }
     if(priv->user){
         free(priv->user);
@@ -209,6 +225,7 @@ void GstRtspPlayer__play(GstRtspPlayer* self){
     GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
 
     priv->retry = 0;
+    priv->fallback = RTSP_FALLBACK_NONE;
     priv->enable_backchannel = 1;//TODO Handle parameter input...
     GstRtspPlayerPrivate__play(priv);
 }
@@ -222,7 +239,6 @@ void GstRtspPlayer__retry(GstRtspPlayer* self){
     g_return_if_fail (GST_IS_RTSPPLAYER (self));
     
     GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
-    priv->retry++;
     GstRtspPlayerPrivate__play(priv);
 }
 
@@ -431,6 +447,7 @@ GstRtspPlayerPrivate__on_rtsp_pad_added (GstElement *element, GstPad *new_pad, G
     }
 
 exit:
+    free(capsName);
     /* Unreference the new pad's caps, if we got them */
     if (new_pad_caps)
         gst_caps_unref (new_pad_caps);
@@ -478,7 +495,7 @@ GstRtspPlayerPrivate__setup_pipeline (GstRtspPlayerPrivate * priv)
     g_object_set (G_OBJECT (priv->src), "do-retransmission", TRUE, NULL);
     g_object_set (G_OBJECT (priv->src), "onvif-mode", FALSE, NULL); //It seems onvif mode can cause segmentation fault with v4l2onvif
     g_object_set (G_OBJECT (priv->src), "is-live", TRUE, NULL);
-    // g_object_set (G_OBJECT (priv->src), "tcp-timeout", 500000, NULL);
+    g_object_set (G_OBJECT (priv->src), "tcp-timeout", 1000000, NULL);
     g_object_set (G_OBJECT (priv->src), "protocols", GST_RTSP_LOWER_TRANS_TCP, NULL); //TODO Allow changing this via settings
 
     /* set up bus */
@@ -554,8 +571,15 @@ GstRtspPlayerPrivate__error_msg (GstBus *bus, GstMessage *msg, GstRtspPlayerPriv
     GError *err;
     gchar *debug_info;
     
-    gst_message_parse_error (msg, &err, &debug_info);
+    int fallback = 0;
+
     P_MUTEX_LOCK(priv->player_lock);
+
+    gst_message_parse_error (msg, &err, &debug_info);
+    C_ERROR ("Error received from element %s: %s", GST_OBJECT_NAME (msg->src), err->message);
+    C_ERROR ("Debugging information: %s", debug_info ? debug_info : "none");
+    C_ERROR ("Error code : %d",err->code);
+
     if(err->code == GST_RESOURCE_ERROR_SETTINGS && priv->enable_backchannel){
         C_WARN ("Backchannel unsupported. Downgrading...");
         priv->enable_backchannel = 0;
@@ -567,29 +591,74 @@ GstRtspPlayerPrivate__error_msg (GstBus *bus, GstMessage *msg, GstRtspPlayerPriv
     } else if((err->code == GST_RESOURCE_ERROR_OPEN_READ ||
                 err->code == GST_RESOURCE_ERROR_OPEN_WRITE ||
                 err->code == GST_RESOURCE_ERROR_OPEN_READ_WRITE) &&
-                priv->port_fallback){
-        char * oldloc = priv->location;
-        priv->location = URL__set_port(oldloc, priv->port_fallback);
-        C_INFO("Stream Correction : '%s' --> '%s'\n",oldloc, priv->location);
-        free(oldloc);
+                (priv->port_fallback || priv->host_fallback)){
+        fallback = 1;
+PUSH_WARNING_IGNORE(-1,-Wimplicit-fallthrough)
+        switch(priv->fallback){
+            case RTSP_FALLBACK_NONE:
+                priv->fallback = RTSP_FALLBACK_PORT;
+                char * port_fallback = NULL;
+                if(priv->port_fallback) port_fallback = URL__set_port(priv->location_set, priv->port_fallback);
+                if(port_fallback && strcmp(port_fallback,priv->location_set) != 0){
+                    C_WARN("Attempting URL port correction : [%s] --> [%s]",priv->location_set, port_fallback);
+                    free(priv->location);
+                    priv->location = port_fallback;
+                    break;
+                } else {
+                    free(port_fallback);
+                }
+            case RTSP_FALLBACK_PORT:
+                priv->fallback = RTSP_FALLBACK_HOST;
+                char * host_fallback = NULL;
+                if(priv->host_fallback) host_fallback = URL__set_host(priv->location_set, priv->host_fallback);
+                if(host_fallback && strcmp(host_fallback,priv->location_set) != 0){
+                    C_WARN("Attempting URL host correction : [%s] --> [%s]",priv->location_set, host_fallback);
+                    free(priv->location);
+                    priv->location = host_fallback;
+                    break;
+                } else {
+                    free(host_fallback);
+                }
+            case RTSP_FALLBACK_HOST:
+                priv->fallback = RTSP_FALLBACK_URL;
+                char * tmp_fallback = NULL;
+                char * url_fallback = NULL;
+                if(priv->host_fallback && priv->port_fallback){
+                    tmp_fallback = URL__set_port(priv->location_set, priv->port_fallback);
+                    url_fallback = URL__set_host(tmp_fallback, priv->host_fallback);
+                }
+                if(url_fallback && strcmp(url_fallback,priv->location_set) != 0){
+                    C_WARN("Attempting root URL correction : [%s] --> [%s]",priv->location_set, url_fallback);
+                    free(priv->location);
+                    priv->location = url_fallback;
+                    free(tmp_fallback);
+                    break;
+                } else {
+                    free(url_fallback);
+                    free(tmp_fallback);
+                }
+            case RTSP_FALLBACK_URL:
+            default:
+                //Do not retry after connection failure
+                priv->playing = 0;
+                break;
+        }
+POP_WARNING_IGNORE(NULL)
     }
-
-    C_ERROR ("Error received from element %s: %s", GST_OBJECT_NAME (msg->src), err->message);
-    C_ERROR ("Debugging information: %s", debug_info ? debug_info : "none");
-    C_ERROR ("Error code : %d",err->code);
 
     g_clear_error (&err);
     g_free (debug_info);
 
-    C_DEBUG("retry[%d] playing[%d]", priv->retry, priv->playing);
-    if(priv->retry < 3 && priv->playing == 1){ //TODO Check if any retry callback exists
+    if((fallback && priv->playing) || (priv->retry < 3 && priv->playing)){ //TODO Check if any retry callback exists
         //Stopping player after if condition because "playing" gets reset
         GstRtspPlayerPrivate__inner_stop(priv);
         C_WARN("****************************************************");
-        C_WARN("Retry attempt #%i",priv->retry);
+        if(fallback) C_WARN("* URI fallback attempt %s", priv->location); else C_WARN("* Retry attempt #%i - %s",priv->retry, priv->location);
         C_WARN("****************************************************");
         P_MUTEX_UNLOCK(priv->player_lock);
         //Retry signal - The player doesn't invoke retry on its own to allow the invoker to dispatch it asynchroniously
+        if(!fallback)
+            priv->retry++;
         g_signal_emit (priv->owner, signals[RETRY], 0 /* details */);
     } else if(priv->playing == 1) { //Ignoring error after the player requested to stop (gst_rtspsrc_try_send)
         priv->playing = 0;
@@ -813,9 +882,11 @@ GstRtspPlayer__init (GstRtspPlayer * self)
     GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
     priv->owner = self;
     priv->port_fallback = NULL;
+    priv->host_fallback = NULL;
     priv->user = NULL;
     priv->pass = NULL;
     priv->location = NULL;
+    priv->location_set = NULL;
     priv->enable_backchannel = 1;
     priv->retry = 0;
     priv->allow_overscale = 0;
@@ -824,6 +895,7 @@ GstRtspPlayer__init (GstRtspPlayer * self)
     priv->canvas = NULL;
     priv->dynamic_elements = NULL;
     priv->sink = NULL;
+    priv->fallback = RTSP_FALLBACK_NONE;
 
     P_MUTEX_SETUP(priv->prop_lock);
     P_MUTEX_SETUP(priv->player_lock);
@@ -849,6 +921,13 @@ void GstRtspPlayer__set_playback_url(GstRtspPlayer * self, char *url) {
     GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
     P_MUTEX_LOCK(priv->prop_lock);
     C_INFO("set location : %s\n",url);
+    
+    if(!priv->location_set){
+        priv->location_set = malloc(strlen(url)+1);
+    } else {
+        priv->location_set = realloc(priv->location_set,strlen(url)+1);
+    }
+    strcpy(priv->location_set,url);
 
     if(!priv->location){
         priv->location = malloc(strlen(url)+1);
@@ -951,5 +1030,20 @@ void GstRtspPlayer__set_port_fallback(GstRtspPlayer* self, char * port){
         priv->port_fallback = realloc(priv->port_fallback,strlen(port)+1);
     }
     strcpy(priv->port_fallback,port);
+    P_MUTEX_UNLOCK(priv->prop_lock);
+}
+
+void GstRtspPlayer__set_host_fallback(GstRtspPlayer* self, char * host){
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (GST_IS_RTSPPLAYER (self));
+
+    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
+    P_MUTEX_LOCK(priv->prop_lock);
+    if(!priv->host_fallback){
+        priv->host_fallback = malloc(strlen(host)+1);
+    } else {
+        priv->host_fallback = realloc(priv->host_fallback,strlen(host)+1);
+    }
+    strcpy(priv->host_fallback,host);
     P_MUTEX_UNLOCK(priv->prop_lock);
 }

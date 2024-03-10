@@ -34,6 +34,7 @@ gboolean GstRtspPlayer__is_mic_mute(GstRtspPlayer* self);
 void GstRtspPlayer__mic_mute(GstRtspPlayer* self, gboolean mute);
 void GstRtspPlayer__set_allow_overscale(GstRtspPlayer * self, int allow_overscale);
 void GstRtspPlayer__set_port_fallback(GstRtspPlayer* self, char * port);
+void GstRtspPlayer__set_host_fallback(GstRtspPlayer* self, char * host);
 
 G_END_DECLS
 

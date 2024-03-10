@@ -289,8 +289,17 @@ void _play_onvif_stream(void * user_data){
         char * port = OnvifDevice__get_port(OnvifMgrDeviceRow__get_device(device));
         GstRtspPlayer__set_port_fallback(app->player,port);
         free(port);
+
+        char * host = OnvifDevice__get_host(OnvifMgrDeviceRow__get_device(device));
+        GstRtspPlayer__set_host_fallback(app->player,host);
+        free(host);
+        
         OnvifCredentials * ocreds = OnvifDevice__get_credentials(odev);
-        GstRtspPlayer__set_credentials(app->player, OnvifCredentials__get_username(ocreds), OnvifCredentials__get_password(ocreds));
+        char * user = OnvifCredentials__get_username(ocreds);
+        char * pass = OnvifCredentials__get_password(ocreds);
+        GstRtspPlayer__set_credentials(app->player, user, pass);
+        free(user);
+        free(pass);
 
         GstRtspPlayer__play(app->player);
     } else if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device)) {
