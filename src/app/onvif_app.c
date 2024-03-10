@@ -393,6 +393,7 @@ void _onvif_authentication_reload(void * user_data){
     } else {
         gdk_threads_add_idle(G_SOURCE_FUNC(idle_hide_dialog_loading),OnvifMgrDeviceRow__get_app(device)->cred_dialog);
     }
+    free(event);
 }
 
 void dialog_login_cb(AppDialogEvent * event){
