@@ -47,6 +47,7 @@ void add_device(OnvifMgrDeviceRow * device);
 gboolean OnvifApp__set_device(OnvifApp * app, GtkListBoxRow * row);
 gboolean * idle_hide_dialog (void * user_data);
 gboolean * idle_hide_dialog_loading (void * user_data);
+gboolean * idle_select_device(void * user_data);
 
 /*
  *
@@ -248,6 +249,14 @@ void _display_onvif_device(void * user_data){
     /* Display row thumbnail. Default to profile index 0 */
 updatethumb:
     OnvifMgrDeviceRow__load_thumbnail(omgr_device);
+    if(!OnvifMgrDeviceRow__is_initialized(omgr_device)){ //First time initialization
+        OnvifMgrDeviceRow__set_initialized(omgr_device);
+        //If it was selected while initializing, redispatch select_device
+        if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(omgr_device) && gtk_list_box_row_is_selected(GTK_LIST_BOX_ROW(omgr_device))){
+            g_object_ref(omgr_device);
+            gdk_threads_add_idle(G_SOURCE_FUNC(idle_select_device),omgr_device);
+        }
+    }
 exit:
     g_object_unref(omgr_device);
 }
@@ -417,26 +426,32 @@ void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
     if(!OnvifApp__set_device(app,row)){
         //In case the previous stream was in a retry cycle, force hide loading
         gtk_spinner_stop (GTK_SPINNER (app->player_loading_handle));
-        goto exit;
-    }
+    } else if(OnvifMgrDeviceRow__is_initialized(app->device)){
+        OnvifDevice * odev = OnvifMgrDeviceRow__get_device(app->device);
+        //Prompt for authentication
+        if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NOT_AUTHORIZED){
+            //In case the previous stream was in a retry cycle, force hide loading
+            gtk_spinner_stop (GTK_SPINNER (app->player_loading_handle));
+            //Re-dispatched to allow proper focus handling
+            g_object_ref(app->device);
+            gdk_threads_add_idle(G_SOURCE_FUNC(idle_show_credentialsdialog),app->device);
+            return;
+        }
 
-    OnvifDevice * odev = OnvifMgrDeviceRow__get_device(app->device);
-    //Prompt for authentication
-    if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NOT_AUTHORIZED){
-        //In case the previous stream was in a retry cycle, force hide loading
-        gtk_spinner_stop (GTK_SPINNER (app->player_loading_handle));
-        //Re-dispatched to allow proper focus handling
+        gtk_spinner_start (GTK_SPINNER (app->player_loading_handle));
         g_object_ref(app->device);
-        gdk_threads_add_idle(G_SOURCE_FUNC(idle_show_credentialsdialog),app->device);
-        return;
+        EventQueue__insert(app->queue,_play_onvif_stream,app->device);
+        update_pages(app, app->device);
     }
+}
 
-    gtk_spinner_start (GTK_SPINNER (app->player_loading_handle));
-    g_object_ref(app->device);
-    EventQueue__insert(app->queue,_play_onvif_stream,app->device);
-
-exit:
-    update_pages(app, app->device);
+gboolean * idle_select_device(void * user_data){
+    OnvifMgrDeviceRow * device = ONVIFMGR_DEVICEROW(user_data);
+    if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) && gtk_list_box_row_is_selected(GTK_LIST_BOX_ROW(device))){
+        OnvifApp__select_device(OnvifMgrDeviceRow__get_app(device),GTK_LIST_BOX_ROW(device));
+    }
+    g_object_unref(device);
+    return FALSE;
 }
 
 void row_selected_cb (GtkWidget *widget,   GtkListBoxRow* row, OnvifApp* app){
@@ -449,7 +464,7 @@ static void switch_page (GtkNotebook* self, GtkWidget* page, guint page_num, Onv
     update_pages(app, app->device);
 }
 
-gboolean idle_add_device(void * user_data){
+gboolean * idle_add_device(void * user_data){
     add_device(ONVIFMGR_DEVICEROW(user_data));
     return FALSE;
 }

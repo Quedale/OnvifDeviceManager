@@ -48,6 +48,8 @@ gboolean OnvifMgrDeviceRow__is_selected(OnvifMgrDeviceRow * self);
 
 void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self);
 void OnvifMgrDeviceRow__set_thumbnail(OnvifMgrDeviceRow * self, GtkWidget * image);
+void OnvifMgrDeviceRow__set_initialized(OnvifMgrDeviceRow * self);
+gboolean OnvifMgrDeviceRow__is_initialized(OnvifMgrDeviceRow * self);
 
 G_END_DECLS
 

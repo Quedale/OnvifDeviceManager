@@ -30,6 +30,7 @@ typedef struct {
     OnvifProfile * profile;
 
     gboolean owned;
+    gboolean init;
     GtkWidget * btn_save;
     GtkWidget * btn_profile;
     GtkWidget * lbl_name;
@@ -495,4 +496,18 @@ void OnvifMgrDeviceRow__set_thumbnail(OnvifMgrDeviceRow * self, GtkWidget * imag
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER (self)) C_TRAIL("OnvifMgrDeviceRow__set_thumbnail - invalid device.");
     OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
     gui_update_widget_image(image,priv->image_handle);
+}
+
+void OnvifMgrDeviceRow__set_initialized(OnvifMgrDeviceRow * self){
+    g_return_if_fail (self != NULL);
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER (self)) C_TRAIL("OnvifMgrDeviceRow__set_initialized - invalid device.");
+    OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
+    priv->init = TRUE;
+}
+
+gboolean OnvifMgrDeviceRow__is_initialized(OnvifMgrDeviceRow * self){
+    g_return_val_if_fail (self != NULL, FALSE);
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER (self)) C_TRAIL("OnvifMgrDeviceRow__is_initialized - invalid device.");
+    OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
+    return priv->init;
 }
