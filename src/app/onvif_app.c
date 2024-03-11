@@ -30,7 +30,6 @@ typedef struct {
     GtkWidget *btn_scan;
     GtkWidget *window;
     GtkWidget *listbox;
-    GtkWidget *main_notebook;
     GtkWidget *player_loading_handle;
     GtkWidget *task_label;
 
@@ -38,8 +37,6 @@ typedef struct {
     CredentialsDialog * cred_dialog;
     AddDeviceDialog * add_dialog;
     MsgDialog * msg_dialog;
-
-    int current_page;
 
     OnvifDetails * details;
     AppSettings * settings;
@@ -66,7 +63,6 @@ static void OnvifApp__add_device(OnvifApp * app, OnvifMgrDeviceRow * omgr_device
 static void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row);
 static int OnvifApp__reload_device(OnvifMgrDeviceRow * device);
 static void OnvifApp__display_device(OnvifApp * self, OnvifMgrDeviceRow * device);
-static void OnvifApp__update_pages(OnvifApp * self, OnvifMgrDeviceRow * device);
 
 gboolean * idle_select_device(void * user_data){
     OnvifMgrDeviceRow * device = ONVIFMGR_DEVICEROW(user_data);
@@ -77,13 +73,6 @@ gboolean * idle_select_device(void * user_data){
     return FALSE;
 }
 
-gboolean * idle_update_pages(void * user_data){
-    OnvifMgrDeviceRow * device = ONVIFMGR_DEVICEROW(user_data);
-    OnvifApp * app = OnvifMgrDeviceRow__get_app(device);
-    OnvifApp__update_pages(app,device);
-    g_object_unref(device);
-    return FALSE;
-}
 
 gboolean * idle_show_credentialsdialog (void * user_data){
     OnvifMgrDeviceRow * device = ONVIFMGR_DEVICEROW(user_data);
@@ -571,25 +560,6 @@ exit:
     return FALSE;
 }
 
-//On the odd chance the by the time update_pages is invoked, the selection changed
-//We use device as input parameters carried through the idle dispatch. Not from the app pointer
-static void OnvifApp__update_pages(OnvifApp * self, OnvifMgrDeviceRow * device){
-    OnvifAppPrivate *priv = OnvifApp__get_instance_private (self);
-    //#0 NVT page already loaded
-    //#2 Settings page already loaded
-    //Details page is dynamically loaded
-    if(priv->current_page == 1){
-        OnvifDetails__clear_details(priv->details);
-        OnvifDetails__update_details(priv->details,device);
-    }
-}
-
-static void OnvifApp__switch_page (GtkNotebook* self, GtkWidget* page, guint page_num, OnvifApp * app) {
-    C_DEBUG("OnvifApp__switch_page");
-    OnvifAppPrivate *priv = OnvifApp__get_instance_private (app);
-    priv->current_page = page_num;
-    OnvifApp__update_pages(app, priv->device);
-}
 
 static int OnvifApp__reload_device(OnvifMgrDeviceRow * device){
     OnvifDevice * odev = OnvifMgrDeviceRow__get_device(device);
@@ -614,9 +584,10 @@ static int OnvifApp__reload_device(OnvifMgrDeviceRow * device){
     OnvifApp * app = OnvifMgrDeviceRow__get_app(device);
     OnvifApp__display_device(app, device);
 
-    g_object_ref(device);
-    gdk_threads_add_idle(G_SOURCE_FUNC(idle_update_pages),device);
     if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NONE && OnvifMgrDeviceRow__is_selected(device)){
+        //Authenticated device counts a changed
+        g_signal_emit (app, signals[DEVICE_CHANGED], 0, device /* details */);
+
         OnvifAppPrivate *priv = OnvifApp__get_instance_private (app);
         safely_start_spinner(priv->player_loading_handle);
         g_object_ref(device);
@@ -657,8 +628,6 @@ static void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
     g_object_ref(app);
     EventQueue__insert(priv->queue,_stop_onvif_stream,app);
 
-    //Clear details
-    OnvifDetails__clear_details(priv->details);
 
     OnvifApp__set_device(app,row);
 
@@ -674,14 +643,16 @@ static void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
             //Re-dispatched to allow proper focus handling
             g_object_ref(priv->device);
             gdk_threads_add_idle(G_SOURCE_FUNC(idle_show_credentialsdialog),priv->device);
-            return;
+            goto exit;
         }
 
         gtk_spinner_start (GTK_SPINNER (priv->player_loading_handle));
         g_object_ref(priv->device);
         EventQueue__insert(priv->queue,_play_onvif_stream,priv->device);
-        OnvifApp__update_pages(app, priv->device);
     }
+
+exit:
+    g_signal_emit (app, signals[DEVICE_CHANGED], 0, ONVIFMGR_DEVICEROW(row) /* details */);
 }
 
 static void OnvifApp__display_device(OnvifApp * self, OnvifMgrDeviceRow * device){
@@ -727,6 +698,8 @@ void OnvifApp__create_ui (OnvifApp * app) {
     GtkWidget *widget;
     GtkWidget *label;
     GtkWidget * hbox;
+    GtkWidget *main_notebook;
+
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (app);
 
     main_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
@@ -827,11 +800,11 @@ void OnvifApp__create_ui (OnvifApp * app) {
     gtk_paned_pack1 (GTK_PANED (hpaned), left_grid, FALSE, FALSE);
 
     /* Create a new notebook, place the position of the tabs */
-    priv->main_notebook = gtk_notebook_new ();
-    gtk_notebook_set_tab_pos (GTK_NOTEBOOK (priv->main_notebook), GTK_POS_TOP);
-    gtk_widget_set_vexpand (priv->main_notebook, TRUE);
-    gtk_widget_set_hexpand (priv->main_notebook, TRUE);
-    gtk_paned_pack2 (GTK_PANED (hpaned), priv->main_notebook, FALSE, FALSE);
+    main_notebook = gtk_notebook_new ();
+    gtk_notebook_set_tab_pos (GTK_NOTEBOOK (main_notebook), GTK_POS_TOP);
+    gtk_widget_set_vexpand (main_notebook, TRUE);
+    gtk_widget_set_hexpand (main_notebook, TRUE);
+    gtk_paned_pack2 (GTK_PANED (hpaned), main_notebook, FALSE, FALSE);
 
     gtk_grid_attach (GTK_GRID (grid), hpaned, 0, 0, 1, 4);
     gtk_paned_set_wide_handle(GTK_PANED(hpaned),TRUE);
@@ -848,7 +821,7 @@ void OnvifApp__create_ui (OnvifApp * app) {
     gtk_widget_show_all(hbox);
 
     widget = OnvifNVT__create_ui(priv->player);
-    gtk_notebook_append_page (GTK_NOTEBOOK (priv->main_notebook), widget, hbox);
+    gtk_notebook_append_page (GTK_NOTEBOOK (main_notebook), widget, hbox);
 
     label = gtk_label_new ("Details");
     //Hidden spinner used to display stream start loading
@@ -863,7 +836,7 @@ void OnvifApp__create_ui (OnvifApp * app) {
 
     widget = OnvifDetails__get_widget(priv->details);
 
-    gtk_notebook_append_page (GTK_NOTEBOOK (priv->main_notebook), widget, hbox);
+    gtk_notebook_append_page (GTK_NOTEBOOK (main_notebook), widget, hbox);
 
 
     label = gtk_label_new ("Settings");
@@ -879,7 +852,7 @@ void OnvifApp__create_ui (OnvifApp * app) {
 
     widget = AppSettings__get_widget(priv->settings);
 
-    gtk_notebook_append_page (GTK_NOTEBOOK (priv->main_notebook), widget, hbox);
+    gtk_notebook_append_page (GTK_NOTEBOOK (main_notebook), widget, hbox);
 
 
 
@@ -904,7 +877,7 @@ void OnvifApp__create_ui (OnvifApp * app) {
 
     widget = TaskMgr__get_widget(priv->taskmgr);
 
-    gtk_notebook_append_page (GTK_NOTEBOOK (priv->main_notebook), widget, hbox);
+    gtk_notebook_append_page (GTK_NOTEBOOK (main_notebook), widget, hbox);
 
 
     GdkMonitor* monitor = gdk_display_get_primary_monitor(gdk_display_get_default());
@@ -923,8 +896,6 @@ void OnvifApp__create_ui (OnvifApp * app) {
 
     priv->window = main_window;
     gtk_widget_show_all (main_window);
-
-    g_signal_connect (G_OBJECT (priv->main_notebook), "switch-page", G_CALLBACK (OnvifApp__switch_page), app);
 
 }
 
@@ -956,6 +927,9 @@ OnvifApp__class_init (OnvifAppClass *klass)
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
     object_class->dispose = OnvifApp__dispose;
 
+    // GType type = ONVIFMGR_TYPE_DEVICEROW;
+    GType params[1];
+    params[0] = ONVIFMGR_TYPE_DEVICEROW | G_SIGNAL_TYPE_STATIC_SCOPE;
     signals[DEVICE_CHANGED] =
         g_signal_newv ("device-changed",
                         G_TYPE_FROM_CLASS (klass),
@@ -965,8 +939,8 @@ OnvifApp__class_init (OnvifAppClass *klass)
                         NULL /* accumulator data */,
                         NULL /* C marshaller */,
                         G_TYPE_NONE /* return_type */,
-                        0     /* n_params */,
-                        NULL  /* param_types */);
+                        1     /* n_params */,
+                        params  /* param_types */);
 }
 
 static gboolean
@@ -1005,7 +979,6 @@ OnvifApp__init (OnvifApp *self)
     priv->taskmgr = TaskMgr__create();
 
     AppSettingsStream__set_overscale_callback(priv->settings->stream,OnvifApp__setting_overscale_cb,self);
-    priv->current_page = 0;
     priv->player = GstRtspPlayer__new();
     GstRtspPlayer__set_allow_overscale(priv->player,AppSettingsStream__get_allow_overscale(priv->settings->stream));
 
@@ -1053,13 +1026,6 @@ MsgDialog * OnvifApp__get_msg_dialog(OnvifApp * self){
     g_return_val_if_fail (ONVIFMGR_IS_APP (self), NULL);
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (self);
     return priv->msg_dialog;
-}
-
-OnvifMgrDeviceRow * OnvifApp__get_device(OnvifApp * self){
-    g_return_val_if_fail (self != NULL, NULL);
-    g_return_val_if_fail (ONVIFMGR_IS_APP (self), NULL);
-    OnvifAppPrivate *priv = OnvifApp__get_instance_private (self);
-    return priv->device;
 }
 
 void OnvifApp__dispatch(OnvifApp* self, void (*callback)(), void * user_data){

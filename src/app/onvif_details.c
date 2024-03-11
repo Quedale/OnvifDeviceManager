@@ -4,29 +4,9 @@
 #include "clogger.h"
 
 typedef struct _OnvifDetails {
-    OnvifApp * app;
     GtkWidget * details_loading_handle;
     GtkWidget *details_notebook;
-    OnvifInfo * info;
-    OnvifNetwork * network;
-
-    int current_page;
 } OnvifDetails;
-
-void hide_loading_cb(void * user_data){
-    OnvifDetails * details = (OnvifDetails *) user_data;
-    if(GTK_IS_SPINNER(details->details_loading_handle)){
-        gtk_spinner_stop (GTK_SPINNER (details->details_loading_handle));
-    }
-}
-
-void network_hide_loading_cb(OnvifNetwork * self, void * user_data){
-    hide_loading_cb(user_data);
-}
-
-void info_hide_loading_cb(OnvifInfo * self, void * user_data){
-    hide_loading_cb(user_data);
-}
 
 void update_details_priv(OnvifDetails * self, OnvifMgrDeviceRow * device){
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device)){
@@ -39,80 +19,62 @@ void update_details_priv(OnvifDetails * self, OnvifMgrDeviceRow * device){
         return;
     }
     gtk_spinner_start (GTK_SPINNER (self->details_loading_handle));
+}
 
-    if(self->current_page == 0){
-        OnvifInfo_update_details(self->info,device);
-    } else if(self->current_page == 1){
-        OnvifNetwork_update_details(self->network,device);
+void OnvifDetails__hide_loading_cb(GtkWidget * widget, OnvifDetails * details){
+    //Checking that the finished event is the current selected page before hiding the loading indicator (Another detail page is loading or loaded)
+    int current_page = gtk_notebook_get_current_page(GTK_NOTEBOOK(details->details_notebook));
+    int widget_page = gtk_notebook_page_num(GTK_NOTEBOOK(details->details_notebook), widget);
+    if(widget_page == current_page && GTK_IS_SPINNER(details->details_loading_handle)){
+        gtk_spinner_stop (GTK_SPINNER (details->details_loading_handle));
     }
 }
 
-void OnvifDetails__update_details(OnvifDetails * self, OnvifMgrDeviceRow * device){
-    update_details_priv(self,device);
+void OnvifDetails__show_loading_cb(GtkWidget * widget, OnvifDetails * details){
+    //TODO Cancel pending/running events
+    if(GTK_IS_SPINNER(details->details_loading_handle)){
+        gtk_spinner_start (GTK_SPINNER (details->details_loading_handle));
+    }
 }
 
-
-static void details_switch_page (GtkNotebook* self, GtkWidget* page, guint page_num, OnvifDetails * details) {
-    OnvifDetails__clear_details(details);
-
-    details->current_page = page_num;
-    update_details_priv(details, OnvifApp__get_device(details->app));
-}
-
-void OnvifDetails__create_ui(OnvifDetails *self){
-    GtkWidget * widget;
+void OnvifDetails__create_ui(OnvifDetails *self, OnvifInfoPanel * info, OnvifNetworkPanel * network){
     GtkWidget *label;
 
     self->details_notebook = gtk_notebook_new ();
 
     gtk_notebook_set_tab_pos (GTK_NOTEBOOK (self->details_notebook), GTK_POS_LEFT);
 
-    widget = OnvifInfo__get_widget(self->info);
-
     label = gtk_label_new ("Information");
-    gtk_notebook_append_page (GTK_NOTEBOOK (self->details_notebook), widget, label);
-
-    widget = OnvifNetwork__get_widget(self->network);
+    gtk_notebook_append_page (GTK_NOTEBOOK (self->details_notebook), GTK_WIDGET(info), label);
 
     label = gtk_label_new ("Networking");
-    gtk_notebook_append_page (GTK_NOTEBOOK (self->details_notebook), widget, label);
+    gtk_notebook_append_page (GTK_NOTEBOOK (self->details_notebook), GTK_WIDGET(network), label);
 
-    g_signal_connect (G_OBJECT (self->details_notebook), "switch-page", G_CALLBACK (details_switch_page), self);
 }
 
 OnvifDetails * OnvifDetails__create(OnvifApp * app){
-    OnvifDetails *info  =  malloc(sizeof(OnvifDetails));
-    info->info = OnvifInfo__create(app);
-    info->network = OnvifNetwork__create(app);
-    info->current_page = 0;
-    info->app = app;
-    OnvifDetails__create_ui(info);
-    OnvifInfo__set_done_callback(info->info,info_hide_loading_cb,info);
-    OnvifNetwork__set_done_callback(info->network,network_hide_loading_cb,info);
-    return info;
+    OnvifDetails *details  =  malloc(sizeof(OnvifDetails));
+    OnvifInfoPanel * info = OnvifInfoPanel__new(app);
+    OnvifNetworkPanel * network = OnvifNetworkPanel__new(app);
+    OnvifDetails__create_ui(details,info,network);
+
+    g_signal_connect (info, "finished", G_CALLBACK (OnvifDetails__hide_loading_cb), details);
+    g_signal_connect (info, "started", G_CALLBACK (OnvifDetails__show_loading_cb), details);
+
+    g_signal_connect (network, "finished", G_CALLBACK (OnvifDetails__hide_loading_cb), details);
+    g_signal_connect (network, "started", G_CALLBACK (OnvifDetails__show_loading_cb), details);
+
+    return details;
 }
 
 void OnvifDetails__destroy(OnvifDetails* self){
     if(self){
-        OnvifInfo__destroy(self->info);
-        OnvifNetwork__destroy(self->network);
         free(self);
     }
 }
 
 void OnvifDetails__set_details_loading_handle(OnvifDetails * self, GtkWidget * widget){
     self->details_loading_handle = widget;
-}
-
-void OnvifDetails__clear_details(OnvifDetails * self){
-    C_TRACE("clear_details");
-    if(self->current_page == 0){
-        OnvifInfo_clear_details(self->info);
-    } else if(self->current_page == 1){
-        OnvifNetwork_clear_details(self->network);
-    }
-
-    gtk_spinner_stop (GTK_SPINNER (self->details_loading_handle));
 }
 
 GtkWidget * OnvifDetails__get_widget(OnvifDetails * self){

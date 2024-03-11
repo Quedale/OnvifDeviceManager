@@ -29,7 +29,6 @@ struct _OnvifAppClass
 OnvifApp * OnvifApp__new (void);
 void OnvifApp__destroy(OnvifApp* self);
 MsgDialog * OnvifApp__get_msg_dialog(OnvifApp * self);
-OnvifMgrDeviceRow * OnvifApp__get_device(OnvifApp * self);
 void OnvifApp__dispatch(OnvifApp* app, void (*callback)(), void * user_data);
 
 G_END_DECLS

@@ -4,13 +4,24 @@
 #include "onvif_app.h"
 #include "omgr_device_row.h"
 
-typedef struct _OnvifInfo OnvifInfo;
+G_BEGIN_DECLS
 
-OnvifInfo * OnvifInfo__create(OnvifApp * app);
-void OnvifInfo__destroy(OnvifInfo* self);
-void OnvifInfo_update_details(OnvifInfo * self, OnvifMgrDeviceRow * device);
-void OnvifInfo_clear_details(OnvifInfo * self);
-GtkWidget * OnvifInfo__get_widget(OnvifInfo * self);
-void OnvifInfo__set_done_callback(OnvifInfo* self, void (*done_callback)(OnvifInfo *, void *), void * user_data);
+#define ONVIFMGR_TYPE_INFOPANEL OnvifInfoPanel__get_type()
+G_DECLARE_FINAL_TYPE (OnvifInfoPanel, OnvifInfoPanel_, ONVIFMGR, INFOPANEL, GtkScrolledWindow)
+
+struct _OnvifInfoPanel
+{
+  GtkScrolledWindow parent_instance;
+};
+
+
+struct _OnvifInfoPanelClass
+{
+  GtkScrolledWindowClass parent_class;
+};
+
+OnvifInfoPanel * OnvifInfoPanel__new(OnvifApp * app);
+
+G_END_DECLS
 
 #endif
