@@ -1,5 +1,6 @@
 #include <string.h>
 #include "gst/onvifinitstaticplugins.h"
+#include "portable_thread.h"
 #include "app/onvif_app.h"
 #include <gst/pbutils/gstpluginsbaseversion.h>
 #include <gtk/gtk.h>
@@ -116,7 +117,7 @@ int main(int argc, char *argv[]) {
   print_elements_by_type("video/x-av1");
   
   /* Initialize Application */
-  OnvifApp__create();
+  OnvifApp__new();
 
   /* Start the GTK main loop. We will not regain control until gtk_main_quit is called. */
   gtk_main ();

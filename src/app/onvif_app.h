@@ -1,21 +1,37 @@
+#ifndef OMGR_APP_H_ 
+#define OMGR_APP_H_
 
-#ifndef ONVIF_APP_H_ 
-#define ONVIF_APP_H_
+#include <glib-object.h>
 
 
 typedef struct _OnvifApp OnvifApp;
 
-#include "../gst/gstrtspplayer.h"
 #include "dialog/msg_dialog.h"
-#include "dialog/profiles_dialog.h"
-#include "onvif_app_shutdown.h"
+#include "omgr_device_row.h"
 
-OnvifApp * OnvifApp__create();
+G_BEGIN_DECLS
+
+
+#define ONVIFMGR_TYPE_APP OnvifApp__get_type()
+G_DECLARE_FINAL_TYPE (OnvifApp, OnvifApp_, ONVIFMGR, APP, GObject)
+
+struct _OnvifApp
+{
+  GObject parent_instance;
+};
+
+
+struct _OnvifAppClass
+{
+  GObjectClass parent_class;
+};
+
+OnvifApp * OnvifApp__new (void);
 void OnvifApp__destroy(OnvifApp* self);
-GstRtspPlayer * OnvifApp__get_player(OnvifApp* self);
 MsgDialog * OnvifApp__get_msg_dialog(OnvifApp * self);
-ProfilesDialog * OnvifApp__get_profiles_dialog(OnvifApp * self);
 OnvifMgrDeviceRow * OnvifApp__get_device(OnvifApp * self);
 void OnvifApp__dispatch(OnvifApp* app, void (*callback)(), void * user_data);
+
+G_END_DECLS
 
 #endif

@@ -7,6 +7,12 @@ typedef struct {
     GtkWidget * handle;
 } ImageGUIUpdate;
 
+typedef struct {
+    GtkWidget * label;
+    char * text;
+} GUILabelUpdate;
+
+
 void gui_widget_destroy(GtkWidget * widget, gpointer user_data){
     gtk_widget_destroy(widget);
 }
@@ -43,6 +49,24 @@ void gui_update_widget_image(GtkWidget * image, GtkWidget * handle){
     gdk_threads_add_idle(G_SOURCE_FUNC(gui_update_widget_image_priv),iguiu);
 }
 
+gboolean * gui_set_label_text_priv (void * user_data){
+    GUILabelUpdate * update = (GUILabelUpdate *) user_data;
+    gtk_label_set_text(GTK_LABEL(update->label),update->text);
+
+    free(update->text);
+    free(update);
+
+    return FALSE;
+}
+
+void gui_set_label_text (GtkWidget * widget, char * value){
+    if(!G_IS_OBJECT(widget) || !G_IS_OBJECT(widget)) return;
+    GUILabelUpdate * iguiu = malloc(sizeof(GUILabelUpdate));
+    iguiu->text = malloc(strlen(value)+1);
+    strcpy(iguiu->text,value);
+    iguiu->label = widget;
+    gdk_threads_add_idle(G_SOURCE_FUNC(gui_set_label_text_priv),iguiu);
+}
 
 gboolean * gui_widget_destroy_cb (void * user_data){
     GtkWidget * widget = (GtkWidget *) user_data;

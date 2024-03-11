@@ -68,7 +68,9 @@ static void
 OnvifMgrDeviceRow_disown (COwnableObject *self)
 {
     OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (ONVIFMGR_DEVICEROW(self));
-    priv->owned = TRUE;
+    priv->owned = FALSE;
+    gtk_widget_unparent(GTK_WIDGET(self));
+    g_object_unref(self);
 }
 
 

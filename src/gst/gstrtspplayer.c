@@ -540,7 +540,7 @@ void GstRtspPlayerPrivate__inner_stop(GstRtspPlayerPrivate * priv){
 }
 
 void GstRtspPlayerPrivate__stop(GstRtspPlayerPrivate * priv){
-    C_DEBUG("RtspPlayer__stop\n");
+    C_DEBUG("GstRtspPlayer__stop\n");
     
     P_MUTEX_LOCK(priv->player_lock);
 
