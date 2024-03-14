@@ -116,14 +116,14 @@ int main(int argc, char *argv[]) {
   set_element_priority("avdec_h265",GST_RANK_MARGINAL); //Can cause a crash
   set_element_priority("openh264dec",GST_RANK_MARGINAL+1); //This always works compared to avdec_h264 that can crash
 
-  C_INFO("**** Video encounter *******");
+  C_INFO("**** Video decoders *******");
   print_elements_by_type("video/x-h264");
   print_elements_by_type("video/x-h265");
   print_elements_by_type("image/jpeg");
   print_elements_by_type("video/x-av1");
   C_INFO("****************************");
 
-  C_INFO("**** Audio encounter *******");
+  C_INFO("**** Audio decoders *******");
   print_elements_by_type("audio/x-mulaw");
   print_elements_by_type("audio/x-alaw");
   print_elements_by_type("audio/mpeg");
