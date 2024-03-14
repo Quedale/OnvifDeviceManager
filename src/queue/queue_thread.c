@@ -5,6 +5,7 @@
 #include <string.h>
 #include "cobject.h"
 #include "clogger.h"
+#include "threads.h"
 
 struct _QueueThread {
     CObject parent;
@@ -21,41 +22,56 @@ void priv_QueueThread__destroy(CObject * cobject){
     P_MUTEX_CLEANUP(self->cancel_lock);
 }
 
+static _Thread_local QueueEvent * event_queue;
+static _Thread_local QueueThread * queue_thread;
+QueueEvent * QueueEvent__get_current(){
+    return event_queue;
+}
+
+QueueThread * QueueThread__get_current(){
+    return queue_thread;
+}
+
+
 void * priv_QueueThread_call(void * data){
     C_DEBUG("Started...");
-    QueueThread* qt = (QueueThread*) data;
+    queue_thread = (QueueThread*) data;
     while (1){
-        if(QueueThread__is_cancelled(qt)){
+        if(QueueThread__is_cancelled(queue_thread)){
             goto exit;
         }
-        if(EventQueue__get_pending_event_count(qt->queue) <= 0){
-            P_MUTEX_LOCK(qt->sleep_lock);
-            if(QueueThread__is_cancelled(qt)){
-                P_MUTEX_UNLOCK(qt->sleep_lock);
+        if(EventQueue__get_pending_event_count(queue_thread->queue) <= 0){
+            P_MUTEX_LOCK(queue_thread->sleep_lock);
+            if(QueueThread__is_cancelled(queue_thread)){
+                P_MUTEX_UNLOCK(queue_thread->sleep_lock);
                 goto exit;
             }
-            EventQueue__wait_condition(qt->queue,qt->sleep_lock);
-            P_MUTEX_UNLOCK(qt->sleep_lock);
+            EventQueue__wait_condition(queue_thread->queue,queue_thread->sleep_lock);
+            P_MUTEX_UNLOCK(queue_thread->sleep_lock);
         }
-        if(QueueThread__is_cancelled(qt)){
+        if(QueueThread__is_cancelled(queue_thread)){
             goto exit;
         }
 
-        QueueEvent * event = EventQueue__pop(qt->queue);
-        QUEUE_CALLBACK callback = QueueEvent__get_callback(event);
+        event_queue = EventQueue__pop(queue_thread->queue);
+        QUEUE_CALLBACK callback = QueueEvent__get_callback(event_queue);
         if(!callback){ //Happens if pop happens simultaniously at 0. Continue to wait on condition call
             continue;
         }
 
-        EventQueue_notify_dispatching(qt->queue,qt);
-        (*(callback))(QueueEvent__get_userdata(event));
-        EventQueue_notify_dispatched(qt->queue,qt);
-        CObject__destroy((CObject*)event);
+        EventQueue_notify(queue_thread->queue,EVENTQUEUE_DISPATCHING);
+        (*(callback))(QueueEvent__get_userdata(event_queue));
+        if(QueueEvent__is_cancelled(event_queue)){
+            EventQueue_notify(queue_thread->queue,EVENTQUEUE_CANCELLED);
+        } else {
+            EventQueue_notify(queue_thread->queue,EVENTQUEUE_DISPATCHED);
+        }
+        CObject__destroy((CObject*)event_queue);
     }
 
 exit:
-    CObject__unref((CObject*)qt);
-    EventQueue__remove_thread(qt->queue,qt);
+    CObject__unref((CObject*)queue_thread);
+    EventQueue__remove_thread(queue_thread->queue,queue_thread);
     C_INFO("Finished...");
     P_THREAD_EXIT;
 }

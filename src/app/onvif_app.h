@@ -29,7 +29,7 @@ struct _OnvifAppClass
 OnvifApp * OnvifApp__new (void);
 void OnvifApp__destroy(OnvifApp* self);
 MsgDialog * OnvifApp__get_msg_dialog(OnvifApp * self);
-void OnvifApp__dispatch(OnvifApp* app, void (*callback)(), void * user_data);
+void OnvifApp__dispatch(OnvifApp* app, void * scope, void (*callback)(), void * user_data);
 
 G_END_DECLS
 

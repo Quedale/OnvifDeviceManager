@@ -96,7 +96,7 @@ void priv_ProfilesDialog__show_cb(AppDialogEvent * event){
 
     gtk_box_pack_start(GTK_BOX(elements->primary_pane), elements->content_pane,     TRUE, FALSE, 0);
 
-    EventQueue__insert(dialog->queue,_priv_ProfilesDialog__load_profiles,dialog);
+    EventQueue__insert(dialog->queue, dialog, _priv_ProfilesDialog__load_profiles,dialog);
 }
 
 void ProfilesDialog__set_device(ProfilesDialog * self, OnvifMgrDeviceRow * device){

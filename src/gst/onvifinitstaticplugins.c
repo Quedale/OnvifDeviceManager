@@ -63,7 +63,7 @@ GST_PLUGIN_STATIC_DECLARE(autodetect);
 // GST_PLUGIN_STATIC_DECLARE(imagefreeze); gstimagefreeze
 GST_PLUGIN_STATIC_DECLARE(interleave); // gstinterleave
 // GST_PLUGIN_STATIC_DECLARE(isomp4); gstisomp4
-// GST_PLUGIN_STATIC_DECLARE(alaw); gstalaw
+GST_PLUGIN_STATIC_DECLARE(alaw); // gstalaw
 GST_PLUGIN_STATIC_DECLARE(mulaw);
 GST_PLUGIN_STATIC_DECLARE(level); // gstlevel
 // GST_PLUGIN_STATIC_DECLARE(matroska); gstmatroska
@@ -280,7 +280,7 @@ onvif_init_static_plugins (void)
     // GST_PLUGIN_STATIC_REGISTER(imagefreeze); gstimagefreeze
     GST_PLUGIN_STATIC_REGISTER(interleave); // gstinterleave
     // GST_PLUGIN_STATIC_REGISTER(isomp4); gstisomp4
-    // GST_PLUGIN_STATIC_REGISTER(alaw); gstalaw
+    GST_PLUGIN_STATIC_REGISTER(alaw);  // gstalaw
     GST_PLUGIN_STATIC_REGISTER(mulaw);
     GST_PLUGIN_STATIC_REGISTER(level); // gstlevel
     // GST_PLUGIN_STATIC_REGISTER(matroska); gstmatroska 

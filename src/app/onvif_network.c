@@ -163,7 +163,7 @@ void OnvifNetworkPanel_update_details(OnvifNetworkPanel * self, OnvifMgrDeviceRo
     input->device = device;
     input->network = self;
     g_object_ref(device);
-    OnvifApp__dispatch(priv->app,_update_network_page,input);
+    OnvifApp__dispatch(priv->app, device, _update_network_page,input);
 }
 
 void OnvifNetworkPanel_clear_details(OnvifNetworkPanel * self){

@@ -1085,6 +1085,7 @@ gst_good_plugins=(
     "rtp;gstrtp"
     "rtpmanager;gstrtpmanager"
     "law;gstmulaw"
+    "law;gstalaw"
     "autodetect;gstautodetect"
     "pulse;gstpulseaudio"
     "interleave;gstinterleave"

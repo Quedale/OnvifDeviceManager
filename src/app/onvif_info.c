@@ -354,7 +354,7 @@ void OnvifInfoPanel_update_details(OnvifInfoPanel * self, OnvifMgrDeviceRow * de
     input->device = device;
     input->info = self;
     g_object_ref(device);
-    OnvifApp__dispatch(priv->app,_update_details_page,input);
+    OnvifApp__dispatch(priv->app, device, _update_details_page,input);
 }
 
 void OnvifInfoPanel_clear_details(OnvifInfoPanel * self){

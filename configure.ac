@@ -65,6 +65,7 @@ AC_DEFUN([SET_GST_PKG_PATH],[
         gstrtsp
         gstrtpmanager 
         gstrtp
+        gstalaw
         gstmulaw
         gstinterleave
         gstautodetect

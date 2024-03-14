@@ -47,16 +47,19 @@ GdkPixbuf * GtkBinaryImage__create_pixbuf(unsigned char* data_start, unsigned in
     GdkPixbuf *pixbuf = NULL;
     GdkPixbufLoader *loader = gdk_pixbuf_loader_new ();
     if(!gdk_pixbuf_loader_write (loader, data_start, data_size, &error)){
+        C_ERROR("Failed to write to GdkPixbufLoader");
         goto exit;
     }
 
     gdk_pixbuf_loader_close(loader,&error);
     if(error){
+        C_ERROR("Failed to close GdkPixbufLoader");
         goto exit;
     }
 
     pixbuf = gdk_pixbuf_loader_get_pixbuf (loader);
     if(!pixbuf){
+        C_ERROR("Failed to get pixbuf from GdkPixbufLoader");
         goto exit;
     }
 
@@ -110,12 +113,13 @@ void GtkBinaryImage__set_image(GtkBinaryImage *  self, GdkPixbuf * pixbuf){
 GtkWidget* GtkBinaryImage__new(unsigned char * data_start, unsigned int data_size, int width, int height, GError *error){
 
     GtkImage *image;
-
+    C_TRACE("GtkBinaryImage__new - size %d",data_size);
     image = g_object_new (GTK_TYPE_BINARYIMAGE, NULL);
     GtkBinaryImage__set_height(GTK_BINARYIMAGE(image),height);
     GtkBinaryImage__set_width(GTK_BINARYIMAGE(image),width);
     GtkBinaryImage__set_data(GTK_BINARYIMAGE(image),data_start,data_size,error);
     if(!GtkBinaryImage__has_data(GTK_BINARYIMAGE(image))){
+        C_ERROR("Unable to create GtkBinaryImage with NULL data.");
         return NULL;
     }
     return GTK_WIDGET (image);

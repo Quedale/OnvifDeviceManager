@@ -46,7 +46,8 @@ int version_compare(int major, int minor, int micro){
 void print_elements_by_type(char * type){
   GList * factories, *filtered, *tmp;
 
-  C_INFO("*** %s decoders ***",type);
+  C_INFO("* %s decoders ***",type);
+  int found =0;
   GstCaps * caps = gst_caps_new_empty_simple(type);
   factories = gst_element_factory_list_get_elements (GST_ELEMENT_FACTORY_TYPE_DECODER || GST_ELEMENT_FACTORY_TYPE_MEDIA_VIDEO, GST_RANK_MARGINAL);
   filtered = gst_element_factory_list_filter (factories, caps, GST_PAD_SINK, FALSE);
@@ -55,11 +56,15 @@ void print_elements_by_type(char * type){
       int rank = gst_plugin_feature_get_rank(GST_PLUGIN_FEATURE_CAST(fact));
       char * name = gst_plugin_feature_get_name(GST_PLUGIN_FEATURE_CAST(fact));
       C_INFO("*    %s[%d]",name,rank);
+      found = 1;
+  }
+
+  if(!found){
+     C_INFO("*    None");
   }
   gst_caps_unref (caps);
   g_list_free(filtered);
   g_list_free (factories);
-  C_INFO("****************************");
 }
 
 /*
@@ -111,11 +116,19 @@ int main(int argc, char *argv[]) {
   set_element_priority("avdec_h265",GST_RANK_MARGINAL); //Can cause a crash
   set_element_priority("openh264dec",GST_RANK_MARGINAL+1); //This always works compared to avdec_h264 that can crash
 
+  C_INFO("**** Video encounter *******");
   print_elements_by_type("video/x-h264");
   print_elements_by_type("video/x-h265");
   print_elements_by_type("image/jpeg");
   print_elements_by_type("video/x-av1");
-  
+  C_INFO("****************************");
+
+  C_INFO("**** Audio encounter *******");
+  print_elements_by_type("audio/x-mulaw");
+  print_elements_by_type("audio/x-alaw");
+  print_elements_by_type("audio/mpeg");
+  C_INFO("****************************");
+
   /* Initialize Application */
   OnvifApp__new();
 

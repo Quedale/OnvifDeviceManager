@@ -7,25 +7,42 @@
 #include "clogger.h"
 #include <string.h>
 
+static const char * EVENTQUEUE_DISPATCHING_STR = "Dispatching";
+static const char * EVENTQUEUE_DISPATCHED_STR = "Dispatched";
+static const char * EVENTQUEUE_CANCELLED_STR = "Cancelled";
+static const char * EVENTQUEUE_STARTED_STR = "Started";
+
 struct _EventQueue {
     CObject parent;
 
-    int running_events;
-
     CListTS events;
+    CListTS running_events;
     CListTS threads;
 
     P_COND_TYPE sleep_cond;
     P_MUTEX_TYPE pool_lock;
-    P_MUTEX_TYPE running_events_lock;
 
-    void (*queue_event_cb)(QueueThread * thread, EventQueueType type, void * user_data);
+    void (*queue_event_cb)(EventQueue * queue, EventQueueType type, void * user_data);
     void * user_data;
 };
 
 void priv_EventQueue__wait_finish(EventQueue* self);
 void priv_EventQueue__destroy(CObject * self);
-void priv_EventQueue__running_event_change(EventQueue * self, int add_flag);
+
+const char * EventQueueType__toString(EventQueueType type){
+  switch(type){
+    case EVENTQUEUE_DISPATCHING:
+      return EVENTQUEUE_DISPATCHING_STR;
+    case EVENTQUEUE_DISPATCHED:
+      return EVENTQUEUE_DISPATCHED_STR;
+    case EVENTQUEUE_CANCELLED:
+      return EVENTQUEUE_CANCELLED_STR;
+    case EVENTQUEUE_STARTED:
+      return EVENTQUEUE_STARTED_STR;
+    default:
+      return NULL;
+  }
+}
 
 void priv_EventQueue__wait_finish(EventQueue* self){
     int val = -1;
@@ -46,21 +63,11 @@ void priv_EventQueue__destroy(CObject * cobject){
 
         CObject__destroy((CObject *)&self->events);
         CObject__destroy((CObject *)&self->threads);
+        CObject__destroy((CObject *)&self->running_events);
 
         P_COND_CLEANUP(self->sleep_cond);
         P_MUTEX_CLEANUP(self->pool_lock);
-        P_MUTEX_CLEANUP(self->running_events_lock);
     }
-}
-
-void priv_EventQueue__running_event_change(EventQueue * self, int add_flag){
-    P_MUTEX_LOCK(self->running_events_lock);
-    if(add_flag){
-        self->running_events++;
-    } else {
-        self->running_events--;
-    }
-    P_MUTEX_UNLOCK(self->running_events_lock);
 }
 
 void EventQueue__init(EventQueue* self) {
@@ -71,15 +78,13 @@ void EventQueue__init(EventQueue* self) {
 
     CListTS__init(&self->threads);
     CListTS__init(&self->events);
-
-    self->running_events=0;
+    CListTS__init(&self->running_events);
 
     P_COND_SETUP(self->sleep_cond);
     P_MUTEX_SETUP(self->pool_lock);
-    P_MUTEX_SETUP(self->running_events_lock);
 }
 
-EventQueue* EventQueue__create(void (*queue_event_cb)(QueueThread * thread, EventQueueType type, void * user_data), void * user_data) {
+EventQueue* EventQueue__create(void (*queue_event_cb)(EventQueue * queue, EventQueueType type, void * user_data), void * user_data) {
     C_TRACE("create...");
     EventQueue* result = (EventQueue*) malloc(sizeof(EventQueue));
     EventQueue__init(result);
@@ -91,9 +96,9 @@ EventQueue* EventQueue__create(void (*queue_event_cb)(QueueThread * thread, Even
 
 int EventQueue__get_running_event_count(EventQueue * self){
     int ret = -1;
-    P_MUTEX_LOCK(self->running_events_lock);
-    ret = self->running_events;
-    P_MUTEX_UNLOCK(self->running_events_lock);
+    P_MUTEX_LOCK(self->pool_lock);
+    ret = CListTS__get_count(&self->running_events);
+    P_MUTEX_UNLOCK(self->pool_lock);
     return ret;
 }
 
@@ -106,7 +111,7 @@ int EventQueue__get_thread_count(EventQueue * self){
 }
 
 void EventQueue__remove_thread(EventQueue* self, QueueThread * qt){
-    CListTS__remove_record(&self->threads,(CObject*)qt);
+    CListTS__destroy_record(&self->threads,(CObject*)qt);
 }
 
 void EventQueue__stop(EventQueue* self, int nthread){
@@ -128,22 +133,73 @@ void EventQueue__stop(EventQueue* self, int nthread){
 }
 
 void EventQueue__clear(EventQueue* self){
+    //TODO Invoke cancellation and cleanup
     CListTS__clear(&self->events);
 }
 
-void EventQueue__insert(EventQueue* queue, void (*callback)(), void * user_data){
+void EventQueue__insert(EventQueue* queue, void * scope, void (*callback)(void * user_data), void * user_data){
     if(!CObject__is_valid((CObject*)queue)){
         return;//Stop accepting events
     }
     
-    QueueEvent * record = QueueEvent__create(callback,user_data);
-    CListTS__add(&queue->events,(CObject*)record);
+    P_MUTEX_LOCK(queue->pool_lock);
+
+    /* TODO Implement cleanup mechaism before uncommenting */
+    // if(!QueueEvent__is_cancelled(QueueEvent__get_current())){
+        QueueEvent * record = QueueEvent__create(scope, callback,user_data);
+        CListTS__add(&queue->events,(CObject*)record);
+    // } else {
+    //     C_WARN("Ignoring event dispatched from cancelled event...");
+    // }
+
+    P_MUTEX_UNLOCK(queue->pool_lock);
     P_COND_SIGNAL(queue->sleep_cond);
 }
 
+void EventQueue__cancel_scopes(EventQueue * self, void ** scopes, int count){
+    P_MUTEX_LOCK(self->pool_lock);
+    int i, a, evtcount;
+    
+    //Clean up pending events
+    evtcount = CListTS__get_count(&self->events);
+    for(i=0;i<evtcount;i++){
+        QueueEvent * evt = (QueueEvent *) CListTS__get(&self->events, i);
+        for(a=0;a<count;a++){
+            void * scope_to_cancel = scopes[a];
+            if(scope_to_cancel == QueueEvent__get_scope(evt)){
+                C_INFO("Removing from queue...");
+                CListTS__remove_record(&self->events,(CObject*)evt);
+                i--;
+                evtcount--;
+                if(self->queue_event_cb){
+                    self->queue_event_cb(self,EVENTQUEUE_CANCELLED,self->user_data);
+                }
+                CObject__destroy((CObject*)evt);
+            }
+        }
+    }
+
+    //Cancellation request for running event
+    evtcount = CListTS__get_count(&self->running_events);
+    for(i=0;i<evtcount;i++){
+        QueueEvent * evt = (QueueEvent *) CListTS__get(&self->running_events, i);
+        for(a=0;a<count;a++){
+            void * scope_to_cancel = scopes[a];
+            if(scope_to_cancel == QueueEvent__get_scope(evt)){
+                C_INFO("Cancelling running event...");
+                QueueEvent__cancel(evt);
+            }
+        }
+    }
+    P_MUTEX_UNLOCK(self->pool_lock);
+}
+
 QueueEvent * EventQueue__pop(EventQueue* self){
-    C_TRACE("pop");
-    return (QueueEvent*) CListTS__pop(&self->events);
+    P_MUTEX_LOCK(self->pool_lock);
+    QueueEvent * qe = (QueueEvent*) CListTS__pop(&self->events);
+    CListTS__add(&self->running_events,(CObject*)qe);
+    P_MUTEX_UNLOCK(self->pool_lock);
+    return qe;
 }
 
 void EventQueue__start(EventQueue* self){
@@ -153,7 +209,7 @@ void EventQueue__start(EventQueue* self){
     P_MUTEX_UNLOCK(self->pool_lock);
 
     if(self->queue_event_cb){
-        self->queue_event_cb(qt,EVENTQUEUE_STARTED,self->user_data);
+        self->queue_event_cb(self,EVENTQUEUE_STARTED,self->user_data);
     }
 }
 
@@ -161,18 +217,14 @@ void EventQueue__wait_condition(EventQueue * self, P_MUTEX_TYPE lock){
     P_COND_WAIT(self->sleep_cond, lock);
 }
 
-void EventQueue_notify_dispatching(EventQueue * self, QueueThread * thread){
-    C_TRACE("notify dispatching event...");
-    priv_EventQueue__running_event_change(self,1);
-    if(self->queue_event_cb){
-        self->queue_event_cb(thread,EVENTQUEUE_DISPATCHING,self->user_data);
+void EventQueue_notify(EventQueue * self, EventQueueType type){
+    C_TRACE("event notify...");
+    if(type == EVENTQUEUE_DISPATCHED || type == EVENTQUEUE_CANCELLED){
+        P_MUTEX_LOCK(self->pool_lock);
+        CListTS__remove_record(&self->running_events,(CObject*)QueueEvent__get_current());
+        P_MUTEX_UNLOCK(self->pool_lock);
     }
-}
-
-void EventQueue_notify_dispatched(EventQueue * self,  QueueThread * thread){
-    C_TRACE("notify dispatched event...");
-    priv_EventQueue__running_event_change(self,0);
     if(self->queue_event_cb){
-        self->queue_event_cb(thread,EVENTQUEUE_DISPATCHED,self->user_data);
+        self->queue_event_cb(self,type,self->user_data);
     }
 }

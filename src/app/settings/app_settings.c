@@ -125,7 +125,7 @@ void apply_settings (GtkWidget *widget, AppSettings * settings) {
     set_button_state(settings,FALSE);
     gtk_spinner_start (GTK_SPINNER (settings->loading_handle));
 
-    EventQueue__insert(settings->queue,_save_settings,settings);
+    OnvifApp__dispatch(settings->app,settings->app,_save_settings,settings);
 }
 
 void AppSettings__reset_settings(AppSettings * self){
@@ -311,9 +311,9 @@ void AppSettings__load_settings(AppSettings * self){
         fclose(fptr);
 }
 
-AppSettings * AppSettings__create(EventQueue * queue){
+AppSettings * AppSettings__create(OnvifApp * app){
     AppSettings * self = malloc(sizeof(AppSettings));
-    self->queue = queue;
+    self->app = app;
     self->stream = AppSettingsStream__create(priv_AppSettings_state_changed,self);
     self->discovery = AppSettingsDiscovery__create(priv_AppSettings_state_changed,self);
     AppSettings__load_settings(self);

@@ -414,7 +414,7 @@ void OnvifApp__cred_dialog_login_cb(AppDialogEvent * event){
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (OnvifMgrDeviceRow__get_app(device));
     AppDialog__show_loading((AppDialog*)priv->cred_dialog, "ONVIF Authentication attempt...");
     OnvifDevice__set_credentials(OnvifMgrDeviceRow__get_device(device),CredentialsDialog__get_username((CredentialsDialog*)event->dialog),CredentialsDialog__get_password((CredentialsDialog*)event->dialog));
-    EventQueue__insert(priv->queue,_onvif_authentication_reload,AppDialogEvent_copy(event));
+    EventQueue__insert(priv->queue, device, _onvif_authentication_reload,AppDialogEvent_copy(event));
 }
 
 void OnvifApp__cred_dialog_cancel_cb(AppDialogEvent * event){
@@ -427,7 +427,7 @@ void OnvifApp__player_retry_cb(GstRtspPlayer * player, void * user_data){
     OnvifApp * self = (OnvifApp *) user_data;
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (self);
     g_object_ref(priv->device);
-    EventQueue__insert(priv->queue,_player_retry_stream,priv->device);
+    EventQueue__insert(priv->queue, priv->device, _player_retry_stream,priv->device);
 }
 
 void OnvifApp__player_error_cb(GstRtspPlayer * player, void * user_data){
@@ -454,17 +454,18 @@ void OnvifApp__player_started_cb(GstRtspPlayer * player, void * user_data){
     }
 }
 
-void OnvifApp__eq_dispatch_cb(QueueThread * thread, EventQueueType type, void * user_data){
+void OnvifApp__eq_dispatch_cb(EventQueue * queue, EventQueueType type, void * user_data){
     OnvifApp * self = (OnvifApp *) user_data;
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (self);
-
     if(!GTK_IS_WIDGET(priv->task_label)){
         return;
     }
-    EventQueue * queue = QueueThread__get_queue(thread);
+
     int running = EventQueue__get_running_event_count(queue);
     int pending = EventQueue__get_pending_event_count(queue);
     int total = EventQueue__get_thread_count(queue);
+
+    C_TRACE("EventQueue %s : %d/%d/%d",EventQueueType__toString(type),running,pending,total);
 
     char str[10];
     memset(&str,'\0',sizeof(str));
@@ -500,13 +501,39 @@ void OnvifApp__btn_scan_cb (GtkWidget *widget, OnvifApp * app) {
 
     gtk_widget_set_sensitive(widget,FALSE);
 
+    /*
+    *
+    *TODO before uncommenting : Add cleanup mechanism to EventQueue event cancellation
+    *
+    */
+    // //Cancell all pending events associated to devices removed.
+    // GList * childs = gtk_container_get_children(GTK_CONTAINER(priv->listbox));
+    // GList * tmp = childs;
+    // int scopes_count = 0;
+    // void ** scopes = NULL;
+    // OnvifMgrDeviceRow * device;
+    // GLIST_FOREACH(device, childs) {
+    //     scopes_count++;
+    //     if(!scopes){
+    //         scopes = malloc(sizeof(void*)*scopes_count);
+    //     } else {
+    //         scopes = realloc(scopes,sizeof(void*)*scopes_count);
+    //     }
+    //     scopes[scopes_count-1] = device;
+    //     childs = childs->next;
+    // }
+    // g_list_free(tmp);
+
+    // //Submit cancellation request
+    // EventQueue__cancel_scopes(priv->queue,scopes, scopes_count);
+    // free(scopes);
+
     //Clearing the list
     gtk_container_foreach (GTK_CONTAINER (priv->listbox), (GtkCallback)gui_container_remove, priv->listbox);
-    // EventQueue__clear(app->queue); //Unable to safely clear because pointers are released inside pending events
 
     //Multiple dispatch in case of packet dropped
     g_object_ref(app);
-    EventQueue__insert(priv->queue,_start_onvif_discovery,app);
+    EventQueue__insert(priv->queue, app, _start_onvif_discovery,app);
 }
 
 static void OnvifApp__profile_picker_cb (OnvifMgrDeviceRow *device){
@@ -518,7 +545,7 @@ static void OnvifApp__profile_picker_cb (OnvifMgrDeviceRow *device){
 static void OnvifApp__profile_changed_cb (OnvifMgrDeviceRow *device){
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (OnvifMgrDeviceRow__get_app(device));
     g_object_ref(device);
-    EventQueue__insert(priv->queue,_profile_callback,device);
+    EventQueue__insert(priv->queue, device, _profile_callback,device);
 }
 
 void OnvifApp__add_device_cb(AppDialogEvent * event){
@@ -531,7 +558,7 @@ void OnvifApp__add_device_cb(AppDialogEvent * event){
 
     AppDialog__show_loading((AppDialog*)event->dialog, "Testing ONVIF device configuration...");
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (app);
-    EventQueue__insert(priv->queue,_onvif_device_add,AppDialogEvent_copy(event));
+    EventQueue__insert(priv->queue, event->dialog, _onvif_device_add,AppDialogEvent_copy(event));
 }
 
 void OnvifApp__add_btn_cb (GtkWidget *widget, OnvifApp * app) {
@@ -626,7 +653,7 @@ static void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
 
     //Stop previous stream
     g_object_ref(app);
-    EventQueue__insert(priv->queue,_stop_onvif_stream,app);
+    EventQueue__insert(priv->queue,app, _stop_onvif_stream,app);
 
 
     OnvifApp__set_device(app,row);
@@ -648,7 +675,7 @@ static void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
 
         gtk_spinner_start (GTK_SPINNER (priv->player_loading_handle));
         g_object_ref(priv->device);
-        EventQueue__insert(priv->queue,_play_onvif_stream,priv->device);
+        EventQueue__insert(priv->queue, priv->device, _play_onvif_stream,priv->device);
     }
 
 exit:
@@ -658,7 +685,7 @@ exit:
 static void OnvifApp__display_device(OnvifApp * self, OnvifMgrDeviceRow * device){
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (self);
     g_object_ref(device);
-    EventQueue__insert(priv->queue,_display_onvif_device,device);
+    EventQueue__insert(priv->queue, device, _display_onvif_device,device);
 }
 
 static void OnvifApp__add_device(OnvifApp * app, OnvifMgrDeviceRow * omgr_device){
@@ -975,7 +1002,7 @@ OnvifApp__init (OnvifApp *self)
     priv->task_label = NULL;
     priv->queue = EventQueue__create(OnvifApp__eq_dispatch_cb,self);
     priv->details = OnvifDetails__create(self);
-    priv->settings = AppSettings__create(priv->queue);
+    priv->settings = AppSettings__create(self);
     priv->taskmgr = TaskMgr__create();
 
     AppSettingsStream__set_overscale_callback(priv->settings->stream,OnvifApp__setting_overscale_cb,self);
@@ -1015,10 +1042,12 @@ OnvifApp * OnvifApp__new(void){
 void OnvifApp__destroy(OnvifApp* self){
     g_return_if_fail (self != NULL);
     g_return_if_fail (ONVIFMGR_IS_APP (self));
+    g_object_ref(self);
     COwnableObject__disown(COWNABLE_OBJECT(self)); //Changing owned state, flagging pending events to be ignored
-    while(G_IS_OBJECT(self) && G_OBJECT(self)->ref_count >= 1){ //Wait for destruction to complete
+    while(G_IS_OBJECT(self) && G_OBJECT(self)->ref_count > 1){ //Wait for destruction to complete
         usleep(500000);
     }
+    g_object_unref(self);
 }
 
 MsgDialog * OnvifApp__get_msg_dialog(OnvifApp * self){
@@ -1028,9 +1057,9 @@ MsgDialog * OnvifApp__get_msg_dialog(OnvifApp * self){
     return priv->msg_dialog;
 }
 
-void OnvifApp__dispatch(OnvifApp* self, void (*callback)(), void * user_data){
+void OnvifApp__dispatch(OnvifApp* self, void * scope, void (*callback)(), void * user_data){
     g_return_if_fail (self != NULL);
     g_return_if_fail (ONVIFMGR_IS_APP (self));
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (self);
-    EventQueue__insert(priv->queue,callback,user_data);
+    EventQueue__insert(priv->queue, scope, callback,user_data);
 }

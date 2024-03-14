@@ -2,7 +2,7 @@
 #define ONVIF_APP_SETTINGS_H_
 
 #include <gtk/gtk.h>
-#include "../../queue/event_queue.h"
+#include "../onvif_app.h"
 
 #include "app_settings_stream.h"
 #include "app_settings_discovery.h"
@@ -26,10 +26,10 @@ struct _AppSettings {
     AppSettingsStream * stream;
     AppSettingsDiscovery * discovery;
 
-    EventQueue * queue;
+    OnvifApp * app;
 };
 
-AppSettings * AppSettings__create(EventQueue * queue);
+AppSettings * AppSettings__create(OnvifApp * app);
 void AppSettings__destroy(AppSettings* dialog);
 void AppSettings__set_details_loading_handle(AppSettings * self, GtkWidget * widget);
 GtkWidget * AppSettings__get_widget(AppSettings * self);
