@@ -2,8 +2,9 @@
 #include <gst/gst.h>
 #include <stdio.h>
 #include "clogger.h"
+#include <gst/pbutils/gstpluginsbaseversion.h>
 
-GST_PLUGIN_STATIC_DECLARE(gtknew);
+// GST_PLUGIN_STATIC_DECLARE(gtknew);
 
 #ifdef STATIC_BUILD
 
@@ -33,7 +34,7 @@ GST_PLUGIN_STATIC_DECLARE(videoconvertscale);
 // GST_PLUGIN_STATIC_DECLARE(videotestsrc);
 GST_PLUGIN_STATIC_DECLARE(volume); // gstvolume
 GST_PLUGIN_STATIC_DECLARE(alsa);
-// GST_PLUGIN_STATIC_DECLARE(opengl); gstopengl
+GST_PLUGIN_STATIC_DECLARE(opengl); // gstopengl
 // GST_PLUGIN_STATIC_DECLARE(ogg); gstogg
 // GST_PLUGIN_STATIC_DECLARE(opus); gstopus
 // GST_PLUGIN_STATIC_DECLARE(vorbis); gstvorbis
@@ -100,7 +101,7 @@ GST_PLUGIN_STATIC_DECLARE(video4linux2);
 // GST_PLUGIN_STATIC_DECLARE(adaptivedemux2); gstadaptivedemux2
 // GST_PLUGIN_STATIC_DECLARE(cairo);
 // GST_PLUGIN_STATIC_DECLARE(gdkpixbuf); // gstgdkpixbuf
-// GST_PLUGIN_STATIC_DECLARE(gtk); // gstgtk
+GST_PLUGIN_STATIC_DECLARE(gtk); // gstgtk
 GST_PLUGIN_STATIC_DECLARE(jpeg); // gstjpeg
 // GST_PLUGIN_STATIC_DECLARE(lame); gstlame 
 // GST_PLUGIN_STATIC_DECLARE(dv); gstdv
@@ -137,7 +138,7 @@ GST_PLUGIN_STATIC_DECLARE(asfmux);
 // GST_PLUGIN_STATIC_DECLARE(geometrictransform); gstgeometrictransform
 // GST_PLUGIN_STATIC_DECLARE(id3tag); gstid3tag
 // GST_PLUGIN_STATIC_DECLARE(inter); gstinter
-// GST_PLUGIN_STATIC_DECLARE(interlace); gstinterlace
+GST_PLUGIN_STATIC_DECLARE(interlace); // gstinterlace
 // GST_PLUGIN_STATIC_DECLARE(ivfparse); gstivfparse
 // GST_PLUGIN_STATIC_DECLARE(ivtc); gstivtc
 // GST_PLUGIN_STATIC_DECLARE(jp2kdecimator); gstjp2kdecimator
@@ -215,13 +216,13 @@ GST_PLUGIN_STATIC_DECLARE(de265);
 
 #endif
 void
-onvif_init_static_plugins (void)
+gst_plugin_init_static (void)
 {
   static gsize initialization_value = 0;
   if (g_once_init_enter (&initialization_value)) {
 
     C_INFO("Initializing Gstreamer plugins...");
-    GST_PLUGIN_STATIC_REGISTER(gtknew);
+    // GST_PLUGIN_STATIC_REGISTER(gtknew);
 
 #ifdef STATIC_BUILD
     
@@ -250,7 +251,7 @@ onvif_init_static_plugins (void)
     // GST_PLUGIN_STATIC_REGISTER(videotestsrc);
     GST_PLUGIN_STATIC_REGISTER(volume); // gstvolume
     GST_PLUGIN_STATIC_REGISTER(alsa);
-    // GST_PLUGIN_STATIC_REGISTER(opengl); gstopengl
+    GST_PLUGIN_STATIC_REGISTER(opengl); // gstopengl
     // GST_PLUGIN_STATIC_REGISTER(ogg); gstogg
     // GST_PLUGIN_STATIC_REGISTER(opus); gstopus
     // GST_PLUGIN_STATIC_REGISTER(vorbis); gstvorbis
@@ -317,7 +318,7 @@ onvif_init_static_plugins (void)
     // GST_PLUGIN_STATIC_REGISTER(adaptivedemux2); gstadaptivedemux2
     // GST_PLUGIN_STATIC_REGISTER(cairo);
     // GST_PLUGIN_STATIC_REGISTER(gdkpixbuf); // gstgdkpixbuf
-    // GST_PLUGIN_STATIC_REGISTER(gtk); // gstgtk
+    GST_PLUGIN_STATIC_REGISTER(gtk); // gstgtk
     GST_PLUGIN_STATIC_REGISTER(jpeg); // gstjpeg
     // GST_PLUGIN_STATIC_REGISTER(lame); gstlame 
     // GST_PLUGIN_STATIC_REGISTER(dv); gstdv
@@ -354,7 +355,7 @@ onvif_init_static_plugins (void)
     // GST_PLUGIN_STATIC_REGISTER(geometrictransform); gstgeometrictransform
     // GST_PLUGIN_STATIC_REGISTER(id3tag); gstid3tag
     // GST_PLUGIN_STATIC_REGISTER(inter); gstinter
-    // GST_PLUGIN_STATIC_REGISTER(interlace); gstinterlace
+    GST_PLUGIN_STATIC_REGISTER(interlace); // gstinterlace
     // GST_PLUGIN_STATIC_REGISTER(ivfparse); gstivfparse
     // GST_PLUGIN_STATIC_REGISTER(ivtc); gstivtc
     // GST_PLUGIN_STATIC_REGISTER(jp2kdecimator); gstjp2kdecimator
@@ -434,4 +435,70 @@ onvif_init_static_plugins (void)
     g_once_init_leave (&initialization_value, 1);
     C_DEBUG("Gstreamer plugins initialized...");
   }
+}
+
+void gst_plugin_feature_set_rank_by_name(char * element_name, int priority){
+  GstRegistry* plugins_register = gst_registry_get();
+  GstPluginFeature* plugfeat = gst_registry_lookup_feature(plugins_register, element_name);
+  if(plugfeat == NULL) {
+      C_WARN("Element '%s' not found.",element_name);
+      return;
+  }
+  int rank = gst_plugin_feature_get_rank(plugfeat);
+  if(rank > priority){
+    C_WARN("Found element '%s'. Lowering priority from %d to %d...",element_name,rank,priority);
+    gst_plugin_feature_set_rank(plugfeat, priority);
+  } else if(rank < priority){
+    C_WARN("Found element '%s'. Increasing priority from %d to %d...",element_name,rank,priority);
+    gst_plugin_feature_set_rank(plugfeat, priority);
+  }
+
+  gst_object_unref(plugfeat);
+}
+
+
+int gst_version_compare(int major, int minor, int micro){
+  if(GST_PLUGINS_BASE_VERSION_MAJOR < major){
+    return 0;
+  } else if(GST_PLUGINS_BASE_VERSION_MAJOR > major){
+    return 1;
+  }
+
+  if(GST_PLUGINS_BASE_VERSION_MINOR < minor){
+    return 0;
+  } else if(GST_PLUGINS_BASE_VERSION_MINOR > minor){
+    return 1;
+  }
+
+  if(GST_PLUGINS_BASE_VERSION_MICRO < micro){
+    return 0;
+  } else if(GST_PLUGINS_BASE_VERSION_MICRO > micro){
+    return 1;
+  }
+
+  return 1;
+}
+
+void gst_print_elements_by_type(char * type){
+  GList * factories, *filtered, *tmp;
+
+  C_INFO("* %s decoders ***",type);
+  int found =0;
+  GstCaps * caps = gst_caps_new_empty_simple(type);
+  factories = gst_element_factory_list_get_elements (GST_ELEMENT_FACTORY_TYPE_DECODER || GST_ELEMENT_FACTORY_TYPE_MEDIA_VIDEO, GST_RANK_MARGINAL);
+  filtered = gst_element_factory_list_filter (factories, caps, GST_PAD_SINK, FALSE);
+  for (tmp = filtered; tmp; tmp = tmp->next) {
+      GstElementFactory *fact = (GstElementFactory *) tmp->data;
+      int rank = gst_plugin_feature_get_rank(GST_PLUGIN_FEATURE_CAST(fact));
+      char * name = gst_plugin_feature_get_name(GST_PLUGIN_FEATURE_CAST(fact));
+      C_INFO("*    %s[%d]",name,rank);
+      found = 1;
+  }
+
+  if(!found){
+     C_INFO("*    None");
+  }
+  gst_caps_unref (caps);
+  g_list_free(filtered);
+  g_list_free (factories);
 }

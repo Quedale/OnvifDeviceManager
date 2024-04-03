@@ -31,10 +31,15 @@ AC_SUBST(PKG_ONVIF_SOAP_PATH, '$(abs_srcdir)/subprojects/OnvifSoapLib/build/dist
 AC_SUBST(PKG_CUTILS_PATH, '$(abs_srcdir)/subprojects/CUtils/build/dist/lib/pkgconfig')
 AC_SUBST(PKG_DE265_PATH, '$(abs_srcdir)/subprojects/libde265/dist/lib/pkgconfig')
 AC_SUBST(PKG_NTLM_PATH, '$(abs_srcdir)/subprojects/libntlm/build/dist/lib/pkgconfig')
+AC_SUBST(PKG_LIBX11_PATH, '$(abs_srcdir)/subprojects/libx11/dist/lib/pkgconfig')
 
 AC_SUBST(GST_LIBS,m4_normalize('
     gstreamer-1.0
     gstreamer-video-1.0
+    gstreamer-gl-1.0
+    gstreamer-gl-egl-1.0
+    gstreamer-gl-prototypes-1.0
+    gstreamer-gl-wayland-1.0
     alsa
 '))
 
@@ -46,6 +51,9 @@ AC_DEFUN([SET_GST_PKG_PATH],[
     AC_SUBST(PKG_PATH, '$(abs_srcdir)/subprojects/gstreamer/build/dist/lib/pkgconfig')
     AC_SUBST(PKG_GST_PATH, '$(abs_srcdir)/subprojects/gstreamer/build/dist/lib/gstreamer-1.0/pkgconfig')
     AC_SUBST(GST_PLGS,m4_normalize('
+        gstopengl
+        gstgtk
+        gstinterlace
         gstde265
         gstjpeg
         gstjpegformat
@@ -183,7 +191,7 @@ AM_COND_IF([GSTBUILDCOND],[
 AC_SUBST(EXT_CFLAGS, '$(EXT_CFLAGS_LIBAV) $(EXT_CFLAGS_NV)')
 
 #Declare all path for pkg-config to search
-AC_SUBST(PKG_FULL_PATH, '$(PKG_PATH):$(PKG_GST_PATH):$(PKG_FFMPEG_PATH):$(PKG_PULSE_PATH):$(PKG_ALSA_PATH):$(PKG_GUDEV_PATH):$(PKG_UDEV_PATH):$(PKG_GLIB_PATH):$(PKG_V4L2_PATH):$(PKG_ONVIF_DISCO_PATH):$(PKG_ONVIF_SOAP_PATH):$(PKG_CUTILS_PATH):$(PKG_OPENSSL_PATH):$(PKG_DE265_PATH):$(PKG_NTLM_PATH)')
+AC_SUBST(PKG_FULL_PATH, '$(PKG_PATH):$(PKG_GST_PATH):$(PKG_FFMPEG_PATH):$(PKG_PULSE_PATH):$(PKG_ALSA_PATH):$(PKG_GUDEV_PATH):$(PKG_UDEV_PATH):$(PKG_GLIB_PATH):$(PKG_V4L2_PATH):$(PKG_ONVIF_DISCO_PATH):$(PKG_ONVIF_SOAP_PATH):$(PKG_CUTILS_PATH):$(PKG_OPENSSL_PATH):$(PKG_DE265_PATH):$(PKG_NTLM_PATH):$(PKG_LIBX11_PATH)')
 
 
 AC_CONFIG_FILES([

@@ -1,5 +1,5 @@
 #include "../gst/gstrtspplayer.h"
-#include "../gst/onvifinitstaticplugins.h"
+#include "../gst/gst_plugin_utils.h"
 #include "clogger.h"
 
 struct PlayerAndButtons {
@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
 
     /* Initialize GStreamer */
     gst_init (&argc, &argv);
-    onvif_init_static_plugins();
+    gst_plugin_init_static();
 
     GtkWidget * window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
     g_signal_connect (G_OBJECT (window), "delete-event", G_CALLBACK (delete_event_cb), NULL);

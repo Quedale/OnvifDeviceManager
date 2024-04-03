@@ -266,17 +266,32 @@ on_decoder_pad_added (GstElement *element, GstPad *new_pad, gpointer data){
 
 static GstElement*
 GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
-    GstElement *vdecoder, *videoconvert, *overlay_comp, *video_bin;
+    GstElement *vdecoder, *videoconvert, *overlay_comp, *video_bin, *gtkglsink;
     GstPad *pad, *ghostpad;
 
     video_bin = gst_bin_new("video_bin");
     vdecoder = gst_element_factory_make ("decodebin3", NULL);
     videoconvert = gst_element_factory_make ("videoconvert", NULL);
     overlay_comp = gst_element_factory_make ("overlaycomposition", NULL);
-    priv->sink = gst_element_factory_make ("gtkcustomsink", NULL);
-    gst_base_sink_set_qos_enabled(GST_BASE_SINK_CAST(priv->sink),FALSE);
-    gst_base_sink_set_sync(GST_BASE_SINK_CAST(priv->sink),FALSE);
-    gst_gtk_base_custom_sink_set_expand(GST_GTK_BASE_CUSTOM_SINK(priv->sink),priv->allow_overscale);
+    priv->sink = gst_element_factory_make ("glsinkbin", "glsinkbin");
+    gtkglsink = gst_element_factory_make ("gtkglsink", "gtkglsink");
+    if (gtkglsink != NULL && priv->sink != NULL) {
+        C_INFO ("Successfully created GTK GL Sink\n");
+        g_object_set (priv->sink, "sink", gtkglsink, NULL);
+        g_object_get (gtkglsink, "widget", &priv->canvas, NULL);
+
+        gst_base_sink_set_sync(GST_BASE_SINK_CAST(gtkglsink),FALSE);
+        gst_base_sink_set_qos_enabled(GST_BASE_SINK_CAST(gtkglsink),FALSE);
+    } else {
+        C_WARN ("Could not create gtkglsink, falling back to gtksink.\n");
+        priv->sink = gst_element_factory_make ("gtksink", "gtksink");
+        g_object_get (priv->sink, "widget", &priv->canvas, NULL);
+
+        gst_base_sink_set_sync(GST_BASE_SINK_CAST(priv->sink),FALSE);
+        gst_base_sink_set_qos_enabled(GST_BASE_SINK_CAST(priv->sink),FALSE);
+    }
+
+    gtk_container_add (GTK_CONTAINER (priv->canvas_handle), GTK_WIDGET(priv->canvas));
 
     if (!video_bin ||
             !vdecoder ||
@@ -326,13 +341,6 @@ GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
     ghostpad = gst_ghost_pad_new ("bin_sink", pad);
     gst_element_add_pad (video_bin, ghostpad);
     gst_object_unref (pad);
-
-    if(!priv->canvas){
-        priv->canvas = gst_gtk_base_custom_sink_acquire_widget(GST_GTK_BASE_CUSTOM_SINK(priv->sink));
-    } else {
-        gst_gtk_base_custom_sink_set_widget(GST_GTK_BASE_CUSTOM_SINK(priv->sink),GTK_GST_BASE_CUSTOM_WIDGET(priv->canvas));
-    }
-    gst_gtk_base_custom_sink_set_parent(GST_GTK_BASE_CUSTOM_SINK(priv->sink),priv->canvas_handle);
 
     return video_bin;
 }
@@ -493,7 +501,7 @@ GstRtspPlayerPrivate__setup_pipeline (GstRtspPlayerPrivate * priv)
     g_object_set (G_OBJECT (priv->src), "backchannel", priv->enable_backchannel, NULL);
     g_object_set (G_OBJECT (priv->src), "user-agent", "OnvifDeviceManager-Linux-0.0", NULL);
     g_object_set (G_OBJECT (priv->src), "do-retransmission", TRUE, NULL);
-    g_object_set (G_OBJECT (priv->src), "onvif-mode", FALSE, NULL); //It seems onvif mode can cause segmentation fault with v4l2onvif
+    g_object_set (G_OBJECT (priv->src), "onvif-mode", FALSE, NULL); //It seems onvif mode can cause segmentation fault with libva
     g_object_set (G_OBJECT (priv->src), "is-live", TRUE, NULL);
     g_object_set (G_OBJECT (priv->src), "tcp-timeout", 1000000, NULL);
     g_object_set (G_OBJECT (priv->src), "protocols", GST_RTSP_LOWER_TRANS_TCP, NULL); //TODO Allow changing this via settings
@@ -1035,9 +1043,7 @@ void GstRtspPlayer__set_allow_overscale(GstRtspPlayer * self, int allow_overscal
     
     GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
     priv->allow_overscale = allow_overscale;
-    if(GST_IS_GTK_BASE_CUSTOM_SINK(priv->sink)){
-        gst_gtk_base_custom_sink_set_expand(GST_GTK_BASE_CUSTOM_SINK(priv->sink),allow_overscale);
-    }
+    //TODO Support overscaling again
 }
 
 void GstRtspPlayer__set_port_fallback(GstRtspPlayer* self, char * port){

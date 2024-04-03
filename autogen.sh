@@ -868,7 +868,7 @@ if [ $ret != 0 ]; then
   fi
 
   echo "-- Building gsoap libgsoap-dev --"
-  downloadAndExtract file="gsoap.zip" path="https://sourceforge.net/projects/gsoap2/files/gsoap_2.8.129.zip/download"
+  downloadAndExtract file="gsoap.zip" path="https://sourceforge.net/projects/gsoap2/files/gsoap_2.8.133.zip/download"
   if [ $FAILED -eq 1 ]; then exit 1; fi
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG:$ZLIB_PKG \
   C_INCLUDE_PATH="$SSL_INCLUDE:$ZLIB_INCLUDE:$C_INCLUDE_PATH" \
@@ -1046,7 +1046,7 @@ FFMPEG_PKG=$SUBPROJECT_DIR/FFmpeg/dist/lib/pkgconfig
 GST_OMX_PKG_PATH=$SUBPROJECT_DIR/gstreamer/build_omx/dist/lib/gstreamer-1.0/pkgconfig
 GST_PKG_PATH=:$SUBPROJECT_DIR/gstreamer/build/dist/lib/pkgconfig:$SUBPROJECT_DIR/gstreamer/build/dist/lib/gstreamer-1.0/pkgconfig
 gst_ret=0
-GSTREAMER_LATEST=1.24.0
+GSTREAMER_LATEST=1.24.1
 if [ $ENABLE_LATEST == 0 ]; then
   GSTREAMER_VERSION=1.14.4
 else
@@ -1060,7 +1060,8 @@ gst_core=(
   "gstreamer-plugins-bad-1.0;gstreamer-plugins-bad-1.0"
 )
 
-gst_base_plugins=( 
+gst_base_plugins=(
+    "gl;gstopengl"
     "app;gstapp"
     "typefind;gsttypefindfunctions"
     "audiotestsrc;gstaudiotestsrc"
@@ -1079,6 +1080,7 @@ gst_base_plugins=(
     "overlaycomposition;gstoverlaycomposition"
   )
 gst_good_plugins=(
+    "gtk3;gstgtk"
     "level;gstlevel"
     "rtsp;gstrtsp"
     "jpeg;gstjpeg"
@@ -1097,6 +1099,9 @@ gst_good_plugins=(
 )
 
 gst_bad_plugins=(
+    "x11;gstx11"
+    "gl;gstgl"
+    "interlace;gstinterlace"
     "openh264;gstopenh264"
     "fdkaac;gstfdkaac"
     "videoparsers;gstvideoparsersbad"
@@ -1149,6 +1154,7 @@ fi
 
 PKG_PULSE=$SUBPROJECT_DIR/pulseaudio/build/dist/lib/pkgconfig
 LIBDE265_PKG=$SUBPROJECT_DIR/libde265/dist/lib/pkgconfig
+LIBX11_PKG=$SUBPROJECT_DIR/libx11/dist/lib/pkgconfig
 
 #Check to see if gstreamer exist on the system
 if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
@@ -1466,116 +1472,122 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
         echo "nasm already installed."
     fi
 
-    if [ $gst_ret != 0 ]; then
-        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$LIBDE265_PKG
-        if [ ! -z "$(pkgCheck name=libde265 minver=v1.0.15)" ]; then
-          pullOrClone path="https://github.com/strukturag/libde265.git" tag=v1.0.15
-          if [ $FAILED -eq 1 ]; then exit 1; fi
-          buildMakeProject srcdir="libde265" prefix="$SUBPROJECT_DIR/libde265/dist" configure="--disable-sherlock265"
-          if [ $FAILED -eq 1 ]; then exit 1; fi
-        else
-          echo "libde265 already installed."
-        fi
-
-        MESON_PARAMS=""
-        if [ $ENABLE_LIBAV -eq 1 ]; then
-            echo "LIBAV Feature enabled..."
-            
-            FFMPEG_BIN=$SUBPROJECT_DIR/FFmpeg/dist/bin
-            PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$FFMPEG_PKG \
-            pkg-config --exists --print-errors "libavcodec >= 58.20.100"
-            ret1=$?
-            PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$FFMPEG_PKG \
-            pkg-config --exists --print-errors "libavfilter >= 7.40.101"
-            ret2=$?
-            PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$FFMPEG_PKG \
-            pkg-config --exists --print-errors "libavformat >= 58.20.100"
-            ret3=$?
-            PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$FFMPEG_PKG \
-            pkg-config --exists --print-errors "libavutil >= 56.22.100"
-            ret4=$?
-            PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$FFMPEG_PKG \
-            pkg-config --exists --print-errors "libpostproc >= 55.3.100"
-            ret5=$?
-            PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$FFMPEG_PKG \
-            pkg-config --exists --print-errors "libswresample >= 3.3.100"
-            ret6=$?
-            PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$FFMPEG_PKG \
-            pkg-config --exists --print-errors "libswscale >= 5.3.100"
-            ret7=$?
-            if [ $ret1 != 0 ] || [ $ret2 != 0 ] || [ $ret3 != 0 ] || [ $ret4 != 0 ] || [ $ret5 != 0 ] || [ $ret6 != 0 ] || [ $ret7 != 0 ]; then
-                #######################
-                #
-                # Custom FFmpeg build
-                #   For some reason, Gstreamer's meson dep doesn't build any codecs
-                #   
-                #   sudo apt install libavcodec-dev libavfilter-dev libavformat-dev libswresample-dev
-                #######################
-
-                FFMPEG_CONFIGURE_ARGS="--disable-lzma"
-                FFMPEG_CONFIGURE_ARGS="$FFMPEG_CONFIGURE_ARGS --disable-doc"
-                FFMPEG_CONFIGURE_ARGS="$FFMPEG_CONFIGURE_ARGS --disable-shared"
-                FFMPEG_CONFIGURE_ARGS="$FFMPEG_CONFIGURE_ARGS --enable-static"
-                FFMPEG_CONFIGURE_ARGS="$FFMPEG_CONFIGURE_ARGS --enable-nonfree"
-                FFMPEG_CONFIGURE_ARGS="$FFMPEG_CONFIGURE_ARGS --enable-version3"
-                FFMPEG_CONFIGURE_ARGS="$FFMPEG_CONFIGURE_ARGS --enable-gpl"
-
-
-                pullOrClone path="https://github.com/FFmpeg/FFmpeg.git" tag=n5.0.2
-                PATH=$PATH:$NASM_BIN \
-                buildMakeProject srcdir="FFmpeg" prefix="$SUBPROJECT_DIR/FFmpeg/dist" configure="$FFMPEG_CONFIGURE_ARGS"
-                if [ $FAILED -eq 1 ]; then exit 1; fi
-                rm -rf $SUBPROJECT_DIR/FFmpeg/dist/lib/*.so
-            else
-                echo "FFmpeg already installed."
-            fi
-
-            MESON_PARAMS="$MESON_PARAMS -Dlibav=enabled"
-        fi
-
-        pullOrClone path="https://gitlab.freedesktop.org/gstreamer/gstreamer.git" tag=$GSTREAMER_VERSION
-
-        #build meson params
-        # Force disable subproject features
-        MESON_PARAMS="$MESON_PARAMS -Dglib:tests=false"
-        MESON_PARAMS="$MESON_PARAMS -Dlibdrm:cairo-tests=false"
-        MESON_PARAMS="$MESON_PARAMS -Dx264:cli=false"
-
-        # Gstreamer options
-        MESON_PARAMS="$MESON_PARAMS -Dbase=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgood=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dbad=enabled"
-        MESON_PARAMS="$MESON_PARAMS -Dgpl=enabled"
-        for gst_p in ${gst_base_plugins[@]}; do
-          IFS=";" read -r -a arr <<< "${gst_p}"
-          MESON_PARAMS+=" -Dgst-plugins-base:${arr[0]}=enabled"
-        done
-        for gst_p in ${gst_good_plugins[@]}; do
-          IFS=";" read -r -a arr <<< "${gst_p}"
-          MESON_PARAMS+=" -Dgst-plugins-good:${arr[0]}=enabled"
-        done
-        for gst_p in ${gst_bad_plugins[@]}; do
-          IFS=";" read -r -a arr <<< "${gst_p}"
-          MESON_PARAMS+=" -Dgst-plugins-bad:${arr[0]}=enabled"
-        done
-        MESON_PARAMS="-Dauto_features=disabled $MESON_PARAMS"
-        MESON_PARAMS="--strip $MESON_PARAMS"
-
-        # Add tinyalsa fallback subproject
-        # echo "[wrap-git]" > subprojects/tinyalsa.wrap
-        # echo "directory=tinyalsa" >> subprojects/tinyalsa.wrap
-        # echo "url=https://github.com/tinyalsa/tinyalsa.git" >> subprojects/tinyalsa.wrap
-        # echo "revision=v2.0.0" >> subprojects/tinyalsa.wrap
-        # MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:tinyalsa=enabled"
-
-        LIBRARY_PATH=$LD_LIBRARY_PATH:$SUBPROJECT_DIR/systemd-252/dist/usr/lib \
-        PATH=$PATH:$SUBPROJECT_DIR/glib-2.74.1/dist/bin:$NASM_BIN \
-        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_GUDEV:$PKG_ALSA:$PKG_PULSE:$PKG_UDEV:$PKG_GLIB:$FFMPEG_PKG:$ALSA_PKG  \
-        buildMesonProject srcdir="gstreamer" prefix="$SUBPROJECT_DIR/gstreamer/build/dist" mesonargs="$MESON_PARAMS" builddir="build"
-        if [ $FAILED -eq 1 ]; then exit 1; fi
+    PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$LIBDE265_PKG
+    if [ ! -z "$(pkgCheck name=libde265 minver=v1.0.15)" ]; then
+      pullOrClone path="https://github.com/strukturag/libde265.git" tag=v1.0.15
+      if [ $FAILED -eq 1 ]; then exit 1; fi
+      buildMakeProject srcdir="libde265" prefix="$SUBPROJECT_DIR/libde265/dist" configure="--disable-sherlock265"
+      if [ $FAILED -eq 1 ]; then exit 1; fi
     else
-      echo "Gstreamer already built"
+      echo "libde265 already installed."
     fi
+
+    PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$LIBX11_PKG
+    if [ ! -z "$(pkgCheck name=x11-xcb minver=1.8.6)" ]; then
+      pullOrClone path="https://gitlab.freedesktop.org/xorg/lib/libx11.git" tag="libX11-1.8.8"
+      if [ $FAILED -eq 1 ]; then exit 1; fi
+      buildMakeProject srcdir="libx11" prefix="$SUBPROJECT_DIR/libx11/dist"
+      if [ $FAILED -eq 1 ]; then exit 1; fi
+    else
+      echo "x11-xcb already installed."
+    fi
+
+    MESON_PARAMS=""
+    if [ $ENABLE_LIBAV -eq 1 ]; then
+        echo "LIBAV Feature enabled..."
+        
+        FFMPEG_BIN=$SUBPROJECT_DIR/FFmpeg/dist/bin
+        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$FFMPEG_PKG \
+        pkg-config --exists --print-errors "libavcodec >= 58.20.100"
+        ret1=$?
+        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$FFMPEG_PKG \
+        pkg-config --exists --print-errors "libavfilter >= 7.40.101"
+        ret2=$?
+        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$FFMPEG_PKG \
+        pkg-config --exists --print-errors "libavformat >= 58.20.100"
+        ret3=$?
+        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$FFMPEG_PKG \
+        pkg-config --exists --print-errors "libavutil >= 56.22.100"
+        ret4=$?
+        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$FFMPEG_PKG \
+        pkg-config --exists --print-errors "libpostproc >= 55.3.100"
+        ret5=$?
+        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$FFMPEG_PKG \
+        pkg-config --exists --print-errors "libswresample >= 3.3.100"
+        ret6=$?
+        PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$FFMPEG_PKG \
+        pkg-config --exists --print-errors "libswscale >= 5.3.100"
+        ret7=$?
+        if [ $ret1 != 0 ] || [ $ret2 != 0 ] || [ $ret3 != 0 ] || [ $ret4 != 0 ] || [ $ret5 != 0 ] || [ $ret6 != 0 ] || [ $ret7 != 0 ]; then
+            #######################
+            #
+            # Custom FFmpeg build
+            #   For some reason, Gstreamer's meson dep doesn't build any codecs
+            #   
+            #   sudo apt install libavcodec-dev libavfilter-dev libavformat-dev libswresample-dev
+            #######################
+
+            FFMPEG_CONFIGURE_ARGS="--disable-lzma"
+            FFMPEG_CONFIGURE_ARGS="$FFMPEG_CONFIGURE_ARGS --disable-doc"
+            FFMPEG_CONFIGURE_ARGS="$FFMPEG_CONFIGURE_ARGS --disable-shared"
+            FFMPEG_CONFIGURE_ARGS="$FFMPEG_CONFIGURE_ARGS --enable-static"
+            FFMPEG_CONFIGURE_ARGS="$FFMPEG_CONFIGURE_ARGS --enable-nonfree"
+            FFMPEG_CONFIGURE_ARGS="$FFMPEG_CONFIGURE_ARGS --enable-version3"
+            FFMPEG_CONFIGURE_ARGS="$FFMPEG_CONFIGURE_ARGS --enable-gpl"
+
+
+            pullOrClone path="https://github.com/FFmpeg/FFmpeg.git" tag=n5.0.2
+            PATH=$PATH:$NASM_BIN \
+            buildMakeProject srcdir="FFmpeg" prefix="$SUBPROJECT_DIR/FFmpeg/dist" configure="$FFMPEG_CONFIGURE_ARGS"
+            if [ $FAILED -eq 1 ]; then exit 1; fi
+            rm -rf $SUBPROJECT_DIR/FFmpeg/dist/lib/*.so
+        else
+            echo "FFmpeg already installed."
+        fi
+
+        MESON_PARAMS="$MESON_PARAMS -Dlibav=enabled"
+    fi
+
+    pullOrClone path="https://gitlab.freedesktop.org/gstreamer/gstreamer.git" tag=$GSTREAMER_VERSION
+
+    #build meson params
+    # Force disable subproject features
+    MESON_PARAMS="$MESON_PARAMS -Dglib:tests=false"
+    MESON_PARAMS="$MESON_PARAMS -Dlibdrm:cairo-tests=false"
+    MESON_PARAMS="$MESON_PARAMS -Dx264:cli=false"
+
+    # Gstreamer options
+    MESON_PARAMS="$MESON_PARAMS -Dbase=enabled"
+    MESON_PARAMS="$MESON_PARAMS -Dgood=enabled"
+    MESON_PARAMS="$MESON_PARAMS -Dbad=enabled"
+    MESON_PARAMS="$MESON_PARAMS -Dgpl=enabled"
+    for gst_p in ${gst_base_plugins[@]}; do
+      IFS=";" read -r -a arr <<< "${gst_p}"
+      MESON_PARAMS+=" -Dgst-plugins-base:${arr[0]}=enabled"
+    done
+    for gst_p in ${gst_good_plugins[@]}; do
+      IFS=";" read -r -a arr <<< "${gst_p}"
+      MESON_PARAMS+=" -Dgst-plugins-good:${arr[0]}=enabled"
+    done
+    for gst_p in ${gst_bad_plugins[@]}; do
+      IFS=";" read -r -a arr <<< "${gst_p}"
+      MESON_PARAMS+=" -Dgst-plugins-bad:${arr[0]}=enabled"
+    done
+    MESON_PARAMS="-Dauto_features=disabled $MESON_PARAMS"
+    MESON_PARAMS="--strip $MESON_PARAMS"
+
+    # Add tinyalsa fallback subproject
+    # echo "[wrap-git]" > subprojects/tinyalsa.wrap
+    # echo "directory=tinyalsa" >> subprojects/tinyalsa.wrap
+    # echo "url=https://github.com/tinyalsa/tinyalsa.git" >> subprojects/tinyalsa.wrap
+    # echo "revision=v2.0.0" >> subprojects/tinyalsa.wrap
+    # MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:tinyalsa=enabled"
+
+    LIBRARY_PATH=$LD_LIBRARY_PATH:$SUBPROJECT_DIR/systemd-252/dist/usr/lib \
+    PATH=$PATH:$SUBPROJECT_DIR/glib-2.74.1/dist/bin:$NASM_BIN \
+    PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_GUDEV:$PKG_ALSA:$PKG_PULSE:$PKG_UDEV:$PKG_GLIB:$FFMPEG_PKG:$ALSA_PKG  \
+    buildMesonProject srcdir="gstreamer" prefix="$SUBPROJECT_DIR/gstreamer/build/dist" mesonargs="$MESON_PARAMS" builddir="build"
+    if [ $FAILED -eq 1 ]; then exit 1; fi
   else
       echo "Latest Gstreamer already installed/built."
   fi

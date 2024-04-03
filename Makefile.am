@@ -16,7 +16,7 @@ EXTRA_PROGRAMS = gifdemo overlaytest queuedemo csssliderdemo playerdemo cssfiles
 playerdemo_SOURCES = $(top_srcdir)/src/demo/player-demo.c \
 					$(top_srcdir)/src/alsa/alsa_devices.c \
 					$(top_srcdir)/src/alsa/alsa_utils.c \
-					$(top_srcdir)/src/gst/onvifinitstaticplugins.c \
+					$(top_srcdir)/src/gst/gst_plugin_utils.c \
 					$(top_srcdir)/src/gst/overlay.c \
 					$(top_srcdir)/src/gst/gstrtspplayer.c \
 					$(top_srcdir)/src/gst/src_retriever.c \
@@ -58,7 +58,7 @@ onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c \
 					$(top_srcdir)/src/app/c_ownable_interface.c \
 					$(top_srcdir)/src/app/gtkbinaryimage.c \
 					$(top_srcdir)/src/app/gtkstyledimage.c \
-					$(top_srcdir)/src/gst/onvifinitstaticplugins.c \
+					$(top_srcdir)/src/gst/gst_plugin_utils.c \
 					$(top_srcdir)/src/gst/overlay.c \
 					$(top_srcdir)/src/gst/src_retriever.c \
 					$(top_srcdir)/src/gst/gtk/gstplugin.c \

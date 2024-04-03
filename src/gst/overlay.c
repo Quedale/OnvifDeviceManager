@@ -30,7 +30,6 @@ void OverlayState__destroy(OverlayState * self){
 void OverlayState__prepare_overlay (GstElement * overlay, GstCaps * caps, gint window_width, gint window_height, gpointer user_data){
 
   OverlayState *s = (OverlayState *) user_data;
-  C_DEBUG("Preparing level indicator overlay");
   if (gst_video_info_from_caps (&s->info, caps))
     s->valid = TRUE;
   else

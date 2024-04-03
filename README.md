@@ -13,7 +13,7 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Prototype Soundlevel indicator
 - Support system and static libraries. (static recommended)
 - Support Multiple ONVIF Profiles
-- Tested H264, H265 and MJPEG stream
+- Tested H264, H265 and MJPEG stream up to 4K
 - Logging framework
 - HTTP authentication challenge (Basic, Digest and NTLM)
 
@@ -40,6 +40,7 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - [rpos](https://github.com/Quedale/rpos)
 - [v4l2onvif](https://github.com/mpromonet/v4l2onvif)
 - Merit LILIN (PSR5024EX30 & SR7424/8)
+- Reolink (RLC-820A)
 - I am open for any suggestion I can work with
 
 # How to build
@@ -70,6 +71,7 @@ sudo apt install libssl-dev
 sudo apt install zlib1g-dev
 sudo apt install libasound2-dev
 sudo apt install libgudev-1.0-dev
+sudo apt install libx11-xcb-dev
 sudo apt install gettext
 sudo apt install libpulse-dev
 sudo apt install nasm
