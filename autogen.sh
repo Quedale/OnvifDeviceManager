@@ -1155,6 +1155,7 @@ fi
 PKG_PULSE=$SUBPROJECT_DIR/pulseaudio/build/dist/lib/pkgconfig
 LIBDE265_PKG=$SUBPROJECT_DIR/libde265/dist/lib/pkgconfig
 LIBX11_PKG=$SUBPROJECT_DIR/libx11/dist/lib/pkgconfig
+XMACROS_PKG=$SUBPROJECT_DIR/macros/dist/lib/pkgconfig
 
 #Check to see if gstreamer exist on the system
 if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
@@ -1484,8 +1485,20 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
 
     PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$LIBX11_PKG
     if [ ! -z "$(pkgCheck name=x11-xcb minver=1.8.6)" ]; then
+
+      PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$XMACROS_PKG
+      if [ ! -z "$(pkgCheck name=xorg-macros minver=1.19.1)" ]; then
+        pullOrClone path="https://gitlab.freedesktop.org/xorg/util/macros.git" tag="util-macros-1.20.0"
+        if [ $FAILED -eq 1 ]; then exit 1; fi
+        buildMakeProject srcdir="macros" prefix="$SUBPROJECT_DIR/macros/dist" configure="--datarootdir=$SUBPROJECT_DIR/macros/dist/lib"
+        if [ $FAILED -eq 1 ]; then exit 1; fi
+      else
+        echo "xorg-macro already installed."
+      fi
+
       pullOrClone path="https://gitlab.freedesktop.org/xorg/lib/libx11.git" tag="libX11-1.8.8"
       if [ $FAILED -eq 1 ]; then exit 1; fi
+      ACLOCAL_PATH="$SUBPROJECT_DIR/macros/dist/lib/aclocal" \
       buildMakeProject srcdir="libx11" prefix="$SUBPROJECT_DIR/libx11/dist"
       if [ $FAILED -eq 1 ]; then exit 1; fi
     else
