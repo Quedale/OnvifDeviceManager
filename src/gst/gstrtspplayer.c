@@ -19,6 +19,7 @@ typedef struct {
     GstElement *pipeline;
     GstElement *src;  /* RtspSrc to support backchannel */
     GstElement *sink;  /* Video Sink */
+    GstElement *snapsink;
     GList * dynamic_elements;
     GstRtspPlayerFallbackType fallback;
     
@@ -266,7 +267,7 @@ on_decoder_pad_added (GstElement *element, GstPad *new_pad, gpointer data){
 
 static GstElement*
 GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
-    GstElement *vdecoder, *videoconvert, *overlay_comp, *video_bin, *gtkglsink;
+    GstElement *vdecoder, *videoconvert, *overlay_comp, *video_bin;
     GstPad *pad, *ghostpad;
 
     video_bin = gst_bin_new("video_bin");
@@ -274,18 +275,21 @@ GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
     videoconvert = gst_element_factory_make ("videoconvert", NULL);
     overlay_comp = gst_element_factory_make ("overlaycomposition", NULL);
     priv->sink = gst_element_factory_make ("glsinkbin", "glsinkbin");
-    gtkglsink = gst_element_factory_make ("gtkglsink", "gtkglsink");
-    if (gtkglsink != NULL && priv->sink != NULL) {
+    priv->snapsink = gst_element_factory_make ("gtkglsink", "gtkglsink");
+    if (priv->snapsink != NULL && priv->sink != NULL) {
         C_INFO ("Successfully created GTK GL Sink\n");
-        g_object_set (priv->sink, "sink", gtkglsink, NULL);
-        g_object_get (gtkglsink, "widget", &priv->canvas, NULL);
+        g_object_set (priv->sink, "sink", priv->snapsink, NULL);
+        g_object_get (priv->snapsink, "widget", &priv->canvas, NULL);
+        g_object_set (G_OBJECT (priv->snapsink), "enable-last-sample", TRUE, NULL);
 
-        gst_base_sink_set_sync(GST_BASE_SINK_CAST(gtkglsink),FALSE);
-        gst_base_sink_set_qos_enabled(GST_BASE_SINK_CAST(gtkglsink),FALSE);
+        gst_base_sink_set_sync(GST_BASE_SINK_CAST(priv->snapsink),FALSE);
+        gst_base_sink_set_qos_enabled(GST_BASE_SINK_CAST(priv->snapsink),FALSE);
     } else {
         C_WARN ("Could not create gtkglsink, falling back to gtksink.\n");
         priv->sink = gst_element_factory_make ("gtksink", "gtksink");
+        priv->snapsink = priv->sink;
         g_object_get (priv->sink, "widget", &priv->canvas, NULL);
+        g_object_set (G_OBJECT (priv->snapsink), "enable-last-sample", TRUE, NULL);
 
         gst_base_sink_set_sync(GST_BASE_SINK_CAST(priv->sink),FALSE);
         gst_base_sink_set_qos_enabled(GST_BASE_SINK_CAST(priv->sink),FALSE);
@@ -400,6 +404,39 @@ GstRtspPlayerPrivate__create_audio_pad(){
     return audio_bin;
 }
 
+struct create_video_data{
+    GstRtspPlayerPrivate * priv;
+    GstPad *new_pad;
+    GstElement *element;
+    P_COND_TYPE cond;
+    P_MUTEX_TYPE lock;
+    int done;
+};
+
+void GstRtspPlayerPrivate__gui_create_video_pad(void * user_data){
+    struct create_video_data * data = (struct create_video_data *) user_data;
+    GstPad *sink_pad;
+
+    GstElement * video_bin = GstRtspPlayerPrivate__create_video_pad(data->priv);
+
+    gst_bin_add_many (GST_BIN (data->priv->pipeline), video_bin, NULL);
+
+    sink_pad = gst_element_get_static_pad (video_bin, "bin_sink");
+
+    GstPadLinkReturn pad_ret = gst_pad_link (data->new_pad, sink_pad);
+    if (GST_PAD_LINK_FAILED (pad_ret)) {
+        C_ERROR ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(data->element),GST_ELEMENT_NAME(video_bin));
+        //TODO Show error on canvas
+        goto exit;
+    }
+    data->priv->dynamic_elements = g_list_append(data->priv->dynamic_elements, video_bin);
+    gst_element_sync_state_with_parent(video_bin);
+
+exit:
+    data->done = 1;
+    P_COND_BROADCAST(data->cond);
+}
+
 static void
 GstRtspPlayerPrivate__on_rtsp_pad_added (GstElement *element, GstPad *new_pad, GstRtspPlayerPrivate * priv){
     C_DEBUG ("Received new pad '%s' from '%s':\n", GST_PAD_NAME (new_pad), GST_ELEMENT_NAME (element));
@@ -420,20 +457,34 @@ GstRtspPlayerPrivate__on_rtsp_pad_added (GstElement *element, GstPad *new_pad, G
 
     //TODO perform stream selection by stream codec not payload
     if (g_strrstr(capsName, "video")){
-        GstElement * video_bin = GstRtspPlayerPrivate__create_video_pad(priv);
+        struct create_video_data data;
+        data.priv = priv;
+        data.new_pad = new_pad;
+        data.element = element;
+        data.done = 0;
+        P_COND_SETUP(data.cond);
+        P_MUTEX_SETUP(data.lock);
 
-        gst_bin_add_many (GST_BIN (priv->pipeline), video_bin, NULL);
+        gdk_threads_add_idle(G_SOURCE_FUNC(GstRtspPlayerPrivate__gui_create_video_pad),&data);
+        
+        if(!data.done) P_COND_WAIT(data.cond, data.lock);
+        P_COND_CLEANUP(data.cond);
+        P_MUTEX_CLEANUP(data.lock);
 
-        sink_pad = gst_element_get_static_pad (video_bin, "bin_sink");
+        // GstElement * video_bin = GstRtspPlayerPrivate__create_video_pad(priv);
 
-        pad_ret = gst_pad_link (new_pad, sink_pad);
-        if (GST_PAD_LINK_FAILED (pad_ret)) {
-            C_ERROR ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(video_bin));
-            //TODO Show error on canvas
-            goto exit;
-        }
-        priv->dynamic_elements = g_list_append(priv->dynamic_elements, video_bin);
-        gst_element_sync_state_with_parent(video_bin);
+        // gst_bin_add_many (GST_BIN (priv->pipeline), video_bin, NULL);
+
+        // sink_pad = gst_element_get_static_pad (video_bin, "bin_sink");
+
+        // pad_ret = gst_pad_link (new_pad, sink_pad);
+        // if (GST_PAD_LINK_FAILED (pad_ret)) {
+        //     C_ERROR ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(video_bin));
+        //     //TODO Show error on canvas
+        //     goto exit;
+        // }
+        // priv->dynamic_elements = g_list_append(priv->dynamic_elements, video_bin);
+        // gst_element_sync_state_with_parent(video_bin);
     } else if (g_strrstr(capsName,"audio")){
         GstElement * audio_bin = GstRtspPlayerPrivate__create_audio_pad();
 
@@ -466,7 +517,6 @@ exit:
 static void
 GstRtspPlayerPrivate__setup_pipeline (GstRtspPlayerPrivate * priv)
 {
-    priv->playing = 0;
 
     /* Create the empty pipeline */
     priv->pipeline = gst_pipeline_new ("onvif-pipeline");
@@ -743,6 +793,11 @@ GstRtspPlayerPrivate__state_changed_msg (GstBus * bus, GstMessage * msg, GstRtsp
     /* Using video_bin for state change since the pipeline is PLAYING before the videosink */
     
     GstElement * element = GST_ELEMENT(GST_MESSAGE_SRC (msg));
+
+    if(GstRtspPlayerPrivate__is_dynamic_pad(priv,element)){
+        C_TRACE ("State set to %s for %s\n", gst_element_state_get_name (new_state), GST_OBJECT_NAME (msg->src));
+    }
+
     if(GstRtspPlayerPrivate__is_video_bin(priv,element) && new_state != GST_STATE_PLAYING && GTK_IS_WIDGET (priv->canvas)){
         gtk_widget_set_visible(priv->canvas, FALSE);
     } else if(GstRtspPlayerPrivate__is_video_bin(priv,element) && new_state == GST_STATE_PLAYING && GTK_IS_WIDGET (priv->canvas)){
@@ -759,10 +814,6 @@ GstRtspPlayerPrivate__state_changed_msg (GstBus * bus, GstMessage * msg, GstRtsp
         priv->retry = 0;
         priv->fallback = RTSP_FALLBACK_NONE;
         g_signal_emit (priv->owner, signals[STARTED], 0 /* details */);
-    }
-
-    if(GstRtspPlayerPrivate__is_dynamic_pad(priv,element)){
-        C_TRACE ("State set to %s for %s\n", gst_element_state_get_name (new_state), GST_OBJECT_NAME (msg->src));
     }
 }
 
@@ -925,7 +976,9 @@ GstRtspPlayer__init (GstRtspPlayer * self)
     priv->canvas = NULL;
     priv->dynamic_elements = NULL;
     priv->sink = NULL;
+    priv->snapsink = NULL;
     priv->fallback = RTSP_FALLBACK_NONE;
+    priv->playing = 0;
 
     P_MUTEX_SETUP(priv->prop_lock);
     P_MUTEX_SETUP(priv->player_lock);
@@ -1074,4 +1127,69 @@ void GstRtspPlayer__set_host_fallback(GstRtspPlayer* self, char * host){
     }
     strcpy(priv->host_fallback,host);
     P_MUTEX_UNLOCK(priv->prop_lock);
+}
+
+GstSnapshot * GstRtspPlayer__get_snapshot(GstRtspPlayer* self){
+    g_return_val_if_fail (self != NULL,NULL);
+    g_return_val_if_fail (GST_IS_RTSPPLAYER (self),NULL);
+
+    GstSnapshot * snap = NULL;
+    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
+    C_TRACE("[%s] GstRtspPlayer__get_snapshot",priv->location);
+
+    P_MUTEX_LOCK(priv->player_lock);
+    GstState state = GST_STATE_NULL;
+    GstStateChangeReturn ret_1 = gst_element_get_state (priv->sink,&state, NULL, GST_CLOCK_TIME_NONE);
+    if(ret_1 == GST_STATE_CHANGE_SUCCESS && state == GST_STATE_PLAYING){
+        GstSample * last_sample = gst_base_sink_get_last_sample(GST_BASE_SINK_CAST(priv->snapsink));
+        last_sample = gst_base_sink_get_last_sample(GST_BASE_SINK_CAST(priv->snapsink));
+        GstSample * png_sample = NULL;
+
+        if(last_sample){
+            C_WARN("Extracted sample.");
+            GError * error = NULL;
+            GstCaps * out_caps = gst_caps_from_string ("image/jpeg,width=640,height=480");
+            png_sample = gst_video_convert_sample(last_sample, out_caps, GST_CLOCK_TIME_NONE, &error);
+            if(error){
+                if(error->message){
+                    C_ERROR("[%s] GstRtspPlayer encountered an error extracting snapshot. [%d] %s",priv->location , error->code, error->message);
+                } else {
+                    C_ERROR("[%s] GstRtspPlayer encountered an error extracting snapshot. [%d]",priv->location , error->code);
+                }
+            }
+        }
+
+        if(png_sample){
+            GstBuffer * buffer = gst_sample_get_buffer(png_sample);
+            GstMapInfo map_info;
+            memset (&map_info, 0, sizeof (map_info));
+
+            if (gst_buffer_map (buffer, &map_info, GST_MAP_READ)) {
+                snap = malloc(sizeof(GstSnapshot));
+                snap->size = map_info.size;
+                snap->data = malloc(snap->size);
+                memcpy (snap->data, map_info.data, snap->size);
+            } else {
+                C_ERROR("[%s] GstRtspPlayer Failed to extract snapshot sample data",priv->location);
+            }
+        }
+
+        if(last_sample)
+            gst_sample_unref(last_sample);
+        if(png_sample)
+            gst_sample_unref(png_sample);
+    } else {
+        C_ERROR("[%s] GstRtspPlayer not playing. No snapshot extracted %d - %d",priv->location,ret_1,state);
+    }
+
+    P_MUTEX_UNLOCK(priv->player_lock);
+
+    return snap;
+}
+
+void GstSnapshot__destroy(GstSnapshot * snapshot){
+    if(!snapshot) return;
+
+    free(snapshot->data);
+    free(snapshot);   
 }

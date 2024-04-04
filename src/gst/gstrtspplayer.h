@@ -11,6 +11,12 @@ typedef struct _GstRtspPlayer GstRtspPlayer;
 #define GST_TYPE_RTSPPLAYER GstRtspPlayer__get_type()
 G_DECLARE_FINAL_TYPE (GstRtspPlayer, GstRtspPlayer_, GST, RTSPPLAYER, GObject)
 
+typedef struct {
+  guint8* data;
+  gsize size;
+} GstSnapshot;
+
+void GstSnapshot__destroy(GstSnapshot * snapshot);
 
 struct _GstRtspPlayer
 {
@@ -35,6 +41,7 @@ void GstRtspPlayer__mic_mute(GstRtspPlayer* self, gboolean mute);
 void GstRtspPlayer__set_allow_overscale(GstRtspPlayer * self, int allow_overscale);
 void GstRtspPlayer__set_port_fallback(GstRtspPlayer* self, char * port);
 void GstRtspPlayer__set_host_fallback(GstRtspPlayer* self, char * host);
+GstSnapshot * GstRtspPlayer__get_snapshot(GstRtspPlayer* self);
 
 G_END_DECLS
 
