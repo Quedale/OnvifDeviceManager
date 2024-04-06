@@ -61,12 +61,6 @@ onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c \
 					$(top_srcdir)/src/gst/gst_plugin_utils.c \
 					$(top_srcdir)/src/gst/overlay.c \
 					$(top_srcdir)/src/gst/src_retriever.c \
-					$(top_srcdir)/src/gst/gtk/gstplugin.c \
-					$(top_srcdir)/src/gst/gtk/gstgtkbasesink.c \
-					$(top_srcdir)/src/gst/gtk/gstgtksink.c \
-					$(top_srcdir)/src/gst/gtk/gstgtkutils.c \
-					$(top_srcdir)/src/gst/gtk/gtkgstbasewidget.c \
-					$(top_srcdir)/src/gst/gtk/gtkgstwidget.c \
 					$(top_srcdir)/src/gst/backchannel.c \
 					$(top_srcdir)/src/gst/gstrtspplayer.c \
 					$(top_srcdir)/src/queue/event_queue.c \
