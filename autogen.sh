@@ -1099,8 +1099,8 @@ gst_good_plugins=(
 )
 
 gst_bad_plugins=(
-    "x11;gstx11"
-    "gl;gstgl"
+    # "x11;gstx11"
+    # "gl;gstgl"
     "interlace;gstinterlace"
     "openh264;gstopenh264"
     "fdkaac;gstfdkaac"
@@ -1161,7 +1161,7 @@ XMACROS_PKG=$SUBPROJECT_DIR/macros/dist/lib/pkgconfig
 if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
   gst_ret=0;
   GSTREAMER_VERSION=$GSTREAMER_LATEST; #If we are to build something, build latest
-  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB:$FFMPEG_PKG:$ALSA_PKG:$PKG_PULSE:$LIBDE265_PKG
+  PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GST_PKG_PATH:$PKG_GLIB:$FFMPEG_PKG:$ALSA_PKG:$PKG_PULSE:$LIBDE265_PKG:$LIBX11_PKG
   #Gstreamer static plugins needs to be checked individually
   if [ ! -z "$(checkGstreamerPkg version=$GSTREAMER_VERSION static=true)" ]; then
     printf "Gstreamer static library not built.. \n$(checkGstreamerPkg version=$GSTREAMER_VERSION static=true)\n"
