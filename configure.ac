@@ -36,10 +36,6 @@ AC_SUBST(PKG_LIBX11_PATH, '$(abs_srcdir)/subprojects/libx11/dist/lib/pkgconfig')
 AC_SUBST(GST_LIBS,m4_normalize('
     gstreamer-1.0
     gstreamer-video-1.0
-    gstreamer-gl-1.0
-    gstreamer-gl-egl-1.0
-    gstreamer-gl-prototypes-1.0
-    gstreamer-gl-wayland-1.0
     alsa
 '))
 
