@@ -21,6 +21,7 @@ typedef struct {
     GstElement *sink;  /* Video Sink */
     GstElement *snapsink;
     GList * dynamic_elements;
+    GstCaps * sinkcaps; /* reference to extract native stream dimension */
     GstRtspPlayerFallbackType fallback;
     
     //Backpipe related properties
@@ -41,8 +42,7 @@ typedef struct {
     GtkWidget *canvas_handle;
     //Canvas used to draw stream
     GtkWidget *canvas;
-    //Set if the drawing area should over stretch
-    int allow_overscale;
+    GstRtspViewMode view_mode;
 
     P_MUTEX_TYPE prop_lock;
     P_MUTEX_TYPE player_lock;
@@ -69,6 +69,7 @@ G_DEFINE_TYPE_WITH_PRIVATE(GstRtspPlayer, GstRtspPlayer_, G_TYPE_OBJECT)
 static void 
 GstRtspPlayerPrivate__message_handler (GstBus * bus, GstMessage * message, GstRtspPlayerPrivate * priv);
 void GstRtspPlayerPrivate__stop(GstRtspPlayerPrivate * priv);
+void GstRtspPlayerPrivate__apply_view_mode(GstRtspPlayerPrivate * self);
 
 static void
 GstRtspPlayer__dispose (GObject *gobject)
@@ -265,6 +266,11 @@ on_decoder_pad_added (GstElement *element, GstPad *new_pad, gpointer data){
     gst_object_unref (sinkpad);
 }
 
+void GstRtspPlayer__caps_changed_cb (GstElement * overlay, GstCaps * caps, gint window_width, gint window_height, GstRtspPlayerPrivate * priv){
+    priv->sinkcaps = caps;
+    GstRtspPlayerPrivate__apply_view_mode(priv);
+}
+
 static GstElement*
 GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
     GstElement *vdecoder, *videoconvert, *overlay_comp, *video_bin;
@@ -280,7 +286,8 @@ GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
         C_INFO ("Successfully created GTK GL Sink\n");
         g_object_set (priv->sink, "sink", priv->snapsink, NULL);
         g_object_get (priv->snapsink, "widget", &priv->canvas, NULL);
-        g_object_set (G_OBJECT (priv->snapsink), "enable-last-sample", TRUE, NULL);
+        //Temporarely disabled for performance
+        g_object_set (G_OBJECT (priv->snapsink), "enable-last-sample", FALSE, NULL);
 
         gst_base_sink_set_sync(GST_BASE_SINK_CAST(priv->snapsink),FALSE);
         gst_base_sink_set_qos_enabled(GST_BASE_SINK_CAST(priv->snapsink),FALSE);
@@ -289,7 +296,8 @@ GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
         priv->sink = gst_element_factory_make ("gtksink", "gtksink");
         priv->snapsink = priv->sink;
         g_object_get (priv->sink, "widget", &priv->canvas, NULL);
-        g_object_set (G_OBJECT (priv->snapsink), "enable-last-sample", TRUE, NULL);
+        //Temporarely disabled for performance
+        g_object_set (G_OBJECT (priv->snapsink), "enable-last-sample", FALSE, NULL);
 
         gst_base_sink_set_sync(GST_BASE_SINK_CAST(priv->sink),FALSE);
         gst_base_sink_set_qos_enabled(GST_BASE_SINK_CAST(priv->sink),FALSE);
@@ -342,6 +350,11 @@ GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
         return NULL;
     }
 
+    if(! g_signal_connect (overlay_comp, "caps-changed",G_CALLBACK (GstRtspPlayer__caps_changed_cb), priv)){
+        C_ERROR ("sink caps-changed callback Fail...");
+        return NULL;
+    }
+
     ghostpad = gst_ghost_pad_new ("bin_sink", pad);
     gst_element_add_pad (video_bin, ghostpad);
     gst_object_unref (pad);
@@ -365,7 +378,7 @@ GstRtspPlayerPrivate__create_audio_pad(){
             !convert ||
             !level ||
             !sink) {
-        C_ERROR ("One of the video elements wasn't created... Exiting\n");
+        C_ERROR ("One of the audio elements wasn't created... Exiting\n");
         return NULL;
     }
 
@@ -970,7 +983,7 @@ GstRtspPlayer__init (GstRtspPlayer * self)
     priv->location_set = NULL;
     priv->enable_backchannel = 1;
     priv->retry = 0;
-    priv->allow_overscale = 0;
+    priv->view_mode = GST_RTSP_PLAYER_VIEW_MODE_FIT_WINDOW;
     priv->overlay_state = OverlayState__create();
     priv->canvas_handle = NULL;
     priv->canvas = NULL;
@@ -979,6 +992,7 @@ GstRtspPlayer__init (GstRtspPlayer * self)
     priv->snapsink = NULL;
     priv->fallback = RTSP_FALLBACK_NONE;
     priv->playing = 0;
+    priv->sinkcaps = NULL;
 
     P_MUTEX_SETUP(priv->prop_lock);
     P_MUTEX_SETUP(priv->player_lock);
@@ -1071,7 +1085,10 @@ GtkWidget * GstRtspPlayer__createCanvas(GstRtspPlayer *self){
     GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
 
     priv->canvas_handle = gtk_grid_new ();
-    return priv->canvas_handle;
+
+    GtkWidget * scroll = gtk_scrolled_window_new(NULL,NULL);
+    gtk_container_add(GTK_CONTAINER(scroll),priv->canvas_handle);
+    return scroll;
 }
 
 gboolean GstRtspPlayer__is_mic_mute(GstRtspPlayer* self) {
@@ -1090,13 +1107,52 @@ void GstRtspPlayer__mic_mute(GstRtspPlayer* self, gboolean mute) {
     RtspBackchannel__mute(priv->backchannel, mute);
 }
 
-void GstRtspPlayer__set_allow_overscale(GstRtspPlayer * self, int allow_overscale){
+void GstRtspPlayerPrivate__apply_view_mode(GstRtspPlayerPrivate * priv){
+    switch(priv->view_mode){
+        case GST_RTSP_PLAYER_VIEW_MODE_FIT_WINDOW:
+            gtk_widget_set_vexpand(GTK_WIDGET(priv->canvas),FALSE);
+            gtk_widget_set_hexpand(GTK_WIDGET(priv->canvas),FALSE);
+            gtk_widget_set_vexpand(GTK_WIDGET(priv->canvas_handle),FALSE);
+            gtk_widget_set_hexpand(GTK_WIDGET(priv->canvas_handle),FALSE);
+            gtk_widget_set_size_request(GTK_WIDGET(priv->canvas),-1,-1);
+            break;
+        case GST_RTSP_PLAYER_VIEW_MODE_FILL_WINDOW:
+            gtk_widget_set_vexpand(GTK_WIDGET(priv->canvas),TRUE);
+            gtk_widget_set_hexpand(GTK_WIDGET(priv->canvas),TRUE);
+            gtk_widget_set_vexpand(GTK_WIDGET(priv->canvas_handle),TRUE);
+            gtk_widget_set_hexpand(GTK_WIDGET(priv->canvas_handle),TRUE);
+            gtk_widget_set_size_request(GTK_WIDGET(priv->canvas),-1,-1);
+            break;
+        case GST_RTSP_PLAYER_VIEW_MODE_NATIVE:
+            gtk_widget_set_vexpand(GTK_WIDGET(priv->canvas),TRUE);
+            gtk_widget_set_hexpand(GTK_WIDGET(priv->canvas),TRUE);
+            gtk_widget_set_vexpand(GTK_WIDGET(priv->canvas_handle),TRUE);
+            gtk_widget_set_hexpand(GTK_WIDGET(priv->canvas_handle),TRUE);
+            if(GST_IS_CAPS(priv->sinkcaps)){
+                GstStructure * caps_struct = gst_caps_get_structure (priv->sinkcaps, 0);
+                gint width,height;
+                gst_structure_get_int(caps_struct,"width",&width);
+                gst_structure_get_int(caps_struct,"height",&height);
+                gtk_widget_set_size_request(GTK_WIDGET(priv->canvas),width,height);
+            }
+
+            break;
+        default:
+            C_WARN("Unsupported setting");
+            break;
+    }
+}
+
+void GstRtspPlayer__set_view_mode(GstRtspPlayer * self, GstRtspViewMode mode){
     g_return_if_fail (self != NULL);
     g_return_if_fail (GST_IS_RTSPPLAYER (self));
-    
+
     GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
-    priv->allow_overscale = allow_overscale;
-    //TODO Support overscaling again
+    priv->view_mode = mode;
+
+    if(GTK_IS_WIDGET(priv->canvas)){
+        GstRtspPlayerPrivate__apply_view_mode(priv);
+    }
 }
 
 void GstRtspPlayer__set_port_fallback(GstRtspPlayer* self, char * port){

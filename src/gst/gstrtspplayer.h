@@ -11,6 +11,12 @@ typedef struct _GstRtspPlayer GstRtspPlayer;
 #define GST_TYPE_RTSPPLAYER GstRtspPlayer__get_type()
 G_DECLARE_FINAL_TYPE (GstRtspPlayer, GstRtspPlayer_, GST, RTSPPLAYER, GObject)
 
+typedef enum {
+  GST_RTSP_PLAYER_VIEW_MODE_FIT_WINDOW,
+  GST_RTSP_PLAYER_VIEW_MODE_FILL_WINDOW,
+  GST_RTSP_PLAYER_VIEW_MODE_NATIVE
+} GstRtspViewMode;
+
 typedef struct {
   guint8* data;
   gsize size;
@@ -38,7 +44,7 @@ void GstRtspPlayer__set_credentials(GstRtspPlayer * self, char * user, char * pa
 GtkWidget * GstRtspPlayer__createCanvas(GstRtspPlayer *self);
 gboolean GstRtspPlayer__is_mic_mute(GstRtspPlayer* self);
 void GstRtspPlayer__mic_mute(GstRtspPlayer* self, gboolean mute);
-void GstRtspPlayer__set_allow_overscale(GstRtspPlayer * self, int allow_overscale);
+void GstRtspPlayer__set_view_mode(GstRtspPlayer * self, GstRtspViewMode mode);
 void GstRtspPlayer__set_port_fallback(GstRtspPlayer* self, char * port);
 void GstRtspPlayer__set_host_fallback(GstRtspPlayer* self, char * host);
 GstSnapshot * GstRtspPlayer__get_snapshot(GstRtspPlayer* self);

@@ -22,9 +22,19 @@ void set_button_state(AppSettings * settings, int state){
         gtk_widget_set_sensitive(settings->reset_btn,state);
 }
 
+//Invoked by discovery (TODO Removed for gobject callback)
 void priv_AppSettings_state_changed(void * data){
     AppSettings * self = (AppSettings*) data;
     //More settings to add here
+    if(AppSettingsStream__get_state(self->stream) ||
+        AppSettingsDiscovery__get_state(self->discovery)){
+        set_button_state(self,TRUE);
+    } else {
+        set_button_state(self,FALSE);
+    }
+}
+
+void priv_AppSettings_state_changed_cb(GtkWidget * widget, AppSettings * self){
     if(AppSettingsStream__get_state(self->stream) ||
         AppSettingsDiscovery__get_state(self->discovery)){
         set_button_state(self,TRUE);
@@ -168,7 +178,7 @@ void AppSettings__create_ui(AppSettings * self){
     gtk_grid_attach (GTK_GRID (self->widget), notebook, 0, 0, 1, 1);
 
     add_panel(notebook, "Discovery", AppSettingsDiscovery__get_widget(self->discovery));
-    add_panel(notebook, "Stream", AppSettingsStream__get_widget(self->stream));
+    add_panel(notebook, "Stream", GTK_WIDGET(self->stream));
 
     //More settings to add here
 
@@ -279,15 +289,31 @@ void AppSettings__load_settings(AppSettings * self){
                     char * val = strtok_r (buff_ptr, "\n", &buff_ptr); //Get reminder of line
                     C_INFO("\t Property : '%s' = '%s'",key,val);
 
+                    GParamSpec * spec;
                     switch(category){
                         case APPSETTING_STREAM_TYPE:
-                            if(!AppSettingsStream__set_property(self->stream,key,val)){
-                                C_WARN("Unknown stream property %s=%s",key,val);
-                            }//More settings to add here
+                            spec = g_object_class_find_property(G_OBJECT_GET_CLASS(self->stream),key);
+                            if(spec){
+                                GParamSpecClass * klass = G_PARAM_SPEC_GET_CLASS(spec);
+                                if(klass->value_type == G_TYPE_INT){
+                                    int i;
+                                    if(sscanf(val, "%d", &i)){
+                                        g_object_set (self->stream, key, i, NULL);
+                                    } else {
+                                        C_ERROR("Invalid integer value for stream property %s=%s",key,val);
+                                    }
+                                } else if(klass->value_type == G_TYPE_STRING){
+                                    g_object_set (self->stream, key, val, NULL);
+                                } else {
+                                    C_ERROR("Unsupported GParamSpec value type.");
+                                }
+                            } else {
+                                C_ERROR("Unknown stream property %s=%s",key,val);
+                            }
                             break;
                         case APPSETTING_DISCOVERY_TYPE:
                             if(!AppSettingsDiscovery__set_property(self->discovery,key,val)){
-                                C_WARN("Unknown discovery property %s=%s",key,val);
+                                C_ERROR("Unknown discovery property %s=%s",key,val);
                             }//More settings to add here
                             break;
                         default:
@@ -314,7 +340,8 @@ void AppSettings__load_settings(AppSettings * self){
 AppSettings * AppSettings__create(OnvifApp * app){
     AppSettings * self = malloc(sizeof(AppSettings));
     self->app = app;
-    self->stream = AppSettingsStream__create(priv_AppSettings_state_changed,self);
+    self->stream = AppSettingsStream__new();
+    g_signal_connect(self->stream,"settings-changed",G_CALLBACK(priv_AppSettings_state_changed_cb),self);
     self->discovery = AppSettingsDiscovery__create(priv_AppSettings_state_changed,self);
     AppSettings__load_settings(self);
     AppSettings__create_ui(self);
@@ -325,8 +352,6 @@ AppSettings * AppSettings__create(OnvifApp * app){
 
 void AppSettings__destroy(AppSettings* self){
     if(self){
-        //TODO Clean up more panels here
-        AppSettingsStream__destroy(self->stream);
         AppSettingsDiscovery__destroy(self->discovery);
         free(self);
     }

@@ -474,10 +474,16 @@ void OnvifApp__eq_dispatch_cb(EventQueue * queue, EventQueueType type, void * us
     gui_set_label_text(priv->task_label,str);
 }
 
-void OnvifApp__setting_overscale_cb(AppSettingsStream * settings, int allow_overscale, void * user_data){
-    OnvifApp * app = (OnvifApp *) user_data;
+void OnvifApp__setting_view_mode_cb(AppSettingsStream * settings, GParamSpec* pspec, OnvifApp * app){
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (app);
-    GstRtspPlayer__set_allow_overscale(priv->player,allow_overscale);
+    int view_mode = AppSettingsStream__get_view_mode(settings);
+
+    //TODO Support native mode
+    if(!view_mode){
+        GstRtspPlayer__set_view_mode(priv->player,GST_RTSP_PLAYER_VIEW_MODE_FIT_WINDOW);
+    } else {
+        GstRtspPlayer__set_view_mode(priv->player,GST_RTSP_PLAYER_VIEW_MODE_FILL_WINDOW);
+    }
 }
 
 void OnvifApp__profile_selected_cb(ProfilesDialog * dialog, OnvifProfile * profile){
@@ -1005,9 +1011,10 @@ OnvifApp__init (OnvifApp *self)
     priv->settings = AppSettings__create(self);
     priv->taskmgr = TaskMgr__create();
 
-    AppSettingsStream__set_overscale_callback(priv->settings->stream,OnvifApp__setting_overscale_cb,self);
+    g_signal_connect (priv->settings->stream, "notify::view-mode", G_CALLBACK (OnvifApp__setting_view_mode_cb), self);
+
     priv->player = GstRtspPlayer__new();
-    GstRtspPlayer__set_allow_overscale(priv->player,AppSettingsStream__get_allow_overscale(priv->settings->stream));
+    OnvifApp__setting_view_mode_cb(priv->settings->stream, NULL, self);
 
     //Defaults 8 paralell event threads.
     //TODO support configuration to modify this
