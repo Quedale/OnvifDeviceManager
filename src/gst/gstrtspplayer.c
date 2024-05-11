@@ -1161,12 +1161,21 @@ void GstRtspPlayer__set_port_fallback(GstRtspPlayer* self, char * port){
     
     GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
     P_MUTEX_LOCK(priv->prop_lock);
-    if(!priv->port_fallback){
-        priv->port_fallback = malloc(strlen(port)+1);
+
+    if(port){
+        if(!priv->port_fallback){
+            priv->port_fallback = malloc(strlen(port)+1);
+        } else {
+            priv->port_fallback = realloc(priv->port_fallback,strlen(port)+1);
+        }
+        strcpy(priv->port_fallback,port);
     } else {
-        priv->port_fallback = realloc(priv->port_fallback,strlen(port)+1);
+        if(priv->port_fallback){
+            free(priv->port_fallback);
+            priv->port_fallback = NULL;
+        }
     }
-    strcpy(priv->port_fallback,port);
+    
     P_MUTEX_UNLOCK(priv->prop_lock);
 }
 
