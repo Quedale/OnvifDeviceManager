@@ -12,6 +12,25 @@ typedef struct {
     char * text;
 } GUILabelUpdate;
 
+typedef struct {
+    gpointer instance;
+    guint signalid;
+    gpointer param;
+} IdleSignalEmit;
+
+void idle_signal_emit (void * user_data){
+    IdleSignalEmit * data = (IdleSignalEmit*)user_data;
+    g_signal_emit (data->instance, data->signalid, 0, data->param);
+    free(data);
+}
+
+void gui_signal_emit(gpointer instance, guint singalid, gpointer param){
+    IdleSignalEmit * emit = malloc(sizeof(IdleSignalEmit));
+    emit->instance= instance;
+    emit->signalid = singalid;
+    emit->param = param;
+    gdk_threads_add_idle(G_SOURCE_FUNC(idle_signal_emit),emit);
+}
 
 void gui_widget_destroy(GtkWidget * widget, gpointer user_data){
     gtk_widget_destroy(widget);

@@ -7,182 +7,222 @@
 #include "clogger.h"
 #include <string.h>
 
-static const char * EVENTQUEUE_DISPATCHING_STR = "Dispatching";
-static const char * EVENTQUEUE_DISPATCHED_STR = "Dispatched";
-static const char * EVENTQUEUE_CANCELLED_STR = "Cancelled";
-static const char * EVENTQUEUE_STARTED_STR = "Started";
+#define GLIST_FOREACH(item, list) for(GList *__glist = list; __glist && (item = __glist->data, TRUE); __glist = __glist->next)
 
-struct _EventQueue {
+enum {
+    POOL_CHANGED,
+    LAST_SIGNAL
+};
+
+typedef struct {
     CObject parent;
 
     CListTS events;
     CListTS running_events;
-    CListTS threads;
+    GList * threads;
 
     P_COND_TYPE sleep_cond;
     P_MUTEX_TYPE pool_lock;
+    P_MUTEX_TYPE threads_lock;
+} EventQueuePrivate;
 
-    void (*queue_event_cb)(EventQueue * queue, EventQueueType type, void * user_data);
-    void * user_data;
-};
+static guint signals[LAST_SIGNAL] = { 0 };
 
-void priv_EventQueue__wait_finish(EventQueue* self);
-void priv_EventQueue__destroy(CObject * self);
+G_DEFINE_TYPE_WITH_PRIVATE(EventQueue, EventQueue_, G_TYPE_OBJECT)
 
-const char * EventQueueType__toString(EventQueueType type){
-  switch(type){
-    case EVENTQUEUE_DISPATCHING:
-      return EVENTQUEUE_DISPATCHING_STR;
-    case EVENTQUEUE_DISPATCHED:
-      return EVENTQUEUE_DISPATCHED_STR;
-    case EVENTQUEUE_CANCELLED:
-      return EVENTQUEUE_CANCELLED_STR;
-    case EVENTQUEUE_STARTED:
-      return EVENTQUEUE_STARTED_STR;
-    default:
-      return NULL;
-  }
-}
-
-void priv_EventQueue__wait_finish(EventQueue* self){
+void EventQueue__wait_finish(EventQueue* self){
     int val = -1;
     while((val = EventQueue__get_thread_count(self)) != 0){
         sleep(0.05);
     }
 }
 
-void priv_EventQueue__destroy(CObject * cobject){
-    EventQueue * self = (EventQueue *)cobject;
-    if (self) {
-        //Thread cleanup
-        int tcount = EventQueue__get_thread_count(self);
-        if(tcount){
-            EventQueue__stop(self,tcount);
-            priv_EventQueue__wait_finish(self);
-        }
+void EventQueue__finalize(GObject * obj){
+    EventQueue * queue = QUEUE_EVENTQUEUE(obj);
+    EventQueuePrivate *priv = EventQueue__get_instance_private (queue);
 
-        CObject__destroy((CObject *)&self->events);
-        CObject__destroy((CObject *)&self->threads);
-        CObject__destroy((CObject *)&self->running_events);
-
-        P_COND_CLEANUP(self->sleep_cond);
-        P_MUTEX_CLEANUP(self->pool_lock);
+    //Thread cleanup
+    int tcount = EventQueue__get_thread_count(queue);
+    if(tcount){
+        EventQueue__stop(queue,tcount);
+        EventQueue__wait_finish(queue);
     }
+    CObject__destroy((CObject *)&priv->events);
+    g_list_free(priv->threads);
+    CObject__destroy((CObject *)&priv->running_events);
+
+    P_COND_CLEANUP(priv->sleep_cond);
+    P_MUTEX_CLEANUP(priv->pool_lock);
+    P_MUTEX_CLEANUP(priv->threads_lock);
+
+    G_OBJECT_CLASS (EventQueue__parent_class)->finalize (obj);
+}
+
+static void
+EventQueue__class_init (EventQueueClass *klass)
+{
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    object_class->finalize = EventQueue__finalize;
+
+    GType params[1];
+    params[0] = QUEUE_TYPE_EVENTTYPE | G_SIGNAL_TYPE_STATIC_SCOPE;
+    signals[POOL_CHANGED] =
+        g_signal_newv ("pool-changed",
+                        G_TYPE_FROM_CLASS (klass),
+                        G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
+                        NULL /* closure */,
+                        NULL /* accumulator */,
+                        NULL /* accumulator data */,
+                        NULL /* C marshaller */,
+                        G_TYPE_NONE /* return_type */,
+                        1     /* n_params */,
+                        params  /* param_types */);
 }
 
 void EventQueue__init(EventQueue* self) {
-    memset (self, 0, sizeof (EventQueue));
+    EventQueuePrivate *priv = EventQueue__get_instance_private (self);
 
-    CObject__init((CObject*)self);
-    CObject__set_destroy_callback((CObject*)self,priv_EventQueue__destroy);
+    priv->threads = NULL;
+    CListTS__init(&priv->events);
+    CListTS__init(&priv->running_events);
 
-    CListTS__init(&self->threads);
-    CListTS__init(&self->events);
-    CListTS__init(&self->running_events);
-
-    P_COND_SETUP(self->sleep_cond);
-    P_MUTEX_SETUP(self->pool_lock);
+    P_COND_SETUP(priv->sleep_cond);
+    P_MUTEX_SETUP(priv->pool_lock);
+    P_MUTEX_SETUP(priv->threads_lock);
 }
 
-EventQueue* EventQueue__create(void (*queue_event_cb)(EventQueue * queue, EventQueueType type, void * user_data), void * user_data) {
+EventQueue* EventQueue__new() {
     C_TRACE("create...");
-    EventQueue* result = (EventQueue*) malloc(sizeof(EventQueue));
-    EventQueue__init(result);
-    CObject__set_allocated((CObject*)result);
-    result->queue_event_cb = queue_event_cb;
-    result->user_data = user_data;
-    return result;
+    return g_object_new (QUEUE_TYPE_EVENTQUEUE, NULL);
 }
 
 int EventQueue__get_running_event_count(EventQueue * self){
-    int ret = -1;
-    P_MUTEX_LOCK(self->pool_lock);
-    ret = CListTS__get_count(&self->running_events);
-    P_MUTEX_UNLOCK(self->pool_lock);
-    return ret;
+    g_return_val_if_fail (self != NULL,0);
+    g_return_val_if_fail (QUEUE_IS_EVENTQUEUE (self),0);
+    EventQueuePrivate *priv = EventQueue__get_instance_private (self);
+    return CListTS__get_count(&priv->running_events);
 }
 
 int EventQueue__get_pending_event_count(EventQueue * self){
-    return CListTS__get_count(&self->events);
+    g_return_val_if_fail (self != NULL,0);
+    g_return_val_if_fail (QUEUE_IS_EVENTQUEUE (self),0);
+    EventQueuePrivate *priv = EventQueue__get_instance_private (self);
+    return CListTS__get_count(&priv->events);
 }
 
 int EventQueue__get_thread_count(EventQueue * self){
-    return CListTS__get_count(&self->threads);
+    g_return_val_if_fail (self != NULL,0);
+    g_return_val_if_fail (QUEUE_IS_EVENTQUEUE (self),0);
+    EventQueuePrivate *priv = EventQueue__get_instance_private (self);
+    int ret;
+    P_MUTEX_LOCK(priv->threads_lock);
+    ret = g_list_length(priv->threads);
+    P_MUTEX_UNLOCK(priv->threads_lock);
+    return ret;
 }
 
 void EventQueue__remove_thread(EventQueue* self, QueueThread * qt){
-    CListTS__destroy_record(&self->threads,(CObject*)qt);
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (QUEUE_IS_EVENTQUEUE (self));
+    EventQueuePrivate *priv = EventQueue__get_instance_private (self);
+    P_MUTEX_LOCK(priv->threads_lock);
+    priv->threads = g_list_remove(priv->threads,qt);
+    P_MUTEX_UNLOCK(priv->threads_lock);
+    g_object_unref(qt);
 }
 
 void EventQueue__stop(EventQueue* self, int nthread){
-    P_MUTEX_LOCK(self->pool_lock);
-    int tcount = EventQueue__get_thread_count(self);
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (QUEUE_IS_EVENTQUEUE (self));
+    EventQueuePrivate *priv = EventQueue__get_instance_private (self);
+    P_MUTEX_LOCK(priv->threads_lock);
     int cancelled_count = 0;
-    for(int i=0; i < tcount; i++){
-        QueueThread * thread = (QueueThread *) CListTS__get(&self->threads,i);
+    GList * childs = priv->threads;
+    QueueThread * thread;
+    for(;childs && (thread = childs->data, TRUE); childs = childs->next){
         if(cancelled_count == nthread){
             break;
         }
         if(!QueueThread__is_cancelled(thread)){
             QueueThread__cancel(thread);
             cancelled_count++;
-        };
+        }
     }
-    P_COND_BROADCAST(self->sleep_cond);
-    P_MUTEX_UNLOCK(self->pool_lock);
+    P_COND_BROADCAST(priv->sleep_cond); //Notify thread if it's sleeping
+    P_MUTEX_UNLOCK(priv->threads_lock);
 }
 
-void EventQueue__clear(EventQueue* self){
-    //TODO Invoke cancellation and cleanup
-    CListTS__clear(&self->events);
+void EventQueue__insert_private(EventQueue* self, void * scope, void (*callback)(void * user_data), void * user_data, void (*cleanup_cb)(int cancelled, void * user_data), int managed){
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (QUEUE_IS_EVENTQUEUE (self));
+    EventQueuePrivate *priv = EventQueue__get_instance_private (self);
+    P_MUTEX_LOCK(priv->pool_lock);
+
+    if(!QueueEvent__is_cancelled(QueueEvent__get_current())){
+        QueueEvent * record = QueueEvent__create(scope, callback,user_data, cleanup_cb, managed);
+        CListTS__add(&priv->events,(CObject*)record);
+    } else {
+        C_WARN("Ignoring event dispatched from cancelled event...");
+        if(cleanup_cb){
+            cleanup_cb(1,user_data);
+        }
+        if(managed){
+            g_object_unref(G_OBJECT(user_data));
+        }
+    }
+
+    P_MUTEX_UNLOCK(priv->pool_lock);
+    P_COND_SIGNAL(priv->sleep_cond);
 }
 
-void EventQueue__insert(EventQueue* queue, void * scope, void (*callback)(void * user_data), void * user_data){
-    if(!CObject__is_valid((CObject*)queue)){
-        return;//Stop accepting events
+void EventQueue__insert_plain(EventQueue* self, void * scope, void (*callback)(void * user_data), void * user_data, void (*cleanup_cb)(int cancelled, void * user_data)){
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (QUEUE_IS_EVENTQUEUE (self));
+    EventQueue__insert_private(self,scope, callback, user_data,cleanup_cb, 0);
+}
+
+void EventQueue__insert(EventQueue* self, void * scope, void (*callback)(void * user_data), gpointer user_data, void (*cleanup_cb)(int cancelled, void * user_data)){
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (QUEUE_IS_EVENTQUEUE (self));
+
+    if(G_IS_OBJECT(user_data)){
+        g_object_ref(G_OBJECT(user_data));
+    } else {
+        C_FIXME("Invalid GObject. Use EventQueue_insert_plain instead.");
     }
-    
-    P_MUTEX_LOCK(queue->pool_lock);
 
-    /* TODO Implement cleanup mechaism before uncommenting */
-    // if(!QueueEvent__is_cancelled(QueueEvent__get_current())){
-        QueueEvent * record = QueueEvent__create(scope, callback,user_data);
-        CListTS__add(&queue->events,(CObject*)record);
-    // } else {
-    //     C_WARN("Ignoring event dispatched from cancelled event...");
-    // }
-
-    P_MUTEX_UNLOCK(queue->pool_lock);
-    P_COND_SIGNAL(queue->sleep_cond);
+    EventQueue__insert_private(self,scope, callback, user_data,cleanup_cb, 1);
 }
 
 void EventQueue__cancel_scopes(EventQueue * self, void ** scopes, int count){
-    P_MUTEX_LOCK(self->pool_lock);
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (QUEUE_IS_EVENTQUEUE (self));
+    EventQueuePrivate *priv = EventQueue__get_instance_private (self);
+    P_MUTEX_LOCK(priv->pool_lock);
     int i, a, evtcount;
     
     //Clean up pending events
-    evtcount = CListTS__get_count(&self->events);
+    evtcount = CListTS__get_count(&priv->events);
     for(i=0;i<evtcount;i++){
-        QueueEvent * evt = (QueueEvent *) CListTS__get(&self->events, i);
+        QueueEvent * evt = (QueueEvent *) CListTS__get(&priv->events, i);
         for(a=0;a<count;a++){
             void * scope_to_cancel = scopes[a];
             if(scope_to_cancel == QueueEvent__get_scope(evt)){
                 C_INFO("Removing from queue...");
-                CListTS__remove_record(&self->events,(CObject*)evt);
+                CListTS__remove_record(&priv->events,(CObject*)evt);
                 i--;
                 evtcount--;
-                if(self->queue_event_cb){
-                    self->queue_event_cb(self,EVENTQUEUE_CANCELLED,self->user_data);
-                }
+                g_signal_emit (self, signals[POOL_CHANGED], 0, EVENTQUEUE_CANCELLED /* details */);
+                QueueEvent__cleanup(evt);
                 CObject__destroy((CObject*)evt);
             }
         }
     }
 
     //Cancellation request for running event
-    evtcount = CListTS__get_count(&self->running_events);
+    evtcount = CListTS__get_count(&priv->running_events);
     for(i=0;i<evtcount;i++){
-        QueueEvent * evt = (QueueEvent *) CListTS__get(&self->running_events, i);
+        QueueEvent * evt = (QueueEvent *) CListTS__get(&priv->running_events, i);
         for(a=0;a<count;a++){
             void * scope_to_cancel = scopes[a];
             if(scope_to_cancel == QueueEvent__get_scope(evt)){
@@ -191,40 +231,54 @@ void EventQueue__cancel_scopes(EventQueue * self, void ** scopes, int count){
             }
         }
     }
-    P_MUTEX_UNLOCK(self->pool_lock);
+    P_MUTEX_UNLOCK(priv->pool_lock);
 }
 
 QueueEvent * EventQueue__pop(EventQueue* self){
-    P_MUTEX_LOCK(self->pool_lock);
-    QueueEvent * qe = (QueueEvent*) CListTS__pop(&self->events);
-    CListTS__add(&self->running_events,(CObject*)qe);
-    P_MUTEX_UNLOCK(self->pool_lock);
+    g_return_val_if_fail (self != NULL,NULL);
+    g_return_val_if_fail (QUEUE_IS_EVENTQUEUE (self),NULL);
+    EventQueuePrivate *priv = EventQueue__get_instance_private (self);
+    P_MUTEX_LOCK(priv->pool_lock);
+    QueueEvent * qe = (QueueEvent*) CListTS__pop(&priv->events);
+    CListTS__add(&priv->running_events,(CObject*)qe);
+    P_MUTEX_UNLOCK(priv->pool_lock);
     return qe;
 }
 
-void EventQueue__start(EventQueue* self){
-    P_MUTEX_LOCK(self->pool_lock);
-    QueueThread * qt = QueueThread__create(self);
-    CListTS__add(&self->threads,(CObject*)qt);
-    P_MUTEX_UNLOCK(self->pool_lock);
-
-    if(self->queue_event_cb){
-        self->queue_event_cb(self,EVENTQUEUE_STARTED,self->user_data);
+void EventQueue__notify_cb(QueueThread * thread, QueueEventType type, EventQueue * self){
+    EventQueuePrivate *priv = EventQueue__get_instance_private (self);
+    switch(type){
+        case EVENTQUEUE_DISPATCHED:
+        case EVENTQUEUE_CANCELLED:
+            P_MUTEX_LOCK(priv->pool_lock);
+            CListTS__remove_record(&priv->running_events,(CObject*)QueueEvent__get_current());
+            P_MUTEX_UNLOCK(priv->pool_lock);
+            break;
+        case EVENTQUEUE_FINISHED:
+            EventQueue__remove_thread(self,thread);
+            break;
+        default:
+            break;
     }
+    
+    g_signal_emit (self, signals[POOL_CHANGED], 0, type /* details */);
+}
+
+void EventQueue__start(EventQueue* self){
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (QUEUE_IS_EVENTQUEUE (self));
+    EventQueuePrivate *priv = EventQueue__get_instance_private (self);
+    P_MUTEX_LOCK(priv->threads_lock);
+    QueueThread * qt = QueueThread__new(self);
+    g_signal_connect (G_OBJECT (qt), "state-changed", G_CALLBACK (EventQueue__notify_cb), self);
+
+    priv->threads = g_list_append(priv->threads, qt);
+    P_MUTEX_UNLOCK(priv->threads_lock);
 }
 
 void EventQueue__wait_condition(EventQueue * self, P_MUTEX_TYPE lock){
-    P_COND_WAIT(self->sleep_cond, lock);
-}
-
-void EventQueue_notify(EventQueue * self, EventQueueType type){
-    C_TRACE("event notify...");
-    if(type == EVENTQUEUE_DISPATCHED || type == EVENTQUEUE_CANCELLED){
-        P_MUTEX_LOCK(self->pool_lock);
-        CListTS__remove_record(&self->running_events,(CObject*)QueueEvent__get_current());
-        P_MUTEX_UNLOCK(self->pool_lock);
-    }
-    if(self->queue_event_cb){
-        self->queue_event_cb(self,type,self->user_data);
-    }
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (QUEUE_IS_EVENTQUEUE (self));
+    EventQueuePrivate *priv = EventQueue__get_instance_private (self);
+    P_COND_WAIT(priv->sleep_cond, lock);
 }

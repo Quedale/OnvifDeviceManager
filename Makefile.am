@@ -71,8 +71,8 @@ onvifmgr_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL
 onvifmgr_LDADD = locked-icon.o microphone.o warning.o save.o tower.o
 
 queuedemo_SOURCES = $(top_srcdir)/src/demo/queue-demo.c $(top_srcdir)/src/queue/event_queue.c $(top_srcdir)/src/queue/queue_event.c $(top_srcdir)/src/queue/queue_thread.c
-queuedemo_LDFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs cutils`
-queuedemo_CFLAGS = -Wall -Wextra -Wpedantic -Wno-unused-parameter `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags cutils`
+queuedemo_LDFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs cutils glib-2.0 gobject-2.0`
+queuedemo_CFLAGS = -Wall -Wextra -Wpedantic -Wno-unused-parameter `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags cutils glib-2.0 gobject-2.0`
 
 gifdemo_SOURCES = $(top_srcdir)/src/demo/gtk-gif.c
 gifdemo_CFLAGS = -Wall -Wextra -Wpedantic -Wno-unused-parameter `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags gtk+-3.0`

@@ -16,9 +16,10 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Tested H264, H265 and MJPEG stream up to 4K
 - Logging framework
 - HTTP authentication challenge (Basic, Digest and NTLM)
+- EventQueue for background tasks
 
 # TODO
-- EventQueue : Interupt pending events when needed
+- EventQueue GUI (TaskManager)
 - GObject rollout
 - Credential Storage 
 - Edit Onvif device identification

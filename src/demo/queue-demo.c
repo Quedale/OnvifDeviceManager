@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
+#include "clogger.h"
 
 void evt_callback(void * user_data){
     printf("evt_callback\n");
@@ -11,27 +12,34 @@ void evt_callback(void * user_data){
 
 }
 
-void eventqueue_dispatch_cb(QueueThread * thread, EventQueueType type, void * user_data){
-    EventQueue * queue = QueueThread__get_queue(thread);
+void evt_cleanup_callback(int cancelled, void * user_data){
+
+}
+
+void eventqueue_dispatch_cb(EventQueue * queue, QueueEventType type,  void * self){
     int running = EventQueue__get_running_event_count(queue);
     int pending = EventQueue__get_pending_event_count(queue);
     int total = EventQueue__get_thread_count(queue);
 
-    char str[10];
+    char str[100];
     memset(&str,'\0',sizeof(str));
-    sprintf(str, "[%d/%d]", running + pending,total);
+    C_DEBUG("Event %s [%d/%d]",g_enum_to_nick(QUEUE_TYPE_EVENTTYPE,type), running + pending, total);
 }
 
 int main()
 {
-    EventQueue * queue = EventQueue__create(eventqueue_dispatch_cb,NULL);
+    EventQueue * queue = EventQueue__new();
+    g_signal_connect (G_OBJECT(queue), "pool-changed", G_CALLBACK (eventqueue_dispatch_cb), NULL);
 
-    EventQueue__insert(queue,evt_callback,"Data 1");
-    EventQueue__insert(queue,evt_callback,"Data 2");
-    EventQueue__insert(queue,evt_callback,"Data 3");
-    EventQueue__insert(queue,evt_callback,"Data 4");
-    EventQueue__insert(queue,evt_callback,"Data 5");
-    EventQueue__insert(queue,evt_callback,"Data 6");
+    char * scope1 = "1";
+    char * scope2 = "2";
+
+    EventQueue__insert_plain(queue,scope1,evt_callback,"Data 1", evt_cleanup_callback);
+    EventQueue__insert_plain(queue,scope1,evt_callback,"Data 2", evt_cleanup_callback);
+    EventQueue__insert_plain(queue,scope1,evt_callback,"Data 3", evt_cleanup_callback);
+    EventQueue__insert_plain(queue,scope2,evt_callback,"Data 4", evt_cleanup_callback);
+    EventQueue__insert_plain(queue,scope2,evt_callback,"Data 5", evt_cleanup_callback);
+    EventQueue__insert_plain(queue,scope2,evt_callback,"Data 6", evt_cleanup_callback);
 
 
     EventQueue__start(queue);
@@ -43,6 +51,6 @@ int main()
         // EventQueue__insert(queue,evt);
         // snprintf(numstr, 12, "Data %d", index++);
         // printf("buff %s\n",numstr);
-        EventQueue__insert(queue,evt_callback,"Data 6");
+        EventQueue__insert_plain(queue,NULL,evt_callback,"Data 6", evt_cleanup_callback);
     }
 }

@@ -19,7 +19,7 @@ G_BEGIN_DECLS
 #define ONVIFMGR_DEVICEROW_FATAL(fmt,dev, ...) ONVIF_DEVICE_FATAL(fmt, OnvifMgrDeviceRow__get_device(ONVIFMGR_DEVICEROW(dev)),##__VA_ARGS__)
 
 #define ONVIFMGR_TYPE_DEVICEROW OnvifMgrDeviceRow__get_type()
-G_DECLARE_FINAL_TYPE (OnvifMgrDeviceRow, OnvifMgrDeviceRow_, ONVIFMGR, DEVICEROW, GtkGrid)
+G_DECLARE_FINAL_TYPE (OnvifMgrDeviceRow, OnvifMgrDeviceRow_, ONVIFMGR, DEVICEROW, GtkListBoxRow)
 
 #define ONVIFMGR_DEVICEROWROW_HAS_OWNER(x) (ONVIFMGR_IS_DEVICEROW(x) && COwnableObject__has_owner(COWNABLE_OBJECT(x)))
 

@@ -188,7 +188,7 @@ gboolean * onvif_info_gui_update (void * user_data){
     if(update->uri) gtk_entry_set_text(GTK_ENTRY(priv->uri_lbl),update->uri);
     gtk_editable_set_editable  ((GtkEditable*)priv->uri_lbl, FALSE);
 
-    g_signal_emit (update->info, signals[FINISHED], 0 /* details */);
+    g_signal_emit (update->info, signals[FINISHED], 0, update->device);
 exit:
     free(update->name);
     free(update->hostname);
@@ -208,6 +208,16 @@ exit:
     g_object_unref(update->device);
     free(update);
     return FALSE;
+}
+
+void _update_details_page_cleanup(int cancelled, void * user_data){
+    InfoDataUpdate * input = (InfoDataUpdate *) user_data;
+    if(cancelled){
+        //If cancelled, dispatch finish signal
+        gui_signal_emit(input->info, signals[FINISHED], input->device);
+    }
+    g_object_unref(input->device);
+    free(input);
 }
 
 void _update_details_page(void * user_data){
@@ -331,8 +341,6 @@ exit:
     OnvifDeviceInformation__destroy(dev_info);
     OnvifInterfaces__destroy(interfaces);
     OnvifScopes__destroy(scopes);
-    g_object_unref(input->device);
-    free(input);
 }
 
 void OnvifInfoPanel_update_details(OnvifInfoPanel * self, OnvifMgrDeviceRow * device){
@@ -346,7 +354,7 @@ void OnvifInfoPanel_update_details(OnvifInfoPanel * self, OnvifMgrDeviceRow * de
         return;
     }
     
-    g_signal_emit (self, signals[STARTED], 0 /* details */);
+    g_signal_emit (self, signals[STARTED], 0, device);
 
     OnvifInfoPanelPrivate *priv = OnvifInfoPanel__get_instance_private (self);
 
@@ -354,7 +362,7 @@ void OnvifInfoPanel_update_details(OnvifInfoPanel * self, OnvifMgrDeviceRow * de
     input->device = device;
     input->info = self;
     g_object_ref(device);
-    OnvifApp__dispatch(priv->app, device, _update_details_page,input);
+    OnvifApp__dispatch(priv->app, device, _update_details_page,input, _update_details_page_cleanup);
 }
 
 void OnvifInfoPanel_clear_details(OnvifInfoPanel * self){
@@ -448,6 +456,8 @@ OnvifInfoPanel__class_init (OnvifInfoPanelClass * klass)
                             ONVIFMGR_TYPE_APP  /* default value */,
                             G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE);
 
+    GType params[1];
+    params[0] = ONVIFMGR_TYPE_DEVICEROW | G_SIGNAL_TYPE_STATIC_SCOPE;
     signals[STARTED] =
         g_signal_newv ("started",
                         G_TYPE_FROM_CLASS (klass),
@@ -457,8 +467,8 @@ OnvifInfoPanel__class_init (OnvifInfoPanelClass * klass)
                         NULL /* accumulator data */,
                         NULL /* C marshaller */,
                         G_TYPE_NONE /* return_type */,
-                        0     /* n_params */,
-                        NULL  /* param_types */);
+                        1     /* n_params */,
+                        params  /* param_types */);
 
     signals[FINISHED] =
         g_signal_newv ("finished",
@@ -469,8 +479,8 @@ OnvifInfoPanel__class_init (OnvifInfoPanelClass * klass)
                         NULL /* accumulator data */,
                         NULL /* C marshaller */,
                         G_TYPE_NONE /* return_type */,
-                        0     /* n_params */,
-                        NULL  /* param_types */);
+                        1     /* n_params */,
+                        params  /* param_types */);
                         
     g_object_class_install_properties (object_class,
                                         N_PROPERTIES,

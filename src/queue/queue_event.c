@@ -1,14 +1,17 @@
 #include "queue_event.h"
 #include "cobject.h"
 #include <stdlib.h>
+#include "clogger.h"
 
 struct _QueueEvent {
     CObject parent;
     int cancelled;
+    int managed;
     P_MUTEX_TYPE cancel_lock;
     void * scope;
     void * user_data;
     void (*callback)();
+    void (*cleanup_cb)(int cancelled, void * user_data);
 };
 
 void priv_QueueEvent__destroy(CObject * cobject){
@@ -17,20 +20,22 @@ void priv_QueueEvent__destroy(CObject * cobject){
 }
 
 
-QueueEvent * QueueEvent__create(void * scope, void (*callback)(void * user_data), void * user_data){
+QueueEvent * QueueEvent__create(void * scope, void (*callback)(void * user_data), void * user_data, void (*cleanup_cb)(int cancelled, void * user_data), int managed){
     QueueEvent * self = malloc(sizeof(QueueEvent));
-    QueueEvent__init(self, scope, callback, user_data);
+    QueueEvent__init(self, scope, callback, user_data, cleanup_cb, managed);
     CObject__set_allocated((CObject *)self);
     return self;
 }
 
-void QueueEvent__init(QueueEvent * self, void * scope, void (*callback)(void * user_data), void * user_data){
+void QueueEvent__init(QueueEvent * self, void * scope, void (*callback)(void * user_data), void * user_data, void (*cleanup_cb)(int cancelled, void * user_data), int managed){
     CObject__init((CObject*)self);
     CObject__set_destroy_callback((CObject*)self,priv_QueueEvent__destroy);
     self->user_data = user_data;
     self->callback = callback;
     self->scope = scope;
     self->cancelled = 0;
+    self->cleanup_cb = cleanup_cb;
+    self->managed = managed;
     P_MUTEX_SETUP(self->cancel_lock);
 }
 
@@ -51,19 +56,21 @@ int QueueEvent__is_cancelled(QueueEvent * self){
     return ret;
 }
 
-
-QUEUE_CALLBACK QueueEvent__get_callback(QueueEvent * self){
-    if(!self){
-        return NULL;
+void QueueEvent__invoke(QueueEvent * self){
+    if(!self || !self->callback){ //Happens if pop happens simultaniously at 0. Continue to wait on condition call
+        C_TRACE("Silmutanious queue pop. Skipping");
+        return;
     }
-    return self->callback;
+    (*(self->callback))(self->user_data);
 }
 
-void * QueueEvent__get_userdata(QueueEvent * self){
-    if(!self){
-        return NULL;
+void QueueEvent__cleanup(QueueEvent * self){
+    if(self->cleanup_cb){
+        self->cleanup_cb(self->cancelled,self->user_data);
     }
-    return self->user_data;
+    if(self->managed){
+        g_object_unref(G_OBJECT(self->user_data));
+    }
 }
 
 void * QueueEvent__get_scope(QueueEvent * self){

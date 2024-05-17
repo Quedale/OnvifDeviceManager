@@ -5,6 +5,7 @@
 
 #define GLIST_FOREACH(item, list) for(GList *__glist = list; __glist && (item = __glist->data, TRUE); __glist = __glist->next)
 
+void gui_signal_emit(gpointer instance, guint singalid, gpointer data);
 void gui_widget_destroy(GtkWidget * widget, gpointer user_data);
 void gui_container_remove(GtkWidget * widget, gpointer user_data);
 void gui_update_widget_image(GtkWidget * image, GtkWidget * handle);
