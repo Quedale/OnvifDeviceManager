@@ -935,6 +935,9 @@ else
 fi
 
 if [ $ret != 0 ]; then
+  #OnvifSoapLib depends on it and will also require a rebuild
+  rm -rf $SUBPROJECT_DIR/OnvifSoapLib/build
+  
   pullOrClone path=https://github.com/Quedale/CUtils.git ignorecache="true"
   if [ $FAILED -eq 1 ]; then exit 1; fi
   #Clean up previous build in case of failure. This will prevent from falling back on the old version
