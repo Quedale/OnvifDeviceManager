@@ -782,10 +782,27 @@ fi
 #Activate virtual environment
 source venvfolder/bin/activate
 
+if [ -z "$(checkProg name='cmake' args='--version' path=$PATH)" ]; then
+ MISSING_DEP=1
+ python3 -m pip install cmake --upgrade
+ ret=$?
+  if [ $ret != 0 ]; then
+    echo "Failed to install cmake via pip. Please try to install cmake manually."
+    exit 1
+  fi
+else
+  echo "cmake already installed."
+fi
+
 #Setup meson
 if [ ! -z "$(isMesonInstalled major=0 minor=63 micro=2)" ]; then
   echo "ninja build utility not found. Installing from pip..."
   python3 -m pip install meson --upgrade
+  ret=$?
+  if [ $ret != 0 ]; then
+    echo "Failed to install meson via pip. Please try to install meson manually."
+    exit 1
+  fi
 else
   echo "Meson $($MESON_TOOL --version) already installed."
 fi
@@ -793,6 +810,11 @@ fi
 if [ -z "$(checkProg name='ninja' args='--version' path=$PATH)" ]; then
   echo "ninja build utility not found. Installing from pip..."
   python3 -m pip install ninja --upgrade
+  ret=$?
+  if [ $ret != 0 ]; then
+    echo "Failed to install ninja via pip. Please try to install ninja manually."
+    exit 1
+  fi
 else
   echo "Ninja $(ninja --version) already installed."
 fi
@@ -1160,6 +1182,10 @@ LIBDE265_PKG=$SUBPROJECT_DIR/libde265/dist/lib/pkgconfig
 LIBX11_PKG=$SUBPROJECT_DIR/libx11/dist/lib/pkgconfig
 XMACROS_PKG=$SUBPROJECT_DIR/macros/dist/lib/pkgconfig
 
+PKG_UDEV=$SUBPROJECT_DIR/systemd-255/build/dist/lib/pkgconfig
+PKG_GUDEV=$SUBPROJECT_DIR/libgudev/build/dist/lib/pkgconfig
+PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_GUDEV:$PKG_UDEV:$PKG_GLIB
+
 #Check to see if gstreamer exist on the system
 if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
   gst_ret=0;
@@ -1200,9 +1226,6 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
     #   sudo apt install libgudev-1.0-dev (tested 232)
     # 
     ################################################################
-    PKG_UDEV=$SUBPROJECT_DIR/systemd-252/dist/usr/local/lib/pkgconfig
-    PKG_GUDEV=$SUBPROJECT_DIR/libgudev/build/dist/lib/pkgconfig
-    PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_GUDEV:$PKG_UDEV:$PKG_GLIB \
     pkg-config --exists --print-errors "gudev-1.0 >= 232"
     ret=$?
     if [ $ret != 0 ]; then 
@@ -1262,7 +1285,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
       fi
 
       PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_UDEV \
-      pkg-config --exists --print-errors "libudev >= 252" # Or check for sys/capability.h
+      pkg-config --exists --print-errors "libudev >= 255" # Or check for sys/capability.h
       ret=$?
       if [ $ret != 0 ]; then
         echo "not found libudev"
@@ -1365,19 +1388,22 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dpcre2=false"
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dglib=false"
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Ddbus=false"
-        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dgnu-efi=false"
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dtests=false"
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Durlify=false"
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Danalyze=false"
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dbpf-framework=false"
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dkernel-install=false"
-        downloadAndExtract file="v252.tar.gz" path="https://github.com/systemd/systemd/archive/refs/tags/v252.tar.gz"
+        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dsysvinit-path=$SUBPROJECT_DIR/systemd-255/build/dist/init.d"
+        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dbashcompletiondir=$SUBPROJECT_DIR/systemd-255/build/dist/bash-completion"
+        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dcreate-log-dirs=false"
+        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dlocalstatedir=$SUBPROJECT_DIR/systemd-255/build/dist/localstate"
+        downloadAndExtract file="v255.tar.gz" path="https://github.com/systemd/systemd/archive/refs/tags/v255.tar.gz"
         if [ $FAILED -eq 1 ]; then exit 1; fi
         PATH=$PATH:$SUBPROJECT_DIR/gperf-3.1/dist/bin \
         PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_LIBCAP:$PKG_UTIL_LINUX \
         C_INCLUDE_PATH=$SUBPROJECT_DIR/libcap/dist/usr/include \
         LIBRARY_PATH=$SUBPROJECT_DIR/libcap/dist/lib64 \
-        buildMesonProject srcdir="systemd-252" prefix="/usr/local" mesonargs="$SYSD_MESON_ARGS" destdir="$SUBPROJECT_DIR/systemd-252/dist"
+        buildMesonProject srcdir="systemd-255" prefix="$SUBPROJECT_DIR/systemd-255/build/dist" mesonargs="$SYSD_MESON_ARGS"
         if [ $FAILED -eq 1 ]; then exit 1; fi
 
       else
@@ -1385,8 +1411,8 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
       fi
 
       pullOrClone path=https://gitlab.gnome.org/GNOME/libgudev.git tag=237
-      C_INCLUDE_PATH=$SUBPROJECT_DIR/systemd-252/dist/usr/local/include \
-      LIBRARY_PATH=$SUBPROJECT_DIR/libcap/dist/lib64:$SUBPROJECT_DIR/systemd-252/dist/usr/lib \
+      C_INCLUDE_PATH=$SUBPROJECT_DIR/systemd-255/build/dist/include \
+      LIBRARY_PATH=$SUBPROJECT_DIR/libcap/dist/lib64:$SUBPROJECT_DIR/systemd-255/build/dist/lib \
       PATH=$PATH:$SUBPROJECT_DIR/glib-2.74.1/dist/bin \
       PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_UDEV:$PKG_GLIB \
       buildMesonProject srcdir="libgudev" prefix="$SUBPROJECT_DIR/libgudev/build/dist" mesonargs="-Dvapi=disabled -Dtests=disabled -Dintrospection=disabled"
@@ -1552,7 +1578,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
             FFMPEG_CONFIGURE_ARGS="$FFMPEG_CONFIGURE_ARGS --enable-gpl"
 
 
-            pullOrClone path="https://github.com/FFmpeg/FFmpeg.git" tag=n5.0.2
+            pullOrClone path="https://github.com/FFmpeg/FFmpeg.git" tag=n6.1.1
             PATH=$PATH:$NASM_BIN \
             buildMakeProject srcdir="FFmpeg" prefix="$SUBPROJECT_DIR/FFmpeg/dist" configure="$FFMPEG_CONFIGURE_ARGS"
             if [ $FAILED -eq 1 ]; then exit 1; fi
@@ -1599,7 +1625,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
     # echo "revision=v2.0.0" >> subprojects/tinyalsa.wrap
     # MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:tinyalsa=enabled"
 
-    LIBRARY_PATH=$LD_LIBRARY_PATH:$SUBPROJECT_DIR/systemd-252/dist/usr/lib \
+    LIBRARY_PATH=$LD_LIBRARY_PATH:$SUBPROJECT_DIR/systemd-255/dist/lib \
     PATH=$PATH:$SUBPROJECT_DIR/glib-2.74.1/dist/bin:$NASM_BIN \
     PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_GUDEV:$PKG_ALSA:$PKG_PULSE:$PKG_UDEV:$PKG_GLIB:$FFMPEG_PKG:$ALSA_PKG  \
     buildMesonProject srcdir="gstreamer" prefix="$SUBPROJECT_DIR/gstreamer/build/dist" mesonargs="$MESON_PARAMS" builddir="build"
