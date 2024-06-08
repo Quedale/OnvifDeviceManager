@@ -289,7 +289,7 @@ GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
         //Temporarely disabled for performance
         g_object_set (G_OBJECT (priv->snapsink), "enable-last-sample", FALSE, NULL);
 
-        gst_base_sink_set_sync(GST_BASE_SINK_CAST(priv->snapsink),FALSE);
+        // gst_base_sink_set_sync(GST_BASE_SINK_CAST(priv->snapsink),FALSE);
         gst_base_sink_set_qos_enabled(GST_BASE_SINK_CAST(priv->snapsink),FALSE);
     } else {
         C_WARN ("Could not create gtkglsink, falling back to gtksink.\n");
