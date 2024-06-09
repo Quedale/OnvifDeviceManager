@@ -43,6 +43,7 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Merit LILIN (PSR5024EX30 & SR7424/8)
 - Reolink (RLC-820A)
 - Imou (Ranger 2C)
+- D-Link (Tapo C200)
 - [Yi-Hack Allwinner V2](https://github.com/roleoroleo/yi-hack-Allwinner-v2) (Pro 2K Home)
 
 # How to build

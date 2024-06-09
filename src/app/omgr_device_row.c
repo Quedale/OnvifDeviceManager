@@ -434,11 +434,20 @@ void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
     if(oerror == ONVIF_ERROR_NONE){
         OnvifMediaService * media_service = OnvifDevice__get_media_service(priv->device);
         snapshot = OnvifMediaService__getSnapshot(media_service,OnvifProfile__get_index(priv->profile));
-        if(!snapshot){
-            C_ERROR("_priv_Device__load_thumbnail- Error retrieve snapshot.");
-            goto warning;
+        SoapFault * fault = SoapObject__get_fault(SOAP_OBJECT(snapshot));
+        switch(*fault){
+            case SOAP_FAULT_NONE:
+                image = GtkBinaryImage__new((unsigned char *)OnvifSnapshot__get_buffer(snapshot),OnvifSnapshot__get_size(snapshot), -1, 40, error);
+                break;
+            case SOAP_FAULT_ACTION_NOT_SUPPORTED:
+                goto unsupported;
+            case SOAP_FAULT_CONNECTION_ERROR:
+            case SOAP_FAULT_NOT_VALID:
+            case SOAP_FAULT_UNAUTHORIZED:
+            case SOAP_FAULT_UNEXPECTED:
+            default:
+                goto warning;
         }
-        image = GtkBinaryImage__new((unsigned char *)OnvifSnapshot__get_buffer(snapshot),OnvifSnapshot__get_size(snapshot), -1, 40, error);
     } else if(oerror == ONVIF_ERROR_NOT_AUTHORIZED){
         image = GtkStyledImage__new((unsigned char *)_binary_locked_icon_png_start,_binary_locked_icon_png_end - _binary_locked_icon_png_start, 40, 40, error);
     } else {
@@ -494,9 +503,17 @@ warning:
     } else {
         C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
     }
+    goto exit;
 
+unsupported:
+    //Snapshot unsupported by camera. No longer need image handle
+    if(priv->image_handle){
+        safely_destroy_widget(priv->image_handle);
+        priv->image_handle = NULL;
+    }
 exit:
-    OnvifSnapshot__destroy(snapshot);
+    if(snapshot)
+        g_object_unref(snapshot);
 
     C_TRACE("OnvifMgrDeviceRow__load_thumbnail done.");
 } 
