@@ -890,11 +890,36 @@ if [ $ret != 0 ]; then
   fi
 
   echo "-- Building gsoap libgsoap-dev --"
+
+  inc_path=""
+  if [ ! -z "$SSL_INCLUDE" ] && [ "$SSL_INCLUDE" != "/usr/include" ]; then
+    if [ -z "$inc_path" ]; then
+      inc_path="$SSL_INCLUDE"
+    else
+      inc_path="$inc_path:$SSL_INCLUDE"
+    fi
+  fi
+  if [ ! -z "$ZLIB_INCLUDE" ] && [ "$SSL_INCLUDE" != "/usr/include" ]; then
+    if [ -z "$inc_path" ]; then
+      inc_path="$ZLIB_INCLUDE"
+    else
+      inc_path="$inc_path:$ZLIB_INCLUDE"
+    fi
+  fi
+  if [ ! -z "$CPLUS_INCLUDE_PATH" ] && [ "$SSL_INCLUDE" != "/usr/include" ]; then
+    if [ -z "$inc_path" ]; then
+      inc_path="$CPLUS_INCLUDE_PATH"
+    else
+      inc_path="$inc_path:$CPLUS_INCLUDE_PATH"
+    fi
+  fi
+
+  echo "gSoap Include Path : $inc_path"
   downloadAndExtract file="gsoap.zip" path="https://sourceforge.net/projects/gsoap2/files/gsoap_2.8.133.zip/download"
   if [ $FAILED -eq 1 ]; then exit 1; fi
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG:$ZLIB_PKG \
-  C_INCLUDE_PATH="$SSL_INCLUDE:$ZLIB_INCLUDE:$C_INCLUDE_PATH" \
-  CPLUS_INCLUDE_PATH="$SSL_INCLUDE:$ZLIB_INCLUDE:$CPLUS_INCLUDE_PATH" \
+  C_INCLUDE_PATH="$inc_path" \
+  CPLUS_INCLUDE_PATH="$inc_path" \
   LIBRARY_PATH="$SSL_LIBS:$ZLIB_LIBS:$LIBRARY_PATH" \
   LD_LIBRARY_PATH="$SSL_LIBS:$ZLIB_LIBS:$LD_LIBRARY_PATH" \
   LIBS='-ldl -lpthread' \
