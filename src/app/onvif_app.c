@@ -159,15 +159,16 @@ void _display_onvif_device(void * user_data){
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(omgr_device)){
         C_TRAIL("_display_onvif_device - invalid device.");
         return;
-    } else if (OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NOT_AUTHORIZED){
+    } else if (!OnvifDevice__is_authenticated(odev)){
         goto updatethumb;
     }
 
     /* Display Profile dropdown */
     if(!OnvifMgrDeviceRow__get_profile(omgr_device)){
-        OnvifProfiles * profiles = OnvifMediaService__get_profiles(OnvifDevice__get_media_service(odev));
-        OnvifMgrDeviceRow__set_profile(omgr_device,OnvifProfiles__get_profile(profiles,0));
-        OnvifProfiles__destroy(profiles);
+        OnvifMediaProfiles * profiles = OnvifMediaService__get_profiles(OnvifDevice__get_media_service(odev));
+        //TODO error handling for profiles fault
+        OnvifMgrDeviceRow__set_profile(omgr_device,OnvifMediaProfiles__get_profile(profiles,0));
+        g_object_unref(profiles);
         //We don't care for the initial profile event since the default index is 0.
         //Connecting to signal only after setting the default profile
         g_signal_connect (G_OBJECT (omgr_device), "profile-changed", G_CALLBACK (OnvifApp__profile_changed_cb), NULL);
@@ -223,14 +224,17 @@ void _play_onvif_stream(void * user_data){
         C_TRAIL("_play_onvif_stream - invalid device.");
         return;
     }
-    if(OnvifDevice__get_last_error(odev) != ONVIF_ERROR_NONE && OnvifMgrDeviceRow__is_selected(device)){
+
+    if(!OnvifDevice__is_authenticated(odev) || !OnvifMgrDeviceRow__is_selected(device)){
         return;
     }
 
     /* Set the URI to play */
-    char * uri = OnvifMediaService__getStreamUri(OnvifDevice__get_media_service(odev),OnvifProfile__get_index(OnvifMgrDeviceRow__get_profile(device)));
+    OnvifMediaUri * media_uri = OnvifMediaService__getStreamUri(OnvifDevice__get_media_service(odev),OnvifProfile__get_index(OnvifMgrDeviceRow__get_profile(device)));
+    SoapFault * fault = SoapObject__get_fault(SOAP_OBJECT(media_uri));
     
-    if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) && OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NONE){
+    if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) && *fault == SOAP_FAULT_NONE){
+        char * uri = OnvifMediaUri__get_uri(media_uri);
         GstRtspPlayer__set_playback_url(priv->player,uri);
         char * port = OnvifDevice__get_port(OnvifMgrDeviceRow__get_device(device));
         GstRtspPlayer__set_port_fallback(priv->player,port);
@@ -251,7 +255,7 @@ void _play_onvif_stream(void * user_data){
     } else if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device)) {
         C_TRAIL("_play_onvif_stream - invalid device.");
     }
-    free(uri);
+    g_object_unref(media_uri);
 }
 
 void _stop_onvif_stream(void * user_data){
@@ -319,42 +323,54 @@ void _onvif_device_add(void * user_data){
     OnvifDevice__set_credentials(onvif_dev,AddDeviceDialog__get_user((AddDeviceDialog *)event->dialog),AddDeviceDialog__get_pass((AddDeviceDialog *)event->dialog));
    
     /* Authentication check */
-    OnvifDevice__authenticate(onvif_dev);
+    OnvifDeviceService * devserv;
+    OnvifScopes * scopes;
+    char * name;
+    char * hardware;
+    char * location;
+    GtkWidget * omgr_device;
 
-    OnvifErrorTypes oerror = OnvifDevice__get_last_error(onvif_dev);
-    if(oerror == ONVIF_ERROR_NONE) {
-        //Extract scope
-        OnvifDeviceService * devserv = OnvifDevice__get_device_service(onvif_dev);
-        OnvifScopes * scopes = OnvifDeviceService__getScopes(devserv);
+    SoapFault fault = OnvifDevice__authenticate(onvif_dev);
+    switch(fault){
+        case SOAP_FAULT_NONE:
+            //Extract scope
+            devserv = OnvifDevice__get_device_service(onvif_dev);
+            scopes = OnvifDeviceService__getScopes(devserv);
 
-        char * name = OnvifScopes__extract_scope(scopes,"name");
-        char * hardware = OnvifScopes__extract_scope(scopes,"hardware");
-        char * location = OnvifScopes__extract_scope(scopes,"location");
+            name = OnvifScopes__extract_scope(scopes,"name");
+            hardware = OnvifScopes__extract_scope(scopes,"hardware");
+            location = OnvifScopes__extract_scope(scopes,"location");
 
-        GtkWidget * omgr_device = OnvifMgrDeviceRow__new(ONVIFMGR_APP(event->user_data), onvif_dev,name,hardware,location);
-        
-        gdk_threads_add_idle(G_SOURCE_FUNC(idle_add_device),omgr_device);
+            omgr_device = OnvifMgrDeviceRow__new(ONVIFMGR_APP(event->user_data), onvif_dev,name,hardware,location);
+            
+            gdk_threads_add_idle(G_SOURCE_FUNC(idle_add_device),omgr_device);
 
-        free(name);
-        free(hardware);
-        free(location);
-        //TODO Save manually added camera to settings
+            free(name);
+            free(hardware);
+            free(location);
+            //TODO Save manually added camera to settings
 
-        OnvifScopes__destroy(scopes);
-    } else {
-        if(oerror == ONVIF_ERROR_NOT_AUTHORIZED){
-            AddDeviceDialog__set_error(dialog,"Unauthorized...");
-        } else if(oerror == ONVIF_ERROR_NOT_VALID){
-            AddDeviceDialog__set_error(dialog,"Not a valid ONVIF device...");
-        } else if(oerror == ONVIF_ERROR_SOAP){
-            AddDeviceDialog__set_error(dialog,"Unexected soap error occured...");
-        } else if(oerror == ONVIF_ERROR_CONNECTION){
+            OnvifScopes__destroy(scopes);
+            break;
+        case SOAP_FAULT_CONNECTION_ERROR:
             AddDeviceDialog__set_error(dialog,"Failed to connect...");
-        } else {
-            C_ERROR("An soap error was encountered %d\n",oerror);
-        }
-        OnvifDevice__destroy(onvif_dev);
-        goto exit;
+            goto exit;
+            break;
+        case SOAP_FAULT_NOT_VALID:
+            AddDeviceDialog__set_error(dialog,"Not a valid ONVIF device...");
+            goto exit;
+            break;
+        case SOAP_FAULT_UNAUTHORIZED:
+            AddDeviceDialog__set_error(dialog,"Unauthorized...");
+            goto exit;
+            break;
+        case SOAP_FAULT_ACTION_NOT_SUPPORTED:
+        case SOAP_FAULT_UNEXPECTED:
+        default:
+            C_ERROR("An soap error was encountered");
+            AddDeviceDialog__set_error(dialog,"Unexected error occured...");
+            goto exit;
+            break;
     }
 
     gdk_threads_add_idle(G_SOURCE_FUNC(idle_hide_dialog),dialog);
@@ -591,7 +607,7 @@ static int OnvifApp__reload_device(OnvifMgrDeviceRow * device){
         return 0;
     }
 
-    if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NOT_AUTHORIZED){
+    if(!OnvifDevice__is_authenticated(odev)){
         return 0;
     }
 
@@ -602,13 +618,12 @@ static int OnvifApp__reload_device(OnvifMgrDeviceRow * device){
     OnvifApp * app = OnvifMgrDeviceRow__get_app(device);
     OnvifApp__display_device(app, device);
 
-    if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NONE && OnvifMgrDeviceRow__is_selected(device)){
+    if(OnvifDevice__is_authenticated(odev) && OnvifMgrDeviceRow__is_selected(device)){
         //Authenticated device counts a changed
         g_signal_emit (app, signals[DEVICE_CHANGED], 0, device /* details */);
 
         OnvifAppPrivate *priv = OnvifApp__get_instance_private (app);
         safely_start_spinner(priv->player_loading_handle);
-        g_object_ref(device);
         _play_onvif_stream(device);
     }
 
@@ -651,7 +666,7 @@ static void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row){
     } else if(OnvifMgrDeviceRow__is_initialized(priv->device)){
         OnvifDevice * odev = OnvifMgrDeviceRow__get_device(priv->device);
         //Prompt for authentication
-        if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NOT_AUTHORIZED){
+        if(!OnvifDevice__is_authenticated(odev)){
             //In case the previous stream was in a retry cycle, force hide loading
             gtk_spinner_stop (GTK_SPINNER (priv->player_loading_handle));
             //Re-dispatched to allow proper focus handling
@@ -684,6 +699,10 @@ static void OnvifApp__add_device(OnvifApp * app, OnvifMgrDeviceRow * omgr_device
 }
 
 static int OnvifApp__device_already_exist(OnvifApp * app, char * xaddr){
+    // if(strcmp(xaddr,"device_service URL") == 0 ||
+    //     strcmp(xaddr,"device_service URL2") == 0 ){
+    //     return 1;
+    // }
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (app);
     int ret = 0;
     GList * childs = gtk_container_get_children(GTK_CONTAINER(priv->listbox));

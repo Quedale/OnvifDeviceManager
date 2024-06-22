@@ -350,7 +350,7 @@ void OnvifInfoPanel_update_details(OnvifInfoPanel * self, OnvifMgrDeviceRow * de
     }
     
     OnvifDevice * odev = OnvifMgrDeviceRow__get_device(device);
-    if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NOT_AUTHORIZED){
+    if(!OnvifDevice__is_authenticated(odev)){
         return;
     }
     

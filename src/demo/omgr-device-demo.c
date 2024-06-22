@@ -63,9 +63,9 @@ int main(int argc, char *argv[])
     OnvifDevice__set_credentials(device,"demo","demo");
     OnvifDevice__authenticate(device);
 
-    OnvifProfiles * profiles = OnvifMediaService__get_profiles(OnvifDevice__get_media_service(device));
-    OnvifMgrDeviceRow__set_profile(ONVIFMGR_DEVICEROW(omgr_device),OnvifProfiles__get_profile(profiles,0));
-    OnvifProfiles__destroy(profiles);
+    OnvifMediaProfiles * profiles = OnvifMediaService__get_profiles(OnvifDevice__get_media_service(device));
+    OnvifMgrDeviceRow__set_profile(ONVIFMGR_DEVICEROW(omgr_device),OnvifMediaProfiles__get_profile(profiles,0));
+    g_object_unref(profiles);
 
     gtk_main ();
 

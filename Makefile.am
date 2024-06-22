@@ -109,8 +109,8 @@ omgrdevicedemo_SOURCES = $(top_srcdir)/src/demo/omgr-device-demo.c \
 						$(top_srcdir)/src/app/gtkstyledimage.c \
 						$(top_srcdir)/src/app/gtkbinaryimage.c \
 					 	$(top_srcdir)/src/app/omgr_device_row.c
-omgrdevicedemo_CFLAGS = $(DEBUG_FLAG) -Wall -Wextra -Wpedantic -Wno-unused-parameter $(GST_STATIC_FLAG) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap`
-omgrdevicedemo_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
+omgrdevicedemo_CFLAGS = $(DEBUG_FLAG) -Wall -Wextra -Wpedantic -Wno-unused-parameter $(GST_STATIC_FLAG) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap libntlm`
+omgrdevicedemo_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap libntlm` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
 omgrdevicedemo_LDADD = save.o locked-icon.o warning.o
 
 gtksliderdemo_SOURCES = $(top_srcdir)/src/demo/widget-demo.c \

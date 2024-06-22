@@ -13,7 +13,7 @@ typedef struct {
 
 typedef struct {
     ProfilesDialog * dialog;
-    OnvifProfiles * profiles;
+    OnvifMediaProfiles * profiles;
 } GUIProfilesEvent;
 
 typedef struct {
@@ -47,8 +47,8 @@ gboolean gui_ProfilesDialog__show_profiles(void * user_data){
 
     gtk_widget_destroy(elements->content_pane);
     elements->content_pane = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
-    for(int i=0;i<OnvifProfiles__get_size(evt->profiles);i++){
-        OnvifProfile * profile = OnvifProfiles__get_profile(evt->profiles,i);
+    for(int i=0;i<OnvifMediaProfiles__get_size(evt->profiles);i++){
+        OnvifProfile * profile = OnvifMediaProfiles__get_profile(evt->profiles,i);
 
         GtkWidget * btn = gtk_profile_panel_new(profile);
         gtk_box_pack_start(GTK_BOX(elements->content_pane), btn,     FALSE, FALSE, 0);
@@ -58,6 +58,7 @@ gboolean gui_ProfilesDialog__show_profiles(void * user_data){
     gtk_box_pack_start(GTK_BOX(elements->primary_pane), elements->content_pane,     FALSE, FALSE, 0);
     gtk_widget_show_all (elements->primary_pane);
     
+    g_object_unref(evt->profiles);
     free(evt);
     return FALSE;
 }
@@ -65,8 +66,8 @@ gboolean gui_ProfilesDialog__show_profiles(void * user_data){
 void _priv_ProfilesDialog__load_profiles(void * user_data){
     ProfilesDialog* cdialog = (ProfilesDialog*)user_data;
     OnvifMediaService * mserv = OnvifDevice__get_media_service(OnvifMgrDeviceRow__get_device(cdialog->device));
-    OnvifProfiles * profiles = OnvifMediaService__get_profiles(mserv);
-
+    OnvifMediaProfiles * profiles = OnvifMediaService__get_profiles(mserv);
+    //TODO Error handling for profiles fault
     GUIProfilesEvent * evt = malloc(sizeof(GUIProfilesEvent));
     evt->dialog = cdialog;
     evt->profiles= profiles;

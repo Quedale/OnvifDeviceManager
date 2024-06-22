@@ -236,12 +236,17 @@ OnvifMgrDeviceRow__destroy (GtkWidget *object)
     g_return_if_fail (object != NULL);
     g_return_if_fail (ONVIFMGR_IS_DEVICEROW (object));
     OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (ONVIFMGR_DEVICEROW(object));
-    OnvifDevice__destroy(priv->device);
-    OnvifProfile__destroy(priv->profile);
 
     //GTK may call destroy multiple times. Setting pointer to null to avoid segmentation fault
-    priv->device = NULL;
-    priv->profile = NULL;
+    if(priv->device){
+        OnvifDevice__destroy(priv->device);
+        priv->device = NULL;
+    }
+
+    if(priv->profile){
+        OnvifProfile__destroy(priv->profile);
+        priv->profile = NULL;
+    }
 
     if (GTK_WIDGET_CLASS (OnvifMgrDeviceRow__parent_class)->destroy)
         (* GTK_WIDGET_CLASS (OnvifMgrDeviceRow__parent_class)->destroy) (object);
@@ -404,7 +409,7 @@ void OnvifMgrDeviceRow__set_profile(OnvifMgrDeviceRow * self, OnvifProfile * pro
 OnvifProfile * OnvifMgrDeviceRow__get_profile(OnvifMgrDeviceRow * self){
     g_return_val_if_fail (self != NULL, NULL);
     g_return_val_if_fail (ONVIFMGR_IS_DEVICEROW (self),NULL);
-    C_DEBUG("OnvifMgrDeviceRow__get_profile");
+    ONVIFMGR_DEVICEROW_DEBUG("%s OnvifMgrDeviceRow__get_profile",self);
     OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
     return priv->profile;
 }
@@ -418,7 +423,7 @@ gboolean OnvifMgrDeviceRow__is_selected(OnvifMgrDeviceRow * self){
 void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
     g_return_if_fail (self != NULL);
     g_return_if_fail (ONVIFMGR_IS_DEVICEROW (self));
-    C_TRACE("OnvifMgrDeviceRow__load_thumbnail");
+    ONVIFMGR_DEVICEROW_TRACE("%s OnvifMgrDeviceRow__load_thumbnail",self);
     GtkWidget *image = NULL;
     GError * error = NULL;
     OnvifSnapshot * snapshot = NULL;
@@ -430,8 +435,7 @@ void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
     
     OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
 
-    OnvifErrorTypes oerror = OnvifDevice__get_last_error(priv->device);
-    if(oerror == ONVIF_ERROR_NONE){
+    if(OnvifDevice__is_authenticated(priv->device)){
         OnvifMediaService * media_service = OnvifDevice__get_media_service(priv->device);
         snapshot = OnvifMediaService__getSnapshot(media_service,OnvifProfile__get_index(priv->profile));
         SoapFault * fault = SoapObject__get_fault(SOAP_OBJECT(snapshot));
@@ -448,11 +452,10 @@ void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
             default:
                 goto warning;
         }
-    } else if(oerror == ONVIF_ERROR_NOT_AUTHORIZED){
-        image = GtkStyledImage__new((unsigned char *)_binary_locked_icon_png_start,_binary_locked_icon_png_end - _binary_locked_icon_png_start, 40, 40, error);
     } else {
-        goto warning;
+        image = GtkStyledImage__new((unsigned char *)_binary_locked_icon_png_start,_binary_locked_icon_png_end - _binary_locked_icon_png_start, 40, 40, error);
     }
+    ONVIFMGR_DEVICEROW_TRACE("%s OnvifMgrDeviceRow__load_thumbnail - img created",self);
 
     //Check is device is still valid. (User performed scan before snapshot finished)
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
@@ -501,7 +504,7 @@ warning:
     if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
         gui_update_widget_image(image,priv->image_handle);
     } else {
-        C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
+        ONVIFMGR_DEVICEROW_TRAIL("%s OnvifMgrDeviceRow__load_thumbnail invalid device",self);
     }
     goto exit;
 
@@ -515,7 +518,7 @@ exit:
     if(snapshot)
         g_object_unref(snapshot);
 
-    C_TRACE("OnvifMgrDeviceRow__load_thumbnail done.");
+    ONVIFMGR_DEVICEROW_TRACE("%s OnvifMgrDeviceRow__load_thumbnail done",self);
 } 
 
 void OnvifMgrDeviceRow__set_thumbnail(OnvifMgrDeviceRow * self, GtkWidget * image){

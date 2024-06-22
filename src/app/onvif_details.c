@@ -9,18 +9,6 @@ typedef struct _OnvifDetails {
     OnvifMgrDeviceRow * selected_device;
 } OnvifDetails;
 
-void update_details_priv(OnvifDetails * self, OnvifMgrDeviceRow * device){
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device)){
-        C_TRAIL("update_details_priv - invalid device.");
-        return;
-    }
-
-    OnvifDevice * odev = OnvifMgrDeviceRow__get_device(device);
-    if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NOT_AUTHORIZED){
-        return;
-    }
-    gtk_spinner_start (GTK_SPINNER (self->details_loading_handle));
-}
 
 void OnvifDetails__hide_loading_cb(GtkWidget * widget, OnvifMgrDeviceRow * device, OnvifDetails * details){
     //Checking that the finished event is the current selected page before hiding the loading indicator (Another detail page is loading or loaded)

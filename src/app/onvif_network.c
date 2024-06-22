@@ -157,7 +157,7 @@ void OnvifNetworkPanel_update_details(OnvifNetworkPanel * self, OnvifMgrDeviceRo
     }
 
     OnvifDevice * odev = OnvifMgrDeviceRow__get_device(device);
-    if(OnvifDevice__get_last_error(odev) == ONVIF_ERROR_NOT_AUTHORIZED){
+    if(!OnvifDevice__is_authenticated(odev)){
         return;
     }
     
