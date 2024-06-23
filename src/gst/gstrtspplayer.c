@@ -33,6 +33,8 @@ typedef struct {
     //Keep location to used on retry
     char * location_set;
     char * location;
+    int valid_location;
+
     //Retry count
     int retry;
     //Playing or trying to play
@@ -205,7 +207,7 @@ void GstRtspPlayerPrivate__play(GstRtspPlayerPrivate* priv){
         g_object_set (G_OBJECT (priv->src), "location", priv->location, NULL);
     P_MUTEX_UNLOCK(priv->prop_lock);
 
-    C_DEBUG("RtspPlayer__play retry[%i] - playing[%i]\n",priv->retry,priv->playing);
+    C_DEBUG("RtspPlayer__play retry[%i] - playing[%i] %s\n",priv->retry,priv->playing, priv->location);
     priv->playing = 1;
 
     GstStateChangeReturn ret;
@@ -642,7 +644,7 @@ static void GstRtspPlayerPrivate__process_fallback(GstRtspPlayerPrivate * priv){
             priv->fallback = RTSP_FALLBACK_HOST;
             char * host_fallback = NULL;
             if(priv->host_fallback) host_fallback = URL__set_host(priv->location_set, priv->host_fallback);
-            if(host_fallback && strcmp(host_fallback,priv->location_set) != 0){
+            if(host_fallback && strcmp(host_fallback,priv->location_set) != 0 && strcmp(host_fallback,priv->location) != 0){
                 C_WARN("Attempting URL host correction : [%s] --> [%s]",priv->location_set, host_fallback);
                 free(priv->location);
                 priv->location = host_fallback;
@@ -655,7 +657,7 @@ static void GstRtspPlayerPrivate__process_fallback(GstRtspPlayerPrivate * priv){
             priv->fallback = RTSP_FALLBACK_PORT;
             char * port_fallback = NULL;
             if(priv->port_fallback) port_fallback = URL__set_port(priv->location_set, priv->port_fallback);
-            if(port_fallback && strcmp(port_fallback,priv->location_set) != 0){
+            if(port_fallback && strcmp(port_fallback,priv->location_set) != 0 && strcmp(port_fallback,priv->location) != 0){
                 C_WARN("Attempting URL port correction : [%s] --> [%s]",priv->location_set, port_fallback);
                 free(priv->location);
                 priv->location = port_fallback;
@@ -672,7 +674,7 @@ static void GstRtspPlayerPrivate__process_fallback(GstRtspPlayerPrivate * priv){
                 tmp_fallback = URL__set_port(priv->location_set, priv->port_fallback);
                 url_fallback = URL__set_host(tmp_fallback, priv->host_fallback);
             }
-            if(url_fallback && strcmp(url_fallback,priv->location_set) != 0){
+            if(url_fallback && strcmp(url_fallback,priv->location_set) != 0 && strcmp(url_fallback,priv->location) != 0){
                 C_WARN("Attempting root URL correction : [%s] --> [%s]",priv->location_set, url_fallback);
                 free(priv->location);
                 priv->location = url_fallback;
@@ -687,7 +689,8 @@ static void GstRtspPlayerPrivate__process_fallback(GstRtspPlayerPrivate * priv){
         default:
             //Do not retry after connection failure
             priv->playing = 0;
-            C_ERROR ("Failed to connect to %s", priv->location_set);
+            C_ERROR ("No more fallback option for %s", priv->location_set);
+            g_signal_emit (priv->owner, signals[ERROR], 0 /* details */);
             break;
     }
 }
@@ -716,25 +719,42 @@ GstRtspPlayerPrivate__error_msg (GstBus *bus, GstMessage *msg, GstRtspPlayerPriv
                 C_ERROR ("Error code : %d",err->code);
             }
             break;
+        case GST_RESOURCE_ERROR_READ:
+            if(!priv->valid_location && !strcmp(err->message,"Unhandled error")){
+                //Most likely invalid handshake response, like HTTP 400 - allow fallthrough into fallback logic
+                // __attribute__ ((fallthrough));
+            } else if(!strcmp(err->message,"Could not read from resource.")){
+                // We allow these errors to retry without fallback with less debug
+                // This may happen with unreliable network route
+                C_ERROR ("Error received from element [%d] %s: %s", err->code, GST_OBJECT_NAME (msg->src), err->message);
+                break;
+            } else {
+                // We allow other errors to retry without fallback with added debug
+                C_ERROR ("Error received from element [%d] %s: %s", err->code, GST_OBJECT_NAME (msg->src), err->message);
+                C_ERROR ("Debugging information: %s", debug_info ? debug_info : "none");
+                break;
+            }
         case GST_RESOURCE_ERROR_OPEN_READ:
         case GST_RESOURCE_ERROR_OPEN_WRITE:
         case GST_RESOURCE_ERROR_OPEN_READ_WRITE:
-            if(priv->port_fallback || priv->host_fallback){
+            /*
+                Fallback may be necessary when the camera is behind a load balancer changin the front facing IP/Port of the device
+                The camera will return its own address unaware of the loadbalancer.
+            */ 
+            C_ERROR ("Failed to connect to %s", priv->location);
+            if(!priv->valid_location && (priv->port_fallback || priv->host_fallback)){
                 fallback = 1;
                 GstRtspPlayerPrivate__process_fallback(priv);
-            } else {
-                C_ERROR ("Failed to connect to %s", priv->location_set);
             }
             break;
         case GST_RESOURCE_ERROR_NOT_AUTHORIZED:
         case GST_RESOURCE_ERROR_NOT_FOUND:
-            C_ERROR("Non-recoverable error encountered.");
+            C_ERROR("Non-recoverable error encountered. [%s]", priv->location);
             priv->playing = 0;
             __attribute__ ((fallthrough));
         default:
-            C_ERROR ("Error received from element %s: %s", GST_OBJECT_NAME (msg->src), err->message);
+            C_ERROR ("Error received from element [%d] %s: %s",err->code, GST_OBJECT_NAME (msg->src), err->message);
             C_ERROR ("Debugging information: %s", debug_info ? debug_info : "none");
-            C_ERROR ("Error code : %d",err->code);
     }
 
     g_clear_error (&err);
@@ -751,13 +771,15 @@ GstRtspPlayerPrivate__error_msg (GstBus *bus, GstMessage *msg, GstRtspPlayerPriv
         if(!fallback)
             priv->retry++;
         g_signal_emit (priv->owner, signals[RETRY], 0 /* details */);
-    } else if(priv->playing == 1) { //Ignoring error after the player requested to stop (gst_rtspsrc_try_send)
+    } else if(priv->playing == 1) {
+        C_TRACE("Player giving up. Too many retries...");
         priv->playing = 0;
         GstRtspPlayerPrivate__inner_stop(priv);
         P_MUTEX_UNLOCK(priv->player_lock);
         //Error signal
         g_signal_emit (priv->owner, signals[ERROR], 0 /* details */);
-    } else {
+    } else { //Ignoring error after the player requested to stop (gst_rtspsrc_try_send)
+        C_TRACE("Player no longer playing...");
         P_MUTEX_UNLOCK(priv->player_lock);
     }
 }
@@ -825,6 +847,7 @@ GstRtspPlayerPrivate__state_changed_msg (GstBus * bus, GstMessage * msg, GstRtsp
         * "select-stream" might be an alternative, although I don't know if the first stream could play before the last one is shown
         */
         priv->retry = 0;
+        priv->valid_location = 1;
         priv->fallback = RTSP_FALLBACK_NONE;
         g_signal_emit (priv->owner, signals[STARTED], 0 /* details */);
     }
@@ -983,6 +1006,7 @@ GstRtspPlayer__init (GstRtspPlayer * self)
     priv->location_set = NULL;
     priv->enable_backchannel = 1;
     priv->retry = 0;
+    priv->valid_location = 0;
     priv->view_mode = GST_RTSP_PLAYER_VIEW_MODE_FIT_WINDOW;
     priv->overlay_state = OverlayState__create();
     priv->canvas_handle = NULL;
@@ -1039,7 +1063,7 @@ void GstRtspPlayer__set_playback_url(GstRtspPlayer * self, char *url) {
     free(priv->pass);
     priv->pass = NULL;
     priv->user = NULL;
-
+    priv->valid_location = 0;
     P_MUTEX_UNLOCK(priv->prop_lock);
 }
 
