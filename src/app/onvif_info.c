@@ -221,9 +221,9 @@ void _update_details_page_cleanup(int cancelled, void * user_data){
 }
 
 void _update_details_page(void * user_data){
-    char * hostname = NULL;
+    OnvifDeviceHostnameInfo * hostname = NULL;
     OnvifDeviceInformation * dev_info = NULL;
-    OnvifInterfaces * interfaces = NULL;
+    OnvifDeviceInterfaces * interfaces = NULL;
     OnvifScopes * scopes = NULL;
 
     InfoDataUpdate * input = (InfoDataUpdate *) user_data;
@@ -237,9 +237,6 @@ void _update_details_page(void * user_data){
         goto exit;
     }
 
-    int ginfo_success = 0;
-    int gnetwork_success = 0;
-    int gscopes_success = 0;
     OnvifDevice * onvif_device = OnvifMgrDeviceRow__get_device(input->device);
     OnvifDeviceService * devserv = OnvifDevice__get_device_service(onvif_device);
 
@@ -248,87 +245,137 @@ void _update_details_page(void * user_data){
         goto exit;
 
     dev_info = OnvifDeviceService__getDeviceInformation(devserv);
-    if(OnvifDevice__get_last_error(onvif_device) == ONVIF_ERROR_NONE) ginfo_success = 1;
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
         goto exit;
 
     interfaces = OnvifDeviceService__getNetworkInterfaces(devserv);
-    if(OnvifDevice__get_last_error(onvif_device) == ONVIF_ERROR_NONE) gnetwork_success = 1;
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
         goto exit;
 
     scopes = OnvifDeviceService__getScopes(devserv);
-    if(OnvifDevice__get_last_error(onvif_device) == ONVIF_ERROR_NONE) gscopes_success = 1;
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
         goto exit;
 
+    //Initialize idle update data struct
     InfoGUIUpdate * gui_update = malloc(sizeof(InfoGUIUpdate));
     gui_update->info = input->info;
     gui_update->device = input->device;
     gui_update->mac_count = 0;
     gui_update->macs= malloc(0);
-    gui_update->hostname = hostname; //No need to copy since OnvifDevice__device_getHostname returns malloc pointer
 
-    if(gscopes_success){
-        gui_update->name = OnvifScopes__extract_scope(scopes,"name"); //No need to copy since extract_scope returns a malloc pointer
-        gui_update->location = OnvifScopes__extract_scope(scopes,"location");
-    } else {
-        gui_update->name = malloc(strlen(ONVIF_GET_SCOPES_ERROR)+1);
-        strcpy(gui_update->name,ONVIF_GET_SCOPES_ERROR);
-        gui_update->location = malloc(strlen(ONVIF_GET_SCOPES_ERROR)+1);
-        strcpy(gui_update->location,ONVIF_GET_SCOPES_ERROR);
+    //GetHostname fault handling
+    SoapFault * fault = SoapObject__get_fault(SOAP_OBJECT(hostname));
+    switch(*fault){
+        case SOAP_FAULT_NONE:
+            gui_update->hostname = malloc(strlen(OnvifDeviceHostnameInfo__get_name(hostname))+1);
+            strcpy(gui_update->hostname,OnvifDeviceHostnameInfo__get_name(hostname));
+            break;
+        case SOAP_FAULT_CONNECTION_ERROR:
+            gui_update->hostname = malloc(strlen("Error: Failed to connect...")+1);
+            strcpy(gui_update->hostname,"Error: Failed to connect...");
+            break;
+        case SOAP_FAULT_NOT_VALID:
+            gui_update->hostname = malloc(strlen("Error: Not a valid ONVIF response...")+1);
+            strcpy(gui_update->hostname,"Error: Not a valid ONVIF response...");
+            break;
+        case SOAP_FAULT_UNAUTHORIZED:
+            gui_update->hostname = malloc(strlen("Error: Unauthorized...")+1);
+            strcpy(gui_update->hostname,"Error: Unauthorized...");
+            break;
+        case SOAP_FAULT_ACTION_NOT_SUPPORTED:
+            gui_update->hostname = malloc(strlen("Error: Action Not Supported...")+1);
+            strcpy(gui_update->hostname,"Error: Action Not Supported...");
+            break;
+        case SOAP_FAULT_UNEXPECTED:
+        default:
+            gui_update->hostname = malloc(strlen(ONVIF_GET_HOSTNAME_ERROR)+1);
+            strcpy(gui_update->hostname,ONVIF_GET_HOSTNAME_ERROR);
+            break;
     }
 
-    if(ginfo_success){
-        gui_update->manufacturer = malloc(strlen(OnvifDeviceInformation__get_manufacturer(dev_info))+1);
-        strcpy(gui_update->manufacturer,OnvifDeviceInformation__get_manufacturer(dev_info));
+    //GetScopes fault handling
+    fault = SoapObject__get_fault(SOAP_OBJECT(scopes));
+    switch(*fault){
+        case SOAP_FAULT_NONE:
+            gui_update->name = OnvifScopes__extract_scope(scopes,"name"); //No need to copy since extract_scope returns a malloc pointer
+            gui_update->location = OnvifScopes__extract_scope(scopes,"location");
+            break;
+        case SOAP_FAULT_CONNECTION_ERROR:
+        case SOAP_FAULT_NOT_VALID:
+        case SOAP_FAULT_UNAUTHORIZED:
+        case SOAP_FAULT_ACTION_NOT_SUPPORTED:
+        case SOAP_FAULT_UNEXPECTED:
+        default:
+            gui_update->name = malloc(strlen(ONVIF_GET_SCOPES_ERROR)+1);
+            strcpy(gui_update->name,ONVIF_GET_SCOPES_ERROR);
+            gui_update->location = malloc(strlen(ONVIF_GET_SCOPES_ERROR)+1);
+            strcpy(gui_update->location,ONVIF_GET_SCOPES_ERROR);
+            break;
+    }
 
-        gui_update->model = malloc(strlen(OnvifDeviceInformation__get_model(dev_info))+1);
-        strcpy(gui_update->model,OnvifDeviceInformation__get_model(dev_info));
+    //getDeviceInformation fault handling
+    fault = SoapObject__get_fault(SOAP_OBJECT(dev_info));
+    switch(*fault){
+        case SOAP_FAULT_NONE:
+            gui_update->manufacturer = malloc(strlen(OnvifDeviceInformation__get_manufacturer(dev_info))+1);
+            strcpy(gui_update->manufacturer,OnvifDeviceInformation__get_manufacturer(dev_info));
 
-        gui_update->hardware = malloc(strlen(OnvifDeviceInformation__get_hardwareId(dev_info))+1);
-        strcpy(gui_update->hardware,OnvifDeviceInformation__get_hardwareId(dev_info));
+            gui_update->model = malloc(strlen(OnvifDeviceInformation__get_model(dev_info))+1);
+            strcpy(gui_update->model,OnvifDeviceInformation__get_model(dev_info));
 
-        gui_update->firmware = malloc(strlen(OnvifDeviceInformation__get_firmwareVersion(dev_info))+1);
-        strcpy(gui_update->firmware,OnvifDeviceInformation__get_firmwareVersion(dev_info));
+            gui_update->hardware = malloc(strlen(OnvifDeviceInformation__get_hardwareId(dev_info))+1);
+            strcpy(gui_update->hardware,OnvifDeviceInformation__get_hardwareId(dev_info));
 
-        gui_update->serial = malloc(strlen(OnvifDeviceInformation__get_serialNumber(dev_info))+1);
-        strcpy(gui_update->serial,OnvifDeviceInformation__get_serialNumber(dev_info));
-    } else {
-        gui_update->manufacturer = malloc(strlen(ONVIF_GET_INFO_ERROR)+1);
-        strcpy(gui_update->manufacturer,ONVIF_GET_INFO_ERROR);
-        gui_update->model = malloc(strlen(ONVIF_GET_INFO_ERROR)+1);
-        strcpy(gui_update->model,ONVIF_GET_INFO_ERROR);
-        gui_update->hardware = malloc(strlen(ONVIF_GET_INFO_ERROR)+1);
-        strcpy(gui_update->hardware,ONVIF_GET_INFO_ERROR);
-        gui_update->firmware = malloc(strlen(ONVIF_GET_INFO_ERROR)+1);
-        strcpy(gui_update->firmware,ONVIF_GET_INFO_ERROR);
-        gui_update->serial = malloc(strlen(ONVIF_GET_INFO_ERROR)+1);
-        strcpy(gui_update->serial,ONVIF_GET_INFO_ERROR);
+            gui_update->firmware = malloc(strlen(OnvifDeviceInformation__get_firmwareVersion(dev_info))+1);
+            strcpy(gui_update->firmware,OnvifDeviceInformation__get_firmwareVersion(dev_info));
+
+            gui_update->serial = malloc(strlen(OnvifDeviceInformation__get_serialNumber(dev_info))+1);
+            strcpy(gui_update->serial,OnvifDeviceInformation__get_serialNumber(dev_info));
+            break;
+        case SOAP_FAULT_CONNECTION_ERROR:
+        case SOAP_FAULT_NOT_VALID:
+        case SOAP_FAULT_UNAUTHORIZED:
+        case SOAP_FAULT_ACTION_NOT_SUPPORTED:
+        case SOAP_FAULT_UNEXPECTED:
+        default:
+            gui_update->manufacturer = malloc(strlen(ONVIF_GET_INFO_ERROR)+1);
+            strcpy(gui_update->manufacturer,ONVIF_GET_INFO_ERROR);
+            gui_update->model = malloc(strlen(ONVIF_GET_INFO_ERROR)+1);
+            strcpy(gui_update->model,ONVIF_GET_INFO_ERROR);
+            gui_update->hardware = malloc(strlen(ONVIF_GET_INFO_ERROR)+1);
+            strcpy(gui_update->hardware,ONVIF_GET_INFO_ERROR);
+            gui_update->firmware = malloc(strlen(ONVIF_GET_INFO_ERROR)+1);
+            strcpy(gui_update->firmware,ONVIF_GET_INFO_ERROR);
+            gui_update->serial = malloc(strlen(ONVIF_GET_INFO_ERROR)+1);
+            strcpy(gui_update->serial,ONVIF_GET_INFO_ERROR);
+            break;
     }
 
     gui_update->ip = OnvifDevice__get_host(onvif_device);
 
-    if(gnetwork_success){
-        for(int i=0;i<OnvifInterfaces__get_count(interfaces);i++){
-            OnvifInterface * interface = OnvifInterfaces__get_interface(interfaces,i);
-            if(OnvifInterface__is_ipv4_enabled(interface)){
-                for(int a=0;a<OnvifInterface__get_ipv4_manual_count(interface);a++){
-                    char * ip = OnvifInterface__get_ipv4_manual(interface)[a];
-                    if(!strcmp(ip,gui_update->ip)){
-                        gui_update->mac_count++;
-                        gui_update->macs = realloc(gui_update->macs,sizeof(char *) * gui_update->mac_count);
-                        gui_update->macs[gui_update->mac_count-1] = malloc(strlen(OnvifInterface__get_mac(interface))+1);
-                        strcpy(gui_update->macs[gui_update->mac_count-1],OnvifInterface__get_mac(interface));
-                    }
-                }
+    //getDeviceInterfaces fault handling
+    fault = SoapObject__get_fault(SOAP_OBJECT(interfaces));
+    switch(*fault){
+        case SOAP_FAULT_NONE:
+            for(int i=0;i<OnvifDeviceInterfaces__get_count(interfaces);i++){
+                OnvifDeviceInterface * interface = OnvifDeviceInterfaces__get_interface(interfaces,i);
+                gui_update->mac_count++;
+                gui_update->macs = realloc(gui_update->macs,sizeof(char *) * gui_update->mac_count);
+                gui_update->macs[gui_update->mac_count-1] = malloc(strlen(OnvifDeviceInterface__get_mac(interface))+1);
+                strcpy(gui_update->macs[gui_update->mac_count-1],OnvifDeviceInterface__get_mac(interface));
             }
-        }
-    } else {
-        gui_update->mac_count++;
-        gui_update->macs = realloc(gui_update->macs,sizeof(char *) * gui_update->mac_count);
-        gui_update->macs[gui_update->mac_count-1] = malloc(strlen(ONVIF_GET_NETWORK_ERROR)+1);
-        strcpy(gui_update->macs[gui_update->mac_count-1],ONVIF_GET_NETWORK_ERROR);
+            break;
+        case SOAP_FAULT_CONNECTION_ERROR:
+        case SOAP_FAULT_NOT_VALID:
+        case SOAP_FAULT_UNAUTHORIZED:
+        case SOAP_FAULT_ACTION_NOT_SUPPORTED:
+        case SOAP_FAULT_UNEXPECTED:
+        default:
+            gui_update->mac_count++;
+            gui_update->macs = realloc(gui_update->macs,sizeof(char *) * gui_update->mac_count);
+            gui_update->macs[gui_update->mac_count-1] = malloc(strlen(ONVIF_GET_NETWORK_ERROR)+1);
+            strcpy(gui_update->macs[gui_update->mac_count-1],ONVIF_GET_NETWORK_ERROR);
+            break;
     }
 
     gui_update->version = malloc(strlen("SomeName")+1);
@@ -338,9 +385,14 @@ void _update_details_page(void * user_data){
     g_object_ref(gui_update->device);
     gdk_threads_add_idle(G_SOURCE_FUNC(onvif_info_gui_update),gui_update);
 exit:
-    OnvifDeviceInformation__destroy(dev_info);
-    OnvifInterfaces__destroy(interfaces);
-    OnvifScopes__destroy(scopes);
+    if(hostname)
+        g_object_unref(hostname);
+    if(dev_info)
+        g_object_unref(dev_info);
+    if(interfaces)
+        g_object_unref(interfaces);
+    if(scopes)
+        g_object_unref(scopes);
 }
 
 void OnvifInfoPanel_update_details(OnvifInfoPanel * self, OnvifMgrDeviceRow * device){

@@ -1096,7 +1096,7 @@ FFMPEG_PKG=$SUBPROJECT_DIR/FFmpeg/dist/lib/pkgconfig
 GST_OMX_PKG_PATH=$SUBPROJECT_DIR/gstreamer/build_omx/dist/lib/gstreamer-1.0/pkgconfig
 GST_PKG_PATH=:$SUBPROJECT_DIR/gstreamer/build/dist/lib/pkgconfig:$SUBPROJECT_DIR/gstreamer/build/dist/lib/gstreamer-1.0/pkgconfig
 gst_ret=0
-GSTREAMER_LATEST=1.24.3
+GSTREAMER_LATEST=1.24.5
 if [ $ENABLE_LATEST == 0 ]; then
   GSTREAMER_VERSION=1.14.4
 else

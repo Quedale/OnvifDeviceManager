@@ -336,21 +336,33 @@ void _onvif_device_add(void * user_data){
             //Extract scope
             devserv = OnvifDevice__get_device_service(onvif_dev);
             scopes = OnvifDeviceService__getScopes(devserv);
+            fault = *SoapObject__get_fault(SOAP_OBJECT(scopes));
+            switch(fault){
+                case SOAP_FAULT_NONE:
+                    name = OnvifScopes__extract_scope(scopes,"name");
+                    hardware = OnvifScopes__extract_scope(scopes,"hardware");
+                    location = OnvifScopes__extract_scope(scopes,"location");
 
-            name = OnvifScopes__extract_scope(scopes,"name");
-            hardware = OnvifScopes__extract_scope(scopes,"hardware");
-            location = OnvifScopes__extract_scope(scopes,"location");
+                    omgr_device = OnvifMgrDeviceRow__new(ONVIFMGR_APP(event->user_data), onvif_dev,name,hardware,location);
+                    
+                    gdk_threads_add_idle(G_SOURCE_FUNC(idle_add_device),omgr_device);
 
-            omgr_device = OnvifMgrDeviceRow__new(ONVIFMGR_APP(event->user_data), onvif_dev,name,hardware,location);
-            
-            gdk_threads_add_idle(G_SOURCE_FUNC(idle_add_device),omgr_device);
-
-            free(name);
-            free(hardware);
-            free(location);
+                    free(name);
+                    free(hardware);
+                    free(location);
+                    break;
+                case SOAP_FAULT_ACTION_NOT_SUPPORTED:
+                case SOAP_FAULT_CONNECTION_ERROR:
+                case SOAP_FAULT_NOT_VALID:
+                case SOAP_FAULT_UNAUTHORIZED:
+                case SOAP_FAULT_UNEXPECTED:
+                default:
+                    AddDeviceDialog__set_error(dialog,"Failed to retrieve Device Scopes...");
+                    g_object_unref(scopes);
+                    goto exit;
+            }
             //TODO Save manually added camera to settings
-
-            OnvifScopes__destroy(scopes);
+            g_object_unref(scopes);
             break;
         case SOAP_FAULT_CONNECTION_ERROR:
             AddDeviceDialog__set_error(dialog,"Failed to connect...");
