@@ -6,6 +6,7 @@
 #define ONVIF_GET_SCOPES_ERROR "Error retreiving scopes"
 #define ONVIF_GET_INFO_ERROR "Error retrieving device information."
 #define ONVIF_GET_NETWORK_ERROR "Error retreiving network details."
+#define ONVIF_GET_DEVICE_CAPS_ERROR "Error retreiving device capabilities."
 
 enum {
     STARTED,
@@ -225,6 +226,7 @@ void _update_details_page(void * user_data){
     OnvifDeviceInformation * dev_info = NULL;
     OnvifDeviceInterfaces * interfaces = NULL;
     OnvifScopes * scopes = NULL;
+    OnvifCapabilities* caps = NULL;
 
     InfoDataUpdate * input = (InfoDataUpdate *) user_data;
 
@@ -253,6 +255,10 @@ void _update_details_page(void * user_data){
         goto exit;
 
     scopes = OnvifDeviceService__getScopes(devserv);
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
+        goto exit;
+
+    caps = OnvifDeviceService__getCapabilities(devserv);
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
         goto exit;
 
@@ -377,9 +383,26 @@ void _update_details_page(void * user_data){
             strcpy(gui_update->macs[gui_update->mac_count-1],ONVIF_GET_NETWORK_ERROR);
             break;
     }
-
-    gui_update->version = malloc(strlen("SomeName")+1);
-    strcpy(gui_update->version,"SomeName");
+    
+    OnvifSystemCapabilities * sys_caps = NULL;
+    //GetCapabilities fault handling
+    fault = SoapObject__get_fault(SOAP_OBJECT(caps));
+    switch(*fault){
+        case SOAP_FAULT_NONE:
+            sys_caps = OnvifDeviceCapabilities__get_system(OnvifCapabilities__get_device(caps));
+            gui_update->version = malloc(6);
+            sprintf(gui_update->version, "%d.%02d", OnvifSystemCapabilities__get_majorVersion(sys_caps),OnvifSystemCapabilities__get_minorVersion(sys_caps));
+            break;
+        case SOAP_FAULT_CONNECTION_ERROR:
+        case SOAP_FAULT_NOT_VALID:
+        case SOAP_FAULT_UNAUTHORIZED:
+        case SOAP_FAULT_ACTION_NOT_SUPPORTED:
+        case SOAP_FAULT_UNEXPECTED:
+        default:
+            gui_update->version = malloc(strlen(ONVIF_GET_DEVICE_CAPS_ERROR)+1);
+            strcpy(gui_update->version,ONVIF_GET_DEVICE_CAPS_ERROR);
+            break;
+    }
 
     gui_update->uri = OnvifDeviceService__get_endpoint(devserv);
     g_object_ref(gui_update->device);
@@ -393,6 +416,8 @@ exit:
         g_object_unref(interfaces);
     if(scopes)
         g_object_unref(scopes);
+    if(caps)
+        g_object_unref(caps);
 }
 
 void OnvifInfoPanel_update_details(OnvifInfoPanel * self, OnvifMgrDeviceRow * device){
