@@ -20,6 +20,11 @@ typedef struct {
     GstElement *src;  /* RtspSrc to support backchannel */
     GstElement *sink;  /* Video Sink */
     GstElement *snapsink;
+
+    //Reusable bins containing encoder and sink
+    GstElement * video_bin;
+    GstElement * audio_bin;
+    
     GList * dynamic_elements;
     GstCaps * sinkcaps; /* reference to extract native stream dimension */
     GstRtspPlayerFallbackType fallback;
@@ -121,6 +126,15 @@ GstRtspPlayer__dispose (GObject *gobject)
     P_MUTEX_CLEANUP(priv->prop_lock);
     P_MUTEX_CLEANUP(priv->player_lock);
 
+    if(priv->video_bin){
+        g_object_unref(priv->video_bin);
+        priv->video_bin = NULL;
+    }
+
+    if(priv->audio_bin){
+        g_object_unref(priv->audio_bin);
+        priv->audio_bin = NULL;
+    }
     /* Always chain up to the parent class; there is no need to check if
     * the parent class implements the dispose() virtual function: it is
     * always guaranteed to do so
@@ -252,7 +266,7 @@ on_decoder_pad_added (GstElement *element, GstPad *new_pad, gpointer data){
     GstPad *sinkpad;
     GstPadLinkReturn ret;
     GstElement *decoder = (GstElement *) data;
-
+    C_TRACE("on_decoder_pad_added '%s' to '%s'",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(decoder));
     // GstCaps * pad_caps = gst_pad_get_current_caps(new_pad);
     // gchar * caps_str = gst_caps_serialize(pad_caps,0);
     // printf("on_pad_added caps_str : %s\n",caps_str);
@@ -262,7 +276,9 @@ on_decoder_pad_added (GstElement *element, GstPad *new_pad, gpointer data){
     ret = gst_pad_link (new_pad, sinkpad);
 
     if (GST_PAD_LINK_FAILED (ret)) {
-        g_print("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(decoder));
+        C_ERROR("failed to link dynamically '%s' to '%s'",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(decoder));
+    } else {
+        C_TRACE("on_decoder_pad_added linked '%s' to '%s'",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(decoder));
     }
 
     gst_object_unref (sinkpad);
@@ -279,8 +295,8 @@ GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
     GstPad *pad, *ghostpad;
 
     video_bin = gst_bin_new("video_bin");
-    vdecoder = gst_element_factory_make ("decodebin3", NULL);
-    videoconvert = gst_element_factory_make ("videoconvert", NULL);
+    vdecoder = gst_element_factory_make ("decodebin3", "video_decodebin");
+    videoconvert = gst_element_factory_make ("videoconvert", "videoconverter");
     overlay_comp = gst_element_factory_make ("overlaycomposition", NULL);
     priv->sink = gst_element_factory_make ("glsinkbin", "glsinkbin");
     priv->snapsink = gst_element_factory_make ("gtkglsink", "gtkglsink");
@@ -370,8 +386,8 @@ GstRtspPlayerPrivate__create_audio_pad(){
     GstElement *decoder, *convert, *level, *sink, *audio_bin;
 
     audio_bin = gst_bin_new("audiobin");
-    decoder = gst_element_factory_make ("decodebin3", NULL);
-    convert = gst_element_factory_make ("audioconvert", NULL);
+    decoder = gst_element_factory_make ("decodebin3", "audio_decodebin");
+    convert = gst_element_factory_make ("audioconvert", "audioconverter");
     level = gst_element_factory_make("level",NULL);
     sink = gst_element_factory_make ("autoaudiosink", NULL);
     g_object_set (G_OBJECT (sink), "sync", FALSE, NULL);
@@ -428,27 +444,27 @@ struct create_video_data{
     int done;
 };
 
-void GstRtspPlayerPrivate__gui_create_video_pad(void * user_data){
+void GstRtspPlayerPrivate__idle_attach_video_pad(void * user_data){
     struct create_video_data * data = (struct create_video_data *) user_data;
     GstPad *sink_pad;
 
-    GstElement * video_bin = GstRtspPlayerPrivate__create_video_pad(data->priv);
+    gst_bin_add_many (GST_BIN (data->priv->pipeline), data->priv->video_bin, NULL);
 
-    gst_bin_add_many (GST_BIN (data->priv->pipeline), video_bin, NULL);
-
-    sink_pad = gst_element_get_static_pad (video_bin, "bin_sink");
+    C_TRACE("GstRtspPlayerPrivate__idle_attach_video_pad");
+    sink_pad = gst_element_get_static_pad (data->priv->video_bin, "bin_sink");
 
     GstPadLinkReturn pad_ret = gst_pad_link (data->new_pad, sink_pad);
     if (GST_PAD_LINK_FAILED (pad_ret)) {
-        C_ERROR ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(data->element),GST_ELEMENT_NAME(video_bin));
+        C_ERROR ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(data->element),GST_ELEMENT_NAME(data->priv->video_bin));
         //TODO Show error on canvas
         goto exit;
     }
-    data->priv->dynamic_elements = g_list_append(data->priv->dynamic_elements, video_bin);
-    gst_element_sync_state_with_parent(video_bin);
+    data->priv->dynamic_elements = g_list_append(data->priv->dynamic_elements, data->priv->video_bin);
+    gst_element_sync_state_with_parent(data->priv->video_bin);
 
 exit:
     data->done = 1;
+    C_TRACE("GstRtspPlayerPrivate__idle_attach_video_pad - done");
     P_COND_BROADCAST(data->cond);
 }
 
@@ -472,6 +488,10 @@ GstRtspPlayerPrivate__on_rtsp_pad_added (GstElement *element, GstPad *new_pad, G
 
     //TODO perform stream selection by stream codec not payload
     if (g_strrstr(capsName, "video")){
+        /*
+            gtkglsink requires to be attached on the main thread
+            pad_added is called by the streaming thread, so we sync with the main thread to attach it
+        */
         struct create_video_data data;
         data.priv = priv;
         data.new_pad = new_pad;
@@ -480,39 +500,25 @@ GstRtspPlayerPrivate__on_rtsp_pad_added (GstElement *element, GstPad *new_pad, G
         P_COND_SETUP(data.cond);
         P_MUTEX_SETUP(data.lock);
 
-        gdk_threads_add_idle(G_SOURCE_FUNC(GstRtspPlayerPrivate__gui_create_video_pad),&data);
+        C_TRACE("dispatch idle_attach_video_pad");
+        gdk_threads_add_idle(G_SOURCE_FUNC(GstRtspPlayerPrivate__idle_attach_video_pad),&data);
         
-        if(!data.done) P_COND_WAIT(data.cond, data.lock);
+        if(!data.done) { C_TRACE("wait idle_attach_video_pad"); P_COND_WAIT(data.cond, data.lock); }
         P_COND_CLEANUP(data.cond);
         P_MUTEX_CLEANUP(data.lock);
 
-        // GstElement * video_bin = GstRtspPlayerPrivate__create_video_pad(priv);
-
-        // gst_bin_add_many (GST_BIN (priv->pipeline), video_bin, NULL);
-
-        // sink_pad = gst_element_get_static_pad (video_bin, "bin_sink");
-
-        // pad_ret = gst_pad_link (new_pad, sink_pad);
-        // if (GST_PAD_LINK_FAILED (pad_ret)) {
-        //     C_ERROR ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(video_bin));
-        //     //TODO Show error on canvas
-        //     goto exit;
-        // }
-        // priv->dynamic_elements = g_list_append(priv->dynamic_elements, video_bin);
-        // gst_element_sync_state_with_parent(video_bin);
     } else if (g_strrstr(capsName,"audio")){
-        GstElement * audio_bin = GstRtspPlayerPrivate__create_audio_pad();
 
-        gst_bin_add_many (GST_BIN (priv->pipeline), audio_bin, NULL);
+        gst_bin_add_many (GST_BIN (priv->pipeline), priv->audio_bin, NULL);
 
-        sink_pad = gst_element_get_static_pad (audio_bin, "bin_sink");
+        sink_pad = gst_element_get_static_pad (priv->audio_bin, "bin_sink");
         pad_ret = gst_pad_link (new_pad, sink_pad);
         if (GST_PAD_LINK_FAILED (pad_ret)) {
-            C_ERROR ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(audio_bin));
+            C_ERROR ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(priv->audio_bin));
             goto exit;
         }
-        priv->dynamic_elements = g_list_append(priv->dynamic_elements, audio_bin);
-        gst_element_sync_state_with_parent(audio_bin);
+        priv->dynamic_elements = g_list_append(priv->dynamic_elements, priv->audio_bin);
+        gst_element_sync_state_with_parent(priv->audio_bin);
     } else {
         new_pad_struct = gst_caps_get_structure (new_pad_caps, 0);
         gint payload_v;
@@ -521,6 +527,7 @@ GstRtspPlayerPrivate__on_rtsp_pad_added (GstElement *element, GstPad *new_pad, G
     }
 
 exit:
+    C_DEBUG ("Received new pad attached");
     free(capsName);
     /* Unreference the new pad's caps, if we got them */
     if (new_pad_caps)
@@ -638,7 +645,7 @@ GstRtspPlayerPrivate__warning_msg (GstBus *bus, GstMessage *msg) {
     g_free (debug_info);
 }
 
-static void GstRtspPlayerPrivate__process_fallback(GstRtspPlayerPrivate * priv){
+static int GstRtspPlayerPrivate__process_fallback(GstRtspPlayerPrivate * priv){
     switch(priv->fallback){
         case RTSP_FALLBACK_NONE:
             priv->fallback = RTSP_FALLBACK_HOST;
@@ -688,11 +695,12 @@ static void GstRtspPlayerPrivate__process_fallback(GstRtspPlayerPrivate * priv){
         case RTSP_FALLBACK_URL:
         default:
             //Do not retry after connection failure
-            priv->playing = 0;
-            C_ERROR ("No more fallback option for %s", priv->location_set);
-            g_signal_emit (priv->owner, signals[ERROR], 0 /* details */);
-            break;
+            // priv->playing = 0;
+            // C_ERROR ("No more fallback option for %s", priv->location_set);
+            // g_signal_emit (priv->owner, signals[ERROR], 0 /* details */);
+            return 0;
     }
+    return 1;
 }
 
 /* This function is called when an error message is posted on the bus */
@@ -743,8 +751,7 @@ GstRtspPlayerPrivate__error_msg (GstBus *bus, GstMessage *msg, GstRtspPlayerPriv
             */ 
             C_ERROR ("Failed to connect to %s", priv->location);
             if(!priv->valid_location && (priv->port_fallback || priv->host_fallback)){
-                fallback = 1;
-                GstRtspPlayerPrivate__process_fallback(priv);
+                fallback = GstRtspPlayerPrivate__process_fallback(priv);
             }
             break;
         case GST_RESOURCE_ERROR_NOT_AUTHORIZED:
@@ -1009,7 +1016,7 @@ GstRtspPlayer__init (GstRtspPlayer * self)
     priv->valid_location = 0;
     priv->view_mode = GST_RTSP_PLAYER_VIEW_MODE_FIT_WINDOW;
     priv->overlay_state = OverlayState__create();
-    priv->canvas_handle = NULL;
+    priv->canvas_handle = gtk_grid_new ();
     priv->canvas = NULL;
     priv->dynamic_elements = NULL;
     priv->sink = NULL;
@@ -1017,7 +1024,10 @@ GstRtspPlayer__init (GstRtspPlayer * self)
     priv->fallback = RTSP_FALLBACK_NONE;
     priv->playing = 0;
     priv->sinkcaps = NULL;
-
+    priv->video_bin = GstRtspPlayerPrivate__create_video_pad(priv);
+    g_object_ref(priv->video_bin);
+    priv->audio_bin = GstRtspPlayerPrivate__create_audio_pad();
+    g_object_ref(priv->audio_bin);
     P_MUTEX_SETUP(priv->prop_lock);
     P_MUTEX_SETUP(priv->player_lock);
 
@@ -1107,8 +1117,6 @@ GtkWidget * GstRtspPlayer__createCanvas(GstRtspPlayer *self){
     g_return_val_if_fail (GST_IS_RTSPPLAYER (self), NULL);
     
     GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
-
-    priv->canvas_handle = gtk_grid_new ();
 
     GtkWidget * scroll = gtk_scrolled_window_new(NULL,NULL);
     gtk_container_add(GTK_CONTAINER(scroll),priv->canvas_handle);
