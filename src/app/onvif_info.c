@@ -404,7 +404,7 @@ void _update_details_page(void * user_data){
             break;
     }
 
-    gui_update->uri = OnvifDeviceService__get_endpoint(devserv);
+    gui_update->uri = OnvifBaseService__get_endpoint(ONVIF_BASE_SERVICE(devserv));
     g_object_ref(gui_update->device);
     gdk_threads_add_idle(G_SOURCE_FUNC(onvif_info_gui_update),gui_update);
 exit:

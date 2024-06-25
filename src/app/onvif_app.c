@@ -723,7 +723,7 @@ static int OnvifApp__device_already_exist(OnvifApp * app, char * xaddr){
     GLIST_FOREACH(device, childs) {
         OnvifDevice * odev = OnvifMgrDeviceRow__get_device(device);
         OnvifDeviceService * devserv = OnvifDevice__get_device_service(odev);
-        char * endpoint = OnvifDeviceService__get_endpoint(devserv);
+        char * endpoint = OnvifBaseService__get_endpoint(ONVIF_BASE_SERVICE(devserv));
         if(!strcmp(xaddr,endpoint)){
             C_DEBUG("Record already part of list [%s]\n",endpoint);
             ret = 1;
