@@ -6,7 +6,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 #include <gtk/gtk.h>
-#include "onvif_media_profile.h"
+#include "media/onvif_media_profile.h"
 
 G_BEGIN_DECLS
 
