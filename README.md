@@ -56,6 +56,7 @@ cd OnvifDeviceManager
 autogen.sh will attempt download and build missing dependencies.   
 **[Mandatory]** The following package dependencies are mandatory and are not yet automatically built:
 ```
+sudo apt install git
 sudo apt install make
 sudo apt install bison 
 sudo apt install flex 
