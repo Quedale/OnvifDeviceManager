@@ -212,12 +212,6 @@ buildMakeProject(){
   local "${@}"
 
   build_start=$SECONDS
-  if [ $SKIP -eq 1 ]; then
-      printf "${ORANGE}*****************************\n${NC}"
-      printf "${ORANGE}*** Skipping Make ${srcdir} ***\n${NC}"
-      printf "${ORANGE}*****************************\n${NC}"
-      return
-  fi
 
   printf "${ORANGE}*****************************\n${NC}"
   printf "${ORANGE}* Building Project ***\n${NC}"
