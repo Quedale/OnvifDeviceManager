@@ -750,8 +750,11 @@ GstRtspPlayerPrivate__error_msg (GstBus *bus, GstMessage *msg, GstRtspPlayerPriv
                 The camera will return its own address unaware of the loadbalancer.
             */ 
             C_ERROR ("Failed to connect to %s", priv->location);
-            if(!priv->valid_location && (priv->port_fallback || priv->host_fallback)){
+            if(priv->retry >=3 && !priv->valid_location && (priv->port_fallback || priv->host_fallback)){
                 fallback = GstRtspPlayerPrivate__process_fallback(priv);
+                if(fallback){
+                    priv->retry = 0;
+                }
             }
             break;
         case GST_RESOURCE_ERROR_NOT_AUTHORIZED:
