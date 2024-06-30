@@ -394,6 +394,12 @@ void OnvifMgrDeviceRow__set_profile(OnvifMgrDeviceRow * self, OnvifProfile * pro
     g_return_if_fail (ONVIFMGR_IS_DEVICEROW (self));
     OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
 
+    if(!profile){
+        OnvifProfile__destroy(priv->profile);
+        priv->profile = NULL;
+        return;
+    }
+
     if(OnvifProfile__equals(priv->profile,profile)){
         return;
     }

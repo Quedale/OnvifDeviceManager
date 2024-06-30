@@ -1,5 +1,10 @@
 #!/bin/bash
-SKIP=0
+ENABLE_LATEST=0   #Force using latest gstreamer build and static link.    enabled using --enable-latest
+ENABLE_LIBAV=0    #Enables building and linking Gstreamer libav plugin.   enabled using --enable-libav
+ENABLE_NVCODEC=0  #Enables building and linking Gstreamer nvidia pluging. enabled using --enable-nvcodec
+ENABLE_DEBUG=1    #Disables debug build flag.                                   disabled using --no-debug
+
+
 #Save current working directory to run configure in
 WORK_DIR=$(pwd)
 
@@ -16,12 +21,6 @@ MESON_TOOL=meson
 #Failure marker
 FAILED=0
 
-ENABLE_LATEST=0
-ENABLE_LIBAV=0
-ENABLE_NVCODEC=0
-ENABLE_FULL_DEBUG=0
-ENABLE_DEBUG=0
-
 i=1;
 
 for arg in "$@" 
@@ -33,13 +32,8 @@ do
     elif [ "$arg" == "--enable-latest" ]; then
         ENABLE_LATEST=1
         set -- "$@" "$arg"
-    elif [ "$arg" == "--full-debug" ]; then
-        ENABLE_FULL_DEBUG=1
-        ENABLE_DEBUG=1
-        set -- "$@" "--enable-debug=yes"
-    elif [ "$arg" == "--debug" ]; then
-        ENABLE_DEBUG=1
-        set -- "$@" "--enable-debug=yes"
+    elif [ "$arg" == "--no-debug" ]; then
+        ENABLE_DEBUG=0
     elif [ "$arg" == "--enable-nvcodec=yes" ] || [ "$arg" == "--enable-nvcodec=true" ] || [ "$arg" == "--enable-nvcodec" ]; then
         ENABLE_NVCODEC=1
         set -- "$@" "$arg"
@@ -49,6 +43,10 @@ do
     i=$((i + 1));
 done
 
+#Set debug flag on current project
+if [ $ENABLE_DEBUG -eq 1 ]; then
+  set -- "$@" "--enable-debug=yes"
+fi
 
 # Define color code constants
 ORANGE='\033[0;33m'
@@ -85,14 +83,6 @@ function displaytime {
 downloadAndExtract (){
   local path file # reset first
   local "${@}"
-
-  if [ $SKIP -eq 1 ]
-  then
-      printf "${ORANGE}*****************************\n${NC}"
-      printf "${ORANGE}*** Skipping Download ${path} ***\n${NC}"
-      printf "${ORANGE}*****************************\n${NC}"
-      return
-  fi
 
   dest_val=""
   if [ ! -z "$SRC_CACHE_DIR" ]; then
@@ -140,14 +130,6 @@ downloadAndExtract (){
 pullOrClone (){
   local path tag depth recurse ignorecache # reset first
   local "${@}"
-
-  if [ $SKIP -eq 1 ]
-  then
-      printf "${ORANGE}*****************************\n${NC}"
-      printf "${ORANGE}*** Skipping Pull/Clone ${tag}@${path} ***\n${NC}"
-      printf "${ORANGE}*****************************\n${NC}"
-      return
-  fi
 
   recursestr=""
   if [ ! -z "${recurse}" ] 
@@ -439,13 +421,6 @@ buildMesonProject() {
   local "${@}"
 
   build_start=$SECONDS
-  if [ $SKIP -eq 1 ]
-  then
-      printf "${ORANGE}*****************************\n${NC}"
-      printf "${ORANGE}*** Skipping Meson ${srcdir} ***\n${NC}"
-      printf "${ORANGE}*****************************\n${NC}"
-      return
-  fi
 
   printf "${ORANGE}*****************************\n${NC}"
   printf "${ORANGE}* Building Github Project ***\n${NC}"
@@ -871,9 +846,10 @@ fi
 #    Build gSoap
 #       
 ################################################################
+gsoap_version=2.8.134
 GSOAP_PKG=$SUBPROJECT_DIR/gsoap-2.8/build/dist/lib/pkgconfig
 PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$GSOAP_PKG \
-pkg-config --exists --print-errors "gsoap >= 2.8.123"
+pkg-config --exists --print-errors "gsoap >= $gsoap_version"
 ret=$?
 if [ $ret != 0 ]; then 
 
@@ -915,7 +891,8 @@ if [ $ret != 0 ]; then
   fi
 
   echo "gSoap Include Path : $inc_path"
-  downloadAndExtract file="gsoap.zip" path="https://sourceforge.net/projects/gsoap2/files/gsoap_2.8.133.zip/download"
+  rm -rf $SUBPROJECT_DIR/gsoap-2.8/ #Make sure we dont extract over an old version
+  downloadAndExtract file="gsoap_$gsoap_version.zip" path="https://sourceforge.net/projects/gsoap2/files/gsoap_$gsoap_version.zip/download"
   if [ $FAILED -eq 1 ]; then exit 1; fi
   PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG:$ZLIB_PKG \
   C_INCLUDE_PATH="$inc_path" \

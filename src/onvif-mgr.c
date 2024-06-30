@@ -8,7 +8,8 @@
 #include <signal.h>
 #include "clogger.h"
 
-void handler(int sig) {
+static void handler(int sig, siginfo_t *dont_care, void *dont_care_either)
+{
   void *array[10];
   size_t size;
 
@@ -21,11 +22,34 @@ void handler(int sig) {
   exit(1);
 }
 
-int main(int argc, char *argv[]) {
-  signal(SIGSEGV, handler);   // install our handler
 
-  // make OpenSSL MT-safe with mutex
-  // CRYPTO_thread_setup();
+void handler_signal(int sig) {
+  void *array[10];
+  size_t size;
+  // struct sigaction sigIntHandler;
+  // get void*'s for all entries on the stack
+  size = backtrace(array, 10);
+
+  // print out all the frames to stderr
+  fprintf(stderr, "Error: signal %d:\n", sig);
+  backtrace_symbols_fd(array, size, STDERR_FILENO);
+  exit(1);
+}
+
+int main(int argc, char *argv[]) {
+  /*
+    Debugging handlers
+   */
+  struct sigaction sa;
+
+  memset(&sa, 0, sizeof(struct sigaction));
+  sigemptyset(&sa.sa_mask);
+
+  sa.sa_flags     = SA_NODEFER;
+  sa.sa_sigaction = handler;
+
+  sigaction(SIGSEGV, &sa, NULL);
+  signal(SIGSEGV, handler_signal);  
   
   c_log_set_level(C_ALL_E);
   c_log_set_thread_color(ANSI_COLOR_DRK_GREEN, P_THREAD_ID);
