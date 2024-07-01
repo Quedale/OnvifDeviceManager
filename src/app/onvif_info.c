@@ -367,8 +367,14 @@ void _update_details_page(void * user_data){
                 OnvifDeviceInterface * interface = OnvifDeviceInterfaces__get_interface(interfaces,i);
                 gui_update->mac_count++;
                 gui_update->macs = realloc(gui_update->macs,sizeof(char *) * gui_update->mac_count);
-                gui_update->macs[gui_update->mac_count-1] = malloc(strlen(OnvifDeviceInterface__get_mac(interface))+1);
-                strcpy(gui_update->macs[gui_update->mac_count-1],OnvifDeviceInterface__get_mac(interface));
+                if(OnvifDeviceInterface__get_mac(interface)){
+                    gui_update->macs[gui_update->mac_count-1] = malloc(strlen(OnvifDeviceInterface__get_mac(interface))+1);
+                    strcpy(gui_update->macs[gui_update->mac_count-1],OnvifDeviceInterface__get_mac(interface));
+                } else {
+                    gui_update->macs[gui_update->mac_count-1] = malloc(strlen("MAC Address not defined.")+1);
+                    strcpy(gui_update->macs[gui_update->mac_count-1],"MAC Address not defined.");
+                }
+
             }
             break;
         case SOAP_FAULT_CONNECTION_ERROR:
