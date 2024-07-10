@@ -41,9 +41,9 @@ onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c \
 					$(top_srcdir)/src/app/omgr_device_row.c \
 					$(top_srcdir)/src/app/onvif_app_shutdown.c \
 					$(top_srcdir)/src/app/onvif_app.c \
-					$(top_srcdir)/src/app/onvif_details.c \
-					$(top_srcdir)/src/app/onvif_info.c \
-					$(top_srcdir)/src/app/onvif_network.c \
+					$(top_srcdir)/src/app/details/onvif_details.c \
+					$(top_srcdir)/src/app/details/onvif_info.c \
+					$(top_srcdir)/src/app/details/onvif_network.c \
 					$(top_srcdir)/src/app/onvif_nvt.c \
 					$(top_srcdir)/src/app/task_manager.c \
 					$(top_srcdir)/src/app/dialog/add_device.c \

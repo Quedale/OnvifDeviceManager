@@ -3,7 +3,7 @@
 #include "dialog/credentials_input.h"
 #include "dialog/add_device.h"
 #include "dialog/profiles_dialog.h"
-#include "onvif_details.h"
+#include "details/onvif_details.h"
 #include "onvif_nvt.h"
 #include "settings/app_settings.h"
 #include "task_manager.h"

@@ -1,8 +1,8 @@
 #ifndef ONVIF_INFO_DETAILS_H_ 
 #define ONVIF_INFO_DETAILS_H_
 
-#include "onvif_app.h"
-#include "omgr_device_row.h"
+#include "../onvif_app.h"
+#include "../omgr_device_row.h"
 
 G_BEGIN_DECLS
 

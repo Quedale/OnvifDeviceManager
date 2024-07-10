@@ -2,8 +2,8 @@
 #define ONVIF_NETWORK_H_
 
 #include <gtk/gtk.h>
-#include "onvif_app.h"
-#include "omgr_device_row.h"
+#include "../onvif_app.h"
+#include "../omgr_device_row.h"
 
 
 G_BEGIN_DECLS

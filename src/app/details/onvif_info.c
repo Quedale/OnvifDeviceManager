@@ -1,5 +1,5 @@
 #include "onvif_info.h"
-#include "gui_utils.h"
+#include "../gui_utils.h"
 #include "clogger.h"
 
 #define ONVIF_GET_HOSTNAME_ERROR "Error retrieving hostname"
@@ -68,7 +68,7 @@ typedef struct {
 
 G_DEFINE_TYPE_WITH_PRIVATE(OnvifInfoPanel, OnvifInfoPanel_, GTK_TYPE_SCROLLED_WINDOW)
 
-void OnvifInfoPanel_update_details(OnvifInfoPanel * self, OnvifMgrDeviceRow * device);
+void OnvifInfoPanel_update_details(OnvifInfoPanel * self);
 void OnvifInfoPanel_clear_details(OnvifInfoPanel * self);
 
 void OnvifInfoPanel__create_ui(OnvifInfoPanel * self){
@@ -111,7 +111,7 @@ void OnvifInfoPanel__device_changed_cb(OnvifApp * app, OnvifMgrDeviceRow * devic
     priv->device = device;
     OnvifInfoPanel_clear_details(info);
     if(gtk_widget_get_mapped(GTK_WIDGET(info)) && ONVIFMGR_IS_DEVICEROW(device) && OnvifMgrDeviceRow__is_initialized(device)){
-        OnvifInfoPanel_update_details(info,priv->device);
+        OnvifInfoPanel_update_details(info);
     }
 }
 
@@ -119,7 +119,7 @@ void OnvifInfoPanel__map_event_cb (GtkWidget* self, OnvifInfoPanel * info){
     OnvifInfoPanelPrivate *priv = OnvifInfoPanel__get_instance_private (info);
     if(gtk_widget_get_mapped(GTK_WIDGET(info)) && ONVIFMGR_IS_DEVICEROW(priv->device) && OnvifMgrDeviceRow__is_initialized(priv->device)){
         OnvifInfoPanel_clear_details(info);
-        OnvifInfoPanel_update_details(info,priv->device);
+        OnvifInfoPanel_update_details(info);
     }
 }
 
@@ -165,9 +165,8 @@ gboolean * onvif_info_gui_update (void * user_data){
     gtk_editable_set_editable  ((GtkEditable*)priv->ip_lbl, FALSE);
 
     for(int i=0;i<update->mac_count;i++){
-        char * format = "MAC Address #%i : ";
         char buff[27];
-        snprintf(buff,sizeof(buff),format,i+1);
+        snprintf(buff,sizeof(buff),"MAC Address #%i : ",i+1);
         GtkWidget * grid = gtk_grid_new();
         GtkWidget * widget = gtk_label_new (buff);
         gtk_widget_set_size_request(widget,130,-1);
@@ -426,26 +425,25 @@ exit:
         g_object_unref(caps);
 }
 
-void OnvifInfoPanel_update_details(OnvifInfoPanel * self, OnvifMgrDeviceRow * device){
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device)){
+void OnvifInfoPanel_update_details(OnvifInfoPanel * self){
+    OnvifInfoPanelPrivate *priv = OnvifInfoPanel__get_instance_private (self);
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(priv->device)){
         C_TRAIL("update_details_priv - invalid device.");
         return;
     }
     
-    OnvifDevice * odev = OnvifMgrDeviceRow__get_device(device);
+    OnvifDevice * odev = OnvifMgrDeviceRow__get_device(priv->device);
     if(!OnvifDevice__is_authenticated(odev)){
         return;
     }
     
-    g_signal_emit (self, signals[STARTED], 0, device);
-
-    OnvifInfoPanelPrivate *priv = OnvifInfoPanel__get_instance_private (self);
+    g_signal_emit (self, signals[STARTED], 0, priv->device);
 
     InfoDataUpdate * input = malloc(sizeof(InfoDataUpdate));
-    input->device = device;
+    input->device = priv->device;
     input->info = self;
-    g_object_ref(device);
-    OnvifApp__dispatch(priv->app, device, _update_details_page,input, _update_details_page_cleanup);
+    g_object_ref(priv->device);
+    OnvifApp__dispatch(priv->app, priv->device, _update_details_page,input, _update_details_page_cleanup);
 }
 
 void OnvifInfoPanel_clear_details(OnvifInfoPanel * self){

@@ -1,8 +1,8 @@
 #ifndef ONVIF_DETAILS_H_ 
 #define ONVIF_DETAILS_H_
 
-#include "omgr_device_row.h"
-#include "onvif_app.h"
+#include "../omgr_device_row.h"
+#include "../onvif_app.h"
 
 typedef struct _OnvifDetails OnvifDetails;
 
