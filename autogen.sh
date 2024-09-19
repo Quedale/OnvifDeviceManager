@@ -816,7 +816,7 @@ PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$OPENSSL_PKG \
 pkg-config --exists --print-errors "libcrypto >= 1.1.1f"
 ret=$?
 if [ $ret != 0 ]; then 
-  pullOrClone path="https://github.com/openssl/openssl.git" tag="OpenSSL_1_1_1q"
+  pullOrClone path="https://github.com/openssl/openssl.git" tag="OpenSSL_1_1_1w"
   buildMakeProject srcdir="openssl" configcustom="./config --prefix=$SUBPROJECT_DIR/openssl/build/dist --openssldir=$SUBPROJECT_DIR/openssl/build/dist/ssl -static"
   if [ $FAILED -eq 1 ]; then exit 1; fi
 else
@@ -1067,7 +1067,7 @@ FFMPEG_PKG=$SUBPROJECT_DIR/FFmpeg/dist/lib/pkgconfig
 GST_OMX_PKG_PATH=$SUBPROJECT_DIR/gstreamer/build_omx/dist/lib/gstreamer-1.0/pkgconfig
 GST_PKG_PATH=:$SUBPROJECT_DIR/gstreamer/build/dist/lib/pkgconfig:$SUBPROJECT_DIR/gstreamer/build/dist/lib/gstreamer-1.0/pkgconfig
 gst_ret=0
-GSTREAMER_LATEST=1.24.5
+GSTREAMER_LATEST=1.24.7
 if [ $ENABLE_LATEST == 0 ]; then
   GSTREAMER_VERSION=1.14.4
 else
@@ -1178,7 +1178,7 @@ LIBDE265_PKG=$SUBPROJECT_DIR/libde265/dist/lib/pkgconfig
 LIBX11_PKG=$SUBPROJECT_DIR/libx11/dist/lib/pkgconfig
 XMACROS_PKG=$SUBPROJECT_DIR/macros/dist/lib/pkgconfig
 
-PKG_UDEV=$SUBPROJECT_DIR/systemd-255/build/dist/lib/pkgconfig
+PKG_UDEV=$SUBPROJECT_DIR/systemd-256/build/dist/lib/pkgconfig
 PKG_GUDEV=$SUBPROJECT_DIR/libgudev/build/dist/lib/pkgconfig
 PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_GUDEV:$PKG_UDEV:$PKG_GLIB
 
@@ -1281,7 +1281,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
       fi
 
       PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_UDEV \
-      pkg-config --exists --print-errors "libudev >= 255" # Or check for sys/capability.h
+      pkg-config --exists --print-errors "libudev >= 256" # Or check for sys/capability.h
       ret=$?
       if [ $ret != 0 ]; then
         echo "not found libudev"
@@ -1389,17 +1389,18 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Danalyze=false"
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dbpf-framework=false"
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dkernel-install=false"
-        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dsysvinit-path=$SUBPROJECT_DIR/systemd-255/build/dist/init.d"
-        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dbashcompletiondir=$SUBPROJECT_DIR/systemd-255/build/dist/bash-completion"
+        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dsysvinit-path=$SUBPROJECT_DIR/systemd-256/build/dist/init.d"
+        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dbashcompletiondir=$SUBPROJECT_DIR/systemd-256/build/dist/bash-completion"
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dcreate-log-dirs=false"
-        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dlocalstatedir=$SUBPROJECT_DIR/systemd-255/build/dist/localstate"
-        downloadAndExtract file="v255.tar.gz" path="https://github.com/systemd/systemd/archive/refs/tags/v255.tar.gz"
+        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dlocalstatedir=$SUBPROJECT_DIR/systemd-256/build/dist/localstate"
+        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dsshconfdir=$SUBPROJECT_DIR/systemd-256/build/dist/sshcfg"
+        downloadAndExtract file="v256.tar.gz" path="https://github.com/systemd/systemd/archive/refs/tags/v256.tar.gz"
         if [ $FAILED -eq 1 ]; then exit 1; fi
         PATH=$PATH:$SUBPROJECT_DIR/gperf-3.1/dist/bin \
         PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_LIBCAP:$PKG_UTIL_LINUX \
         C_INCLUDE_PATH=$SUBPROJECT_DIR/libcap/dist/usr/include \
         LIBRARY_PATH=$SUBPROJECT_DIR/libcap/dist/lib64 \
-        buildMesonProject srcdir="systemd-255" prefix="$SUBPROJECT_DIR/systemd-255/build/dist" mesonargs="$SYSD_MESON_ARGS"
+        buildMesonProject srcdir="systemd-256" prefix="$SUBPROJECT_DIR/systemd-256/build/dist" mesonargs="$SYSD_MESON_ARGS"
         if [ $FAILED -eq 1 ]; then exit 1; fi
 
       else
@@ -1407,8 +1408,8 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
       fi
 
       pullOrClone path=https://gitlab.gnome.org/GNOME/libgudev.git tag=237
-      C_INCLUDE_PATH=$SUBPROJECT_DIR/systemd-255/build/dist/include \
-      LIBRARY_PATH=$SUBPROJECT_DIR/libcap/dist/lib64:$SUBPROJECT_DIR/systemd-255/build/dist/lib \
+      C_INCLUDE_PATH=$SUBPROJECT_DIR/systemd-256/build/dist/include \
+      LIBRARY_PATH=$SUBPROJECT_DIR/libcap/dist/lib64:$SUBPROJECT_DIR/systemd-256/build/dist/lib \
       PATH=$PATH:$SUBPROJECT_DIR/glib-2.74.1/dist/bin \
       PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_UDEV:$PKG_GLIB \
       buildMesonProject srcdir="libgudev" prefix="$SUBPROJECT_DIR/libgudev/build/dist" mesonargs="-Dvapi=disabled -Dtests=disabled -Dintrospection=disabled"
@@ -1621,7 +1622,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
     # echo "revision=v2.0.0" >> subprojects/tinyalsa.wrap
     # MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:tinyalsa=enabled"
 
-    LIBRARY_PATH=$LD_LIBRARY_PATH:$SUBPROJECT_DIR/systemd-255/dist/lib \
+    LIBRARY_PATH=$LD_LIBRARY_PATH:$SUBPROJECT_DIR/systemd-256/dist/lib \
     PATH=$PATH:$SUBPROJECT_DIR/glib-2.74.1/dist/bin:$NASM_BIN \
     PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$PKG_GUDEV:$PKG_ALSA:$PKG_PULSE:$PKG_UDEV:$PKG_GLIB:$FFMPEG_PKG:$ALSA_PKG  \
     buildMesonProject srcdir="gstreamer" prefix="$SUBPROJECT_DIR/gstreamer/build/dist" mesonargs="$MESON_PARAMS" builddir="build"
