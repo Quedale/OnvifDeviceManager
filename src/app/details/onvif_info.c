@@ -266,7 +266,7 @@ void _update_details_page(void * user_data){
     gui_update->info = input->info;
     gui_update->device = input->device;
     gui_update->mac_count = 0;
-    gui_update->macs= malloc(0);
+    gui_update->macs= NULL;
 
     //GetHostname fault handling
     SoapFault * fault = SoapObject__get_fault(SOAP_OBJECT(hostname));
@@ -365,7 +365,11 @@ void _update_details_page(void * user_data){
             for(int i=0;i<OnvifDeviceInterfaces__get_count(interfaces);i++){
                 OnvifDeviceInterface * interface = OnvifDeviceInterfaces__get_interface(interfaces,i);
                 gui_update->mac_count++;
-                gui_update->macs = realloc(gui_update->macs,sizeof(char *) * gui_update->mac_count);
+                if(gui_update->macs){
+                    gui_update->macs = realloc(gui_update->macs,sizeof(char *) * gui_update->mac_count);
+                } else {
+                    gui_update->macs = malloc(sizeof(char *) * gui_update->mac_count);
+                }
                 if(OnvifDeviceInterface__get_mac(interface)){
                     gui_update->macs[gui_update->mac_count-1] = malloc(strlen(OnvifDeviceInterface__get_mac(interface))+1);
                     strcpy(gui_update->macs[gui_update->mac_count-1],OnvifDeviceInterface__get_mac(interface));
