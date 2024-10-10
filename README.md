@@ -57,10 +57,6 @@ autogen.sh will attempt download and build missing dependencies.
 **[Mandatory]** The following package dependencies are mandatory and are not yet automatically built:
 ```
 sudo apt install git
-sudo apt install make
-sudo apt install bison 
-sudo apt install flex 
-sudo apt install libtool 
 sudo apt install pkg-config
 sudo apt install libgtk-3-dev
 sudo apt install g++
@@ -71,6 +67,10 @@ sudo apt install python3-pip
 python3 -m pip install meson
 python3 -m pip install ninja
 python3 -m pip install cmake
+sudo apt install make
+sudo apt install bison 
+sudo apt install flex 
+sudo apt install libtool
 sudo apt install libssl-dev
 sudo apt install zlib1g-dev
 sudo apt install libasound2-dev
