@@ -618,6 +618,37 @@ buildGetTextAndAutoPoint(){
   fi
 }
 
+checkGitRepoState(){
+  local repo package
+  local "${@}"
+  
+  git -C ${repo} remote update 2> /dev/null 1> /dev/null
+  LOCAL=$(git -C ${repo} rev-parse @)
+  REMOTE=$(git -C ${repo} rev-parse @{u})
+  BASE=$(git -C ${repo} merge-base @ @{u})
+  if [ $LOCAL = $REMOTE ]; then
+    echo "${repo} is already up-to-date. Do nothing..." 1> /dev/stdin
+  elif [ $LOCAL = $BASE ]; then
+    echo "${repo} has new changes. Force rebuild..." 1> /dev/stdin
+    echo 1
+    return;
+  elif [ $REMOTE = $BASE ]; then
+    echo "${repo} has local changes. Doing nothing..." 1> /dev/stdin
+  else
+    echo "Error ${repo} is diverged." 1> /dev/stdin
+    echo -1
+    return;
+  fi
+
+  if [ ! -z "${package}" ] && [ ! -z "$(pkgCheck name=${package})" ]; then
+    echo "Package ${package} found" 1> /dev/stdin
+    echo 1
+    return;
+  fi
+
+  echo 0
+}
+
 # Hard dependency check
 MISSING_DEP=0
 if [ ! -z "$(progVersionCheck program='make')" ]; then
@@ -914,33 +945,12 @@ fi
 #    Build cutils
 #       
 ################################################################
-#Check if new changes needs to be pulled
-git -C CUtils remote update 2> /dev/null
-LOCAL=$(git -C CUtils rev-parse @ 2> /dev/null)
-REMOTE=$(git -C CUtils rev-parse @{u} 2> /dev/null)
-BASE=$(git -C CUtils merge-base @ @{u} 2> /dev/null)
-force_rebuild=0
-if [ $LOCAL = $REMOTE ]; then
-    echo "CUtils is already up-to-date. Do nothing..."
-elif [ $LOCAL = $BASE ]; then
-    echo "CUtils has new changes. Force rebuild..."
-    force_rebuild=1
-elif [ $REMOTE = $BASE ]; then
-    echo "CUtils has local changes. Doing nothing..."
-else
-    echo "Error CUtils is diverged."
-    exit 1
-fi
-
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/CUtils/build/dist/lib/pkgconfig
-if [ $force_rebuild -eq 0 ]; then
-  [[ ! -z "$(pkgCheck name=cutils)" ]] && ret=1 || ret=0
-else
-  ret=1
-fi
+rebuild=$(checkGitRepoState repo="CUtils" package="cutils")
 
-if [ $ret != 0 ]; then
+if [ $rebuild == 1 ]; then
   #OnvifSoapLib depends on it and will also require a rebuild
+  rm -rf $SUBPROJECT_DIR/CUtils/build
   rm -rf $SUBPROJECT_DIR/OnvifSoapLib/build
   
   pullOrClone path=https://github.com/Quedale/CUtils.git ignorecache="true"
@@ -955,55 +965,23 @@ fi
 
 ################################################################
 # 
-#    Build libntlm for onvifsoap
-#       
-################################################################
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/libntlm/build/dist/lib/pkgconfig
-if [ ! -z "$(pkgCheck name=libntlm minver=v1.5)" ]; then
-  pullOrClone path=https://gitlab.com/gsasl/libntlm.git tag=v1.7
-  if [ $FAILED -eq 1 ]; then exit 1; fi
-  buildMakeProject srcdir="libntlm" prefix="$SUBPROJECT_DIR/libntlm/build/dist" configure="--enable-shared=no" #TODO support shared linking
-  if [ $FAILED -eq 1 ]; then exit 1; fi
-else 
-  echo "libntlm already found."
-fi
-
-################################################################
-# 
 #    Build OnvifSoapLib
 #       
 ################################################################
-#Check if new changes needs to be pulled
-git -C OnvifSoapLib remote update 2> /dev/null
-LOCAL=$(git -C OnvifSoapLib rev-parse @)
-REMOTE=$(git -C OnvifSoapLib rev-parse @{u})
-BASE=$(git -C OnvifSoapLib merge-base @ @{u})
-force_rebuild=0
-if [ $LOCAL = $REMOTE ]; then
-    echo "OnvifSoapLib is already up-to-date. Do nothing..."
-elif [ $LOCAL = $BASE ]; then
-    echo "OnvifSoapLib has new changes. Force rebuild..."
-    force_rebuild=1
-    #Temporarely disabled after renaming soapH.h which would fail here
-    # skipwsdl="--skip-wsdl"
-elif [ $REMOTE = $BASE ]; then
-    echo "OnvifSoapLib has local changes. Doing nothing..."
-    #Temporarely disabled after renaming soapH.h which would fail here
-    # skipwsdl="--skip-wsdl"
-else
-    echo "Error OnvifSoapLib is diverged."
-    exit 1
-fi
-
-#Git is up to date, now check if built
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/OnvifSoapLib/build/dist/lib/pkgconfig
-if [ $force_rebuild -eq 0 ]; then
-  [[ ! -z "$(pkgCheck name=onvifsoap)" ]] && ret=1 || ret=0
-else
-  ret=1
-fi
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/libntlm/build/dist/lib/pkgconfig
+rebuild=$(checkGitRepoState repo="OnvifSoapLib" package="onvifsoap")
 
-if [ $ret != 0 ]; then
+if [ $rebuild == 1 ]; then
+  if [ ! -z "$(pkgCheck name=libntlm minver=v1.5)" ]; then
+    pullOrClone path=https://gitlab.com/gsasl/libntlm.git tag=v1.7
+    if [ $FAILED -eq 1 ]; then exit 1; fi
+    buildMakeProject srcdir="libntlm" prefix="$SUBPROJECT_DIR/libntlm/build/dist" configure="--enable-shared=no" #TODO support shared linking
+    if [ $FAILED -eq 1 ]; then exit 1; fi
+  else 
+    echo "libntlm already found."
+  fi
+
   echo "-- Bootstrap OnvifSoapLib  --"
   pullOrClone path=https://github.com/Quedale/OnvifSoapLib.git ignorecache="true"
   if [ $FAILED -eq 1 ]; then exit 1; fi
