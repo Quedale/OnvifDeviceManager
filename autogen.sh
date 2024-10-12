@@ -26,9 +26,6 @@ GREEN='\033[0;32m'
 #Failure marker
 FAILED=0
 
-unbuffer echo "test" 2> /dev/null
-[ $? == 0 ] && UNBUFFER_COMMAND="unbuffer" || UNBUFFER_COMMAND=""
-
 script_start=$SECONDS
 
 i=1;
@@ -59,6 +56,44 @@ if [ $ENABLE_DEBUG -eq 1 ]; then
   set -- "$@" "--enable-debug=yes"
 fi
 
+unbufferCall(){
+  if [ ! -z "$UNBUFFER_COMMAND" ]; then
+    $UNBUFFER_COMMAND $(printf "%s" "${@}")
+  else
+    script -efq -c "$(printf "%s" "${@}")"
+  fi
+}
+
+printline(){
+  local project task color padding prefix
+  local "${@}"
+  line="" #Reset variable before using it
+  nextchar=""
+  postfix=""
+  cross_carriage=0
+  while IFS= read -rn1 data; do
+    if [ "$data" =  $'\r' ]; then
+      postfix=$postfix$'\r'
+      cross_carriage=1
+      continue
+    elif [ -z "$data" ]; then #newline
+      postfix=$postfix$'\n'
+    else
+      if [ $cross_carriage -eq 0 ]; then
+        line=$line"$data"
+        continue
+      fi
+      nextchar="$data"
+    fi
+    #TODO Extract last font color to restore it on nextline
+    printf "${GREEN}${project}${CYAN} ${task}${color}${prefix}${padding}%s${NC}$postfix" "$line" >&2
+    line="$nextchar" #Reset line after print and restore peeked charater
+    nextchar=""
+    postfix=""
+    cross_carriage=0
+  done;
+}
+
 printlines(){
   local project task msg color padding prefix
   local "${@}"
@@ -71,25 +106,9 @@ printlines(){
   inpadding="" && for i in $(seq 1 $padding); do inpadding=$inpadding" "; done
 
   if [ ! -z "${msg}" ]; then
-    while IFS= read -r line; do
-      printf "${GREEN}${project}${CYAN} ${task}${incolor}${prefix}${inpadding}%s${NC}\n" "$line" >&2
-    done <<< "${msg}"
+    echo "${msg}" | printline project="${project}" task="${task}" color="${incolor}" padding="${inpadding}" prefix="${prefix}"
   else
-    line="" #Reset variable before using it
-    while IFS= read -rn1 -e -d $'\n' data; do
-      postfix=""
-      if [ "$data" =  $'\r' ]; then
-        postfix=$'\r'
-      elif [ -z "$data" ]; then #newline
-        postfix=$'\n'
-      else
-        line=$line"$data"
-        continue
-      fi
-      #TODO Extract last font color to restore it on nextline
-      printf "${GREEN}${project}${CYAN} ${task}${NC}${prefix}${inpadding}%s${NC}$postfix" "$line" >&2
-      line="" #Reset line after print
-    done;
+    printline project="${project}" task="${task}" color="${incolor}" padding="${inpadding}" prefix="${prefix}"
   fi
 }
 
@@ -175,7 +194,7 @@ downloadAndExtract (){
   elif [[ $dest_val == *.tar.bz2 ]]; then
     tar xjf $dest_val 2>&1 | printlines project="${project}" task="extract";
   elif [[ $dest_val == *.zip ]]; then
-    unzip -o $dest_val 2>&1 | printlines project="${project}" task="extract";
+    unzip -oq $dest_val 2>&1 | printlines project="${project}" task="extract";
   else
     printError project="${project}" task="wget" msg="downloaded file not found. ${file}"
     [[ ! -z "${noexit}" ]] && FAILED=1 && return || exit 1;
@@ -215,9 +234,9 @@ privatepullOrClone(){
     depthstr="--depth ${depth}"
   fi 
   
-  $UNBUFFER_COMMAND git -C $dest pull $tgstr 2> /dev/null | printlines project="${project}" task="git";
+  unbufferCall "git -C ${dest} pull ${tgstr}" 2> /dev/null | printlines project="${project}" task="git"
   if [ "${PIPESTATUS[0]}" != "0" ]; then
-    $UNBUFFER_COMMAND git clone -j$(nproc) $recursestr $depthstr $tgstr2 ${path} $dest 2>&1 | printlines project="${project}" task="git"
+    unbufferCall "git clone -j$(nproc) $recursestr $depthstr $tgstr2 ${path} $dest" 2>&1 | printlines project="${project}" task="git"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="git" msg="failed to fetch ${path}"
       [[ ! -z "${noexit}" ]] && FAILED=1 && return || exit 1;
@@ -308,7 +327,7 @@ buildMakeProject(){
 
   if [ -f "$rel_path/bootstrap" ] && [ -z "${skipbootstrap}" ]; then
     printlines project="${project}" task="bootstrap" msg="src: ${srcdir}"
-    $UNBUFFER_COMMAND $rel_path/bootstrap ${bootstrap} 2>&1 | printlines project="${project}" task="bootstrap"
+    unbufferCall "$rel_path/bootstrap ${bootstrap}" 2>&1 | printlines project="${project}" task="bootstrap"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="bootstrap" msg="$rel_path/bootstrap failed ${srcdir}"
       [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
@@ -317,7 +336,7 @@ buildMakeProject(){
 
   if [ -f "$rel_path/bootstrap.sh" ]; then
     printlines project="${project}" task="bootstrap.sh" msg="src: ${srcdir}"
-    $UNBUFFER_COMMAND $rel_path/bootstrap.sh ${bootstrap} 2>&1 | printlines project="${project}" task="bootstrap.sh"
+    unbufferCall "$rel_path/bootstrap.sh ${bootstrap}" 2>&1 | printlines project="${project}" task="bootstrap.sh"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="bootstrap.sh" msg="$rel_path/bootstrap.sh failed ${srcdir}"
       [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
@@ -325,7 +344,7 @@ buildMakeProject(){
   fi
   if [ -f "$rel_path/autogen.sh" ] && [ "${autogen}" != "skip" ]; then
     printlines project="${project}" task="autogen.sh" msg="src: ${srcdir}"
-    $UNBUFFER_COMMAND $rel_path/autogen.sh ${autogen} 2>&1 | printlines project="${project}" task="autogen.sh"
+    unbufferCall "$rel_path/autogen.sh ${autogen}" 2>&1 | printlines project="${project}" task="autogen.sh"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="autogen.sh" msg="Autogen failed ${srcdir}"
       [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
@@ -335,19 +354,20 @@ buildMakeProject(){
   if [ ! -z "${autoreconf}" ] 
   then
     printlines project="${project}" task="autoreconf" msg="src: ${srcdir}"
-    $UNBUFFER_COMMAND autoreconf ${autoreconf} 2>&1 | printlines project="${project}" task="autoreconf"
+    unbufferCall "autoreconf ${autoreconf}" 2>&1 | printlines project="${project}" task="autoreconf"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="autoreconf" msg="Autoreconf failed ${srcdir}"
       [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
     fi
   fi
+  
   if [ ! -z "${cmakedir}" ] 
   then
     printlines project="${project}" task="cmake" msg="src: ${srcdir}"
     printlines project="${project}" task="cmake" msg="arguments: ${cmakeargs}"
     if [ ! -z "${cmakeclean}" ]
     then 
-      $UNBUFFER_COMMAND cmake --build "${cmakedir}" --target clean 2>&1 | printlines project="${project}" task="cmake"
+      unbufferCall "cmake --build \"${cmakedir}\" --target clean" 2>&1 | printlines project="${project}" task="cmake"
       find . -iwholename '*cmake*' -not -name CMakeLists.txt -delete
     fi
 
@@ -355,12 +375,12 @@ buildMakeProject(){
     if [ $ENABLE_DEBUG -eq 1 ]; then
       btype="Debug"
     fi
-    $UNBUFFER_COMMAND cmake -G "Unix Makefiles" \
-      ${cmakeargs} \
-      -DCMAKE_BUILD_TYPE=$btype \
-      -DCMAKE_INSTALL_PREFIX="${prefix}" \
-      -DENABLE_TESTS=OFF \
-      -DENABLE_SHARED=on \
+    unbufferCall 'cmake -G "Unix Makefiles" ' \
+      "${cmakeargs} " \
+      "-DCMAKE_BUILD_TYPE=$btype " \
+      "-DCMAKE_INSTALL_PREFIX=\"${prefix}\" " \
+      "-DENABLE_TESTS=OFF " \
+      "-DENABLE_SHARED=on " \
       "${cmakedir}" 2>&1 | printlines project="${project}" task="cmake"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="cmake" msg="failed ${srcdir}"
@@ -371,7 +391,7 @@ buildMakeProject(){
   if [ ! -z "${configcustom}" ]; then
     printlines project="${project}" task="bash" msg="src: ${srcdir}"
     printlines project="${project}" task="bash" msg="command: ${configcustom}"
-    $UNBUFFER_COMMAND bash -c "${configcustom}" 2>&1 | printlines project="${project}" task="bash"
+    unbufferCall "bash -c \"${configcustom}\"" 2>&1 | printlines project="${project}" task="bash"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="bash" msg="command failed: ${configcustom}"
       [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
@@ -381,9 +401,9 @@ buildMakeProject(){
   if [ -f "$rel_path/configure" ] && [ -z "${cmakedir}" ]; then
     printlines project="${project}" task="configure" msg="src: ${srcdir}"
     printlines project="${project}" task="configure" msg="arguments: ${configure}"
-    $UNBUFFER_COMMAND $rel_path/configure \
-        --prefix=${prefix} \
-        ${configure} 2>&1 | printlines project="${project}" task="configure"
+    unbufferCall "$rel_path/configure " \
+        "--prefix=${prefix} " \
+        "${configure}" 2>&1 | printlines project="${project}" task="configure"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="configure" msg="$rel_path/configure failed ${srcdir}"
       [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
@@ -394,7 +414,7 @@ buildMakeProject(){
 
   printlines project="${project}" task="compile" msg="src: ${srcdir}"
   printlines project="${project}" task="compile" msg="arguments: ${makeargs}"
-  $UNBUFFER_COMMAND make -j$(nproc) ${make} 2>&1 | printlines project="${project}" task="compile"
+  unbufferCall "make -j$(nproc) ${make}" 2>&1 | printlines project="${project}" task="compile"
   if [ "${PIPESTATUS[0]}" -ne 0 ]; then
     printError project="${project}" task="compile" msg="make failed ${srcdir}"
     [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
@@ -402,7 +422,7 @@ buildMakeProject(){
 
   printlines project="${project}" task="install" msg="src: ${srcdir}"
   printlines project="${project}" task="install" msg="arguments: ${installargs}"
-  $UNBUFFER_COMMAND make -j$(nproc) ${make} install ${installargs} 2>&1 | printlines project="${project}" task="install"
+  unbufferCall "make -j$(nproc) ${make} install ${installargs}" 2>&1 | printlines project="${project}" task="install"
   if [ "${PIPESTATUS[0]}" -ne 0 ]; then
     printError project="${project}" task="install" msg="failed ${srcdir}"
     [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
@@ -467,7 +487,7 @@ buildMesonProject() {
       if [ ! -z "${setuppatch}" ]; then
         printlines project="${project}" task="bash" msg="src: ${srcdir}"
         printlines project="${project}" task="bash" msg="command: ${setuppatch}"
-        bash -c "${setuppatch}" 2>&1 | printlines project="${project}" task="bash"
+        unbufferCall "bash -c \"${setuppatch}\"" 2>&1 | printlines project="${project}" task="bash"
         if [ "${PIPESTATUS[0]}" -ne 0 ]; then
           printError project="${project}" task="bash" msg="command failed: ${srcdir}"
           [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
@@ -478,14 +498,14 @@ buildMesonProject() {
         btype="debug"
       fi
       printlines project="${project}" task="meson" msg="setup ${srcdir}"
-      $UNBUFFER_COMMAND meson setup $build_dir \
-          ${mesonargs} \
-          --default-library=$default_lib \
-          --prefix=${prefix} \
-          $bindir_val \
-          --libdir=lib \
-          --includedir=include \
-          --buildtype=$btype 2>&1 | printlines project="${project}" task="meson"
+      unbufferCall "meson setup $build_dir " \
+          "${mesonargs} " \
+          "--default-library=$default_lib " \
+          "--prefix=${prefix} " \
+          "$bindir_val " \
+          "--libdir=lib " \
+          "--includedir=include " \
+          "--buildtype=$btype" 2>&1 | printlines project="${project}" task="meson"
       if [ "${PIPESTATUS[0]}" -ne 0 ]; then
         printError project="${project}" task="meson" msg="setup failed ${srcdir}"
         rm -rf $build_dir
@@ -500,7 +520,7 @@ buildMesonProject() {
 
       if [ ! -z "${setuppatch}" ]; then
         printlines project="${project}" task="bash" msg="command: ${setuppatch}"
-        bash -c "${setuppatch}" 2>&1 | printlines project="${project}" task="bash"
+        unbufferCall "bash -c \"${setuppatch}\"" 2>&1 | printlines project="${project}" task="bash"
         if [ "${PIPESTATUS[0]}" -ne 0 ]; then
           printError project="${project}" task="bash" msg="command failed ${srcdir}"
           [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
@@ -511,15 +531,15 @@ buildMesonProject() {
         btype="debug"
       fi
       printlines project="${project}" task="meson" msg="reconfigure ${srcdir}"
-      $UNBUFFER_COMMAND meson setup $build_dir \
-          ${mesonargs} \
-          --default-library=$default_lib \
-          --prefix=${prefix} \
-          $bindir_val \
-          --libdir=lib \
-          --includedir=include \
-          --buildtype=$btype \
-          --reconfigure 2>&1 | printlines project="${project}" task="meson"
+      unbufferCall "meson setup $build_dir " \
+          "${mesonargs} " \
+          "--default-library=$default_lib " \
+          "--prefix=${prefix} " \
+          "$bindir_val " \
+          "--libdir=lib " \
+          "--includedir=include " \
+          "--buildtype=$btype " \
+          "--reconfigure" 2>&1 | printlines project="${project}" task="meson"
       if [ "${PIPESTATUS[0]}" -ne 0 ]; then
         printError project="${project}" task="meson" msg="setup failed ${srcdir}"
         rm -rf $build_dir
@@ -529,7 +549,7 @@ buildMesonProject() {
 
   printlines project="${project}" task="meson" msg="compile ${srcdir}"
   printf '\033[?7l' #Small hack to prevent meson from cropping progress line
-  $UNBUFFER_COMMAND meson compile -C $build_dir 2>&1 | printlines project="${project}" task="compile"
+  unbufferCall "meson compile -C $build_dir" 2>&1 | printlines project="${project}" task="compile"
   status="${PIPESTATUS[0]}"
   printf '\033[?7h' #Small hack to prevent meson from cropping progress line
   if [ $status -ne 0 ]; then
@@ -538,7 +558,7 @@ buildMesonProject() {
   fi
 
   printlines project="${project}" task="meson" msg="install ${srcdir}"
-  DESTDIR=${destdir} $UNBUFFER_COMMAND meson install -C $build_dir 2>&1 | printlines project="${project}" task="install"
+  DESTDIR=${destdir} unbufferCall "meson install -C $build_dir" 2>&1 | printlines project="${project}" task="install"
   if [ "${PIPESTATUS[0]}" -ne 0 ]; then
     printError project="${project}" task="meson" msg="install failed ${srcdir}"
     [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
@@ -683,6 +703,9 @@ if [ $MISSING_DEP -eq 1 ]; then
   exit 1
 fi
 
+unbuffer echo "test" 2> /dev/null 1> /dev/null
+[ $? == 0 ] && UNBUFFER_COMMAND="unbuffer" && printlines project="unbuffer" task="check" msg="found" || printlines project="unbuffer" task="check" msg="not found"
+
 mkdir -p $SUBPROJECT_DIR
 mkdir -p $SRC_CACHE_DIR
 
@@ -791,7 +814,7 @@ fi
 if [ $NO_DOWNLOAD -eq 0 ]; then
   if [ ! -z "$(progVersionCheck program=meson linenumber=1 lineindex=0 major=0 minor=63 micro=2)" ]; then
     printlines project="meson" task="check" msg="not found"
-    python3 -m pip install meson --upgrade 2>&1 | printlines project="meson" task="install"
+    unbufferCall "python3 -m pip install meson --upgrade" 2>&1 | printlines project="meson" task="install"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="meson" task="install" msg="Failed to install meson via pip. Please try to install meson manually."
       exit 1
@@ -802,7 +825,7 @@ if [ $NO_DOWNLOAD -eq 0 ]; then
 
   if [ ! -z "$(progVersionCheck program=ninja)" ]; then
     printlines project="ninja" task="check" msg="not found"
-    python3 -m pip install ninja --upgrade 2>&1 | printlines project="ninja" task="install"
+    unbufferCall "python3 -m pip install ninja --upgrade" 2>&1 | printlines project="ninja" task="install"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="ninja" task="check" msg="Failed to install ninja via pip. Please try to install ninja manually."
       exit 1
@@ -1195,7 +1218,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
       python3 -c 'from setuptools import setup'
       if [ $? != 0 ]; then
         printlines project="setuptools" task="check" msg="not found"
-        python3 -m pip install setuptools 2>&1 | printlines project="setuptools" task="install"
+        unbufferCall "python3 -m pip install setuptools --upgrade" 2>&1 | printlines project="setuptools" task="install"
         if [ "${PIPESTATUS[0]}" -ne 0 ]; then
           printError project="setuptools" task="install" msg="Failed to setuptools ninja via pip. Please try to install setuptools manually."
           exit 1
@@ -1208,7 +1231,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
       ret=$?
       if [ $ret != 0 ]; then
         printlines project="jinja2" task="jinja2" msg="not found"
-        python3 -m pip install jinja2 2>&1 | printlines project="jinja2" task="install"
+        unbufferCall "python3 -m pip install jinja2 --upgrade" 2>&1 | printlines project="jinja2" task="install"
         if [ "${PIPESTATUS[0]}" -ne 0 ]; then
           printError project="jinja2" task="install" msg="Failed to jinja2 ninja via pip. Please try to install jinja2 manually."
           exit 1
@@ -1506,17 +1529,17 @@ printlines project="onvifmgr" task="build" msg="bootstrap"
 #Change to the project folder to run autoconf and automake
 cd $SCRT_DIR
 #Initialize project
-$UNBUFFER_COMMAND aclocal 2>&1 | printlines project="onvifmgr" task="bootstrap"
-$UNBUFFER_COMMAND autoconf 2>&1 | printlines project="onvifmgr" task="bootstrap"
-$UNBUFFER_COMMAND automake --add-missing 2>&1 | printlines project="onvifmgr" task="bootstrap"
-$UNBUFFER_COMMAND autoreconf 2>&1 | printlines project="onvifmgr" task="bootstrap"
-$UNBUFFER_COMMAND libtoolize 2>&1 | printlines project="onvifmgr" task="libtoolize"
+aclocal 2>&1 | printlines project="onvifmgr" task="aclocal"
+autoconf 2>&1 | printlines project="onvifmgr" task="autoconf"
+automake --add-missing 2>&1 | printlines project="onvifmgr" task="automake"
+autoreconf 2>&1 | printlines project="onvifmgr" task="autoreconf"
+libtoolize 2>&1 | printlines project="onvifmgr" task="libtoolize"
 
 configArgs=$@
 printlines project="onvifmgr" task="build" msg="configure $configArgs"
 cd $WORK_DIR
 
-$UNBUFFER_COMMAND $SCRT_DIR/configure $configArgs 2>&1 | printlines project="onvifmgr" task="configure"
+unbufferCall "$SCRT_DIR/configure $configArgs" 2>&1 | printlines project="onvifmgr" task="configure"
 if [ "${PIPESTATUS[0]}" -ne 0 ]; then
   printError project="onvifmgr" task="build" msg="Failed to configure OnvifDeviceManager"
 else
