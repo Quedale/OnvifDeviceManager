@@ -804,17 +804,21 @@ else
 fi
 
 #Activate virtual environment
-source venvfolder/bin/activate 2>&1 | printlines project="virtualenv" task="activate"
-if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+if [[ ! -f "venvfolder/bin/activate" ]]; then
   printError project="virtualenv" task="activate" msg="failed to activate python virtual environment."
   exit 1;
+else
+  source venvfolder/bin/activate 
+  printlines project="virtualenv" task="activate" msg="activated python virtual environment."
 fi
+
+pip cache purge
 
 #Setup meson
 if [ $NO_DOWNLOAD -eq 0 ]; then
   if [ ! -z "$(progVersionCheck program=meson linenumber=1 lineindex=0 major=0 minor=63 micro=2)" ]; then
     printlines project="meson" task="check" msg="not found"
-    unbufferCall "python3 -m pip install meson --upgrade" 2>&1 | printlines project="meson" task="install"
+    unbufferCall "python3 -m pip install --progress-bar on meson --upgrade" 2>&1 | printlines project="meson" task="install"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="meson" task="install" msg="Failed to install meson via pip. Please try to install meson manually."
       exit 1
@@ -825,7 +829,7 @@ if [ $NO_DOWNLOAD -eq 0 ]; then
 
   if [ ! -z "$(progVersionCheck program=ninja)" ]; then
     printlines project="ninja" task="check" msg="not found"
-    unbufferCall "python3 -m pip install ninja --upgrade" 2>&1 | printlines project="ninja" task="install"
+    unbufferCall "python3 -m pip install --progress-bar on ninja --upgrade" 2>&1 | printlines project="ninja" task="install"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="ninja" task="check" msg="Failed to install ninja via pip. Please try to install ninja manually."
       exit 1
@@ -1218,7 +1222,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
       python3 -c 'from setuptools import setup'
       if [ $? != 0 ]; then
         printlines project="setuptools" task="check" msg="not found"
-        unbufferCall "python3 -m pip install setuptools --upgrade" 2>&1 | printlines project="setuptools" task="install"
+        unbufferCall "python3 -m pip install --progress-bar on setuptools --upgrade" 2>&1 | printlines project="setuptools" task="install"
         if [ "${PIPESTATUS[0]}" -ne 0 ]; then
           printError project="setuptools" task="install" msg="Failed to setuptools ninja via pip. Please try to install setuptools manually."
           exit 1
@@ -1231,7 +1235,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
       ret=$?
       if [ $ret != 0 ]; then
         printlines project="jinja2" task="jinja2" msg="not found"
-        unbufferCall "python3 -m pip install jinja2 --upgrade" 2>&1 | printlines project="jinja2" task="install"
+        unbufferCall "python3 -m pip install --progress-bar on jinja2 --upgrade" 2>&1 | printlines project="jinja2" task="install"
         if [ "${PIPESTATUS[0]}" -ne 0 ]; then
           printError project="jinja2" task="install" msg="Failed to jinja2 ninja via pip. Please try to install jinja2 manually."
           exit 1
