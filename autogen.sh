@@ -812,8 +812,6 @@ else
   printlines project="virtualenv" task="activate" msg="activated python virtual environment."
 fi
 
-pip cache purge
-
 #Setup meson
 if [ $NO_DOWNLOAD -eq 0 ]; then
   if [ ! -z "$(progVersionCheck program=meson linenumber=1 lineindex=0 major=0 minor=63 micro=2)" ]; then
