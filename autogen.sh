@@ -58,7 +58,8 @@ fi
 
 unbufferCall(){
   if [ ! -z "$UNBUFFER_COMMAND" ]; then
-    unbuffer $(printf "%s" "${@}")
+    # unbuffer $(printf "%s" "${@}")
+    script -efq -c "$(printf "%s" "${@}")"
   else
     script -efq -c "$(printf "%s" "${@}")"
   fi
