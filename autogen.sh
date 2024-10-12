@@ -26,7 +26,7 @@ GREEN='\033[0;32m'
 #Failure marker
 FAILED=0
 
-$(unbuffer echo "test")
+unbuffer echo "test" 2> /dev/null
 [ $? == 0 ] && UNBUFFER_COMMAND="unbuffer" || UNBUFFER_COMMAND=""
 
 script_start=$SECONDS
