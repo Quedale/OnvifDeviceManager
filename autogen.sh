@@ -1508,8 +1508,9 @@ cd $SCRT_DIR
 #Initialize project
 $UNBUFFER_COMMAND aclocal 2>&1 | printlines project="onvifmgr" task="bootstrap"
 $UNBUFFER_COMMAND autoconf 2>&1 | printlines project="onvifmgr" task="bootstrap"
-$UNBUFFER_COMMAND automake 2>&1 | printlines project="onvifmgr" task="bootstrap"
+$UNBUFFER_COMMAND automake --add-missing 2>&1 | printlines project="onvifmgr" task="bootstrap"
 $UNBUFFER_COMMAND autoreconf 2>&1 | printlines project="onvifmgr" task="bootstrap"
+$UNBUFFER_COMMAND libtoolize 2>&1 | printlines project="onvifmgr" task="libtoolize"
 
 configArgs=$@
 printlines project="onvifmgr" task="build" msg="configure $configArgs"
