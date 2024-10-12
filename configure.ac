@@ -29,7 +29,7 @@ AC_SUBST(PKG_ONVIF_DISCO_PATH, '$(abs_srcdir)/subprojects/OnvifDiscoveryLib/buil
 AC_SUBST(PKG_ONVIF_SOAP_PATH, '$(abs_srcdir)/subprojects/OnvifSoapLib/build/dist/lib/pkgconfig')
 AC_SUBST(PKG_CUTILS_PATH, '$(abs_srcdir)/subprojects/CUtils/build/dist/lib/pkgconfig')
 AC_SUBST(PKG_DE265_PATH, '$(abs_srcdir)/subprojects/libde265/dist/lib/pkgconfig')
-AC_SUBST(PKG_NTLM_PATH, '$(abs_srcdir)/subprojects/libntlm/build/dist/lib/pkgconfig')
+AC_SUBST(PKG_NTLM_PATH, '$(abs_srcdir)/subprojects/libntlm-1.8/build/dist/lib/pkgconfig')
 AC_SUBST(PKG_LIBX11_PATH, '$(abs_srcdir)/subprojects/libx11/dist/lib/pkgconfig')
 
 AC_SUBST(GST_LIBS,m4_normalize('
