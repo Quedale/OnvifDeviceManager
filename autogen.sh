@@ -58,8 +58,7 @@ fi
 
 unbufferCall(){
   if [ ! -z "$UNBUFFER_COMMAND" ]; then
-    # unbuffer $(printf "%s" "${@}")
-    script -efq -c "$(printf "%s" "${@}")"
+    eval "unbuffer ${@}"
   else
     script -efq -c "$(printf "%s" "${@}")"
   fi
@@ -376,13 +375,13 @@ buildMakeProject(){
     if [ $ENABLE_DEBUG -eq 1 ]; then
       btype="Debug"
     fi
-    unbufferCall 'cmake -G "Unix Makefiles" ' \
+    unbufferCall "cmake -G 'Unix Makefiles' " \
       "${cmakeargs} " \
       "-DCMAKE_BUILD_TYPE=$btype " \
-      "-DCMAKE_INSTALL_PREFIX=\"${prefix}\" " \
+      "-DCMAKE_INSTALL_PREFIX='${prefix}' " \
       "-DENABLE_TESTS=OFF " \
       "-DENABLE_SHARED=on " \
-      "${cmakedir}" 2>&1 | printlines project="${project}" task="cmake"
+      "'${cmakedir}'" 2>&1 | printlines project="${project}" task="cmake"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="cmake" msg="failed ${srcdir}"
       [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
