@@ -71,8 +71,21 @@ printline(){
   nextchar=""
   postfix=""
   cross_carriage=0
+  clearline=0
   while IFS= read -rn1 data; do
-    if [ "$data" =  $'\r' ]; then
+    #Support for VT100 clear line escape codes.
+    if ([ $clearline -eq 0 ] && [[ "$data" == *\* ]]) || \
+       ([ $clearline -eq 1 ] && [[ "$data" == *\[* ]]) || \
+       ([ $clearline -eq 2 ] && [[ "$data" == *\1* ]]) || #clear left \
+       ([ $clearline -eq 2 ] && [[ "$data" == *\2* ]]) || #clear line \
+       ([ $clearline -eq 3 ] && [[ "$data" == *\K* ]]); then
+      ((clearline++))
+    elif [ $clearline -ne 0 ]; then
+      clearline=0
+    fi
+    
+    
+    if [ "$data" =  $'\r' ] || [ $clearline -eq 4 ]; then
       postfix=$postfix$'\r'
       cross_carriage=1
       continue
