@@ -763,7 +763,7 @@ export PATH=$SUBPROJECT_DIR/m4-1.4.19/build/dist/bin:$PATH
 if [ ! -z "$(progVersionCheck program=m4 linenumber=1 lineindex=3 major=1 minor=4 micro=18 )" ]; then
   printlines project="m4" task="check" msg="not found"
   downloadAndExtract project="m4" file="m4-1.4.19.tar.xz" path="https://ftp.gnu.org/gnu/m4/m4-1.4.19.tar.xz"
-  buildMakeProject project="m4"srcdir="m4-1.4.19" prefix="$SUBPROJECT_DIR/m4-1.4.19/build/dist" skipbootstrap="true"
+  buildMakeProject project="m4" srcdir="m4-1.4.19" prefix="$SUBPROJECT_DIR/m4-1.4.19/build/dist" skipbootstrap="true"
 else
   printlines project="m4" task="check" msg="found"
 fi
