@@ -74,12 +74,17 @@ printline(){
   clearline=0
   while IFS= read -rn1 data; do
     #Support for VT100 clear line escape codes.
-    if ([ $clearline -eq 0 ] && [[ "$data" == *\* ]]) || \
-       ([ $clearline -eq 1 ] && [[ "$data" == *\[* ]]) || \
-       ([ $clearline -eq 2 ] && [[ "$data" == *\1* ]]) || #clear left \
-       ([ $clearline -eq 2 ] && [[ "$data" == *\2* ]]) || #clear line \
-       ([ $clearline -eq 3 ] && [[ "$data" == *\K* ]]); then
+    if [ $clearline -eq 0 ] && [[ "$data" == *\* ]]; then
       ((clearline++))
+    elif [ $clearline -gt 0 ]; then #Seperated the rest of the condition to save on performance
+      if ([ $clearline -eq 1 ] && [[ "$data" == *\[* ]]) || \
+         ([ $clearline -eq 2 ] && [[ "$data" == *\1* ]]) || \
+         ([ $clearline -eq 2 ] && [[ "$data" == *\2* ]]) || \
+         ([ $clearline -eq 3 ] && [[ "$data" == *\K* ]]); then
+        ((clearline++))
+      else
+        clearline=0
+      fi
     elif [ $clearline -ne 0 ]; then
       clearline=0
     fi
@@ -181,16 +186,14 @@ downloadAndExtract (){
     [[ ! -z "${noexit}" ]] && FAILED=1 && return || exit 1;
   fi
 
-  dest_val=""
-  if [ ! -z "$SRC_CACHE_DIR" ]; then
-    dest_val="$SRC_CACHE_DIR/${file}"
-  else
-    dest_val=${file}
-  fi
+  [ ! -z "$SRC_CACHE_DIR" ] && pathprefix="$SRC_CACHE_DIR/" || pathprefix=""
 
   if [ ! -f "$dest_val" ]; then
     printlines project="${project}" task="wget" msg="downloading: ${path}"
-    wget ${path} -O $dest_val 2>&1 | printlines project="${project}" task="wget";
+    current=$(pwd)
+    cd $pathprefix #Changing directory so that wget logs only the filename
+    wget --show-progress --progress=bar:force ${path} -O ${file} 2>&1 | printlines project="${project}" task="wget";
+    cd $current
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="wget" msg="failed to fetch ${path}"
       [[ ! -z "${noexit}" ]] && FAILED=1 && return || exit 1;
@@ -200,14 +203,15 @@ downloadAndExtract (){
   fi
 
   printlines project="${project}" task="wget" msg="extracting : ${file}"
-  if [[ $dest_val == *.tar.gz ]]; then
-    tar xfz $dest_val 2>&1 | printlines project="${project}" task="extract";
-  elif [[ $dest_val == *.tar.xz ]]; then
-    tar xf $dest_val 2>&1 | printlines project="${project}" task="extract";
-  elif [[ $dest_val == *.tar.bz2 ]]; then
-    tar xjf $dest_val 2>&1 | printlines project="${project}" task="extract";
-  elif [[ $dest_val == *.zip ]]; then
-    unzip -oq $dest_val 2>&1 | printlines project="${project}" task="extract";
+  if [[ ${pathprefix}${file} == *.tar.gz ]]; then
+    tar xfz ${pathprefix}${file} 2>&1 | printlines project="${project}" task="extract";
+  elif [[ ${pathprefix}${file} == *.tar.xz ]]; then
+    tar xf ${pathprefix}${file} 2>&1 | printlines project="${project}" task="extract";
+  elif [[ ${pathprefix}${file} == *.tar.bz2 ]]; then
+    tar xjf ${pathprefix}${file} 2>&1 | printlines project="${project}" task="extract";
+  elif [[ ${pathprefix}${file} == *.zip ]]; then
+    checkUnzip
+    unzip -oq ${pathprefix}${file} 2>&1 | printlines project="${project}" task="extract";
   else
     printError project="${project}" task="wget" msg="downloaded file not found. ${file}"
     [[ ! -z "${noexit}" ]] && FAILED=1 && return || exit 1;
@@ -646,16 +650,32 @@ progVersionCheck(){
   fi
 }
 
-buildGetTextAndAutoPoint(){
-  export PATH=$PATH:$SUBPROJECT_DIR/gettext-0.21.1/dist/bin
-  if [ ! -z "$(progVersionCheck program=gettextize linenumber=1 lineindex=3 major=0 minor=9 micro=18 )" ] || 
-     [ ! -z "$(progVersionCheck program=autopoint linenumber=1 lineindex=3 major=0 minor=9 micro=18 )" ]; then
+export PATH=$SUBPROJECT_DIR/unzip60/build/dist/bin:$PATH
+HAS_UNZIP=0
+checkUnzip(){
+  if [ $HAS_UNZIP -eq 0 ] && [ ! -z "$(progVersionCheck program=unzip paramoverride="-v")" ]; then
+    printlines project="unzip" task="check" msg="not found"
+    downloadAndExtract project="unzip" file="unzip60.tar.gz" path="https://sourceforge.net/projects/infozip/files/UnZip%206.x%20%28latest%29/UnZip%206.0/unzip60.tar.gz/download"
+    buildMakeProject project="unzip" srcdir="unzip60" make="-f unix/Makefile generic" installargs="prefix=$SUBPROJECT_DIR/unzip60/build/dist MANDIR=$SUBPROJECT_DIR/unzip60/build/dist/share/man/man1 -f unix/Makefile"
+  elif [ $HAS_UNZIP -eq 0 ]; then
+    printlines project="unzip" task="check" msg="found"
+  fi
+  HAS_UNZIP=1
+}
+
+export PATH=$PATH:$SUBPROJECT_DIR/gettext-0.21.1/dist/bin
+HAS_GETTEXT=0
+checkGetTextAndAutoPoint(){
+  if [ $HAS_GETTEXT -eq 0 ] && \
+     ([ ! -z "$(progVersionCheck program=gettextize linenumber=1 lineindex=3 major=0 minor=9 micro=18 )" ] || 
+      [ ! -z "$(progVersionCheck program=autopoint linenumber=1 lineindex=3 major=0 minor=9 micro=18 )" ]); then
     printlines project="gettext" task="check" msg="not found"
     downloadAndExtract project="gettext" file="gettext-0.21.1.tar.gz" path="https://ftp.gnu.org/pub/gnu/gettext/gettext-0.21.1.tar.gz"
     buildMakeProject project="gettext" srcdir="gettext-0.21.1" prefix="$SUBPROJECT_DIR/gettext-0.21.1/dist" autogen="skip"
-  else
+  elif [ $HAS_GETTEXT -eq 0 ]; then
     printlines project="gettext" task="check" msg="found"
   fi
+  HAS_GETTEXT=1
 }
 
 checkGitRepoState(){
@@ -780,7 +800,7 @@ fi
 
 export PATH=$SUBPROJECT_DIR/flex-2.6.4/build/dist/bin:$PATH
 if [ ! -z "$(progVersionCheck program=flex linenumber=1 lineindex=1 major=2 minor=6 micro=4 )" ]; then
-  buildGetTextAndAutoPoint
+  checkGetTextAndAutoPoint
   printlines project="flex" task="check" msg="not found"
   downloadAndExtract project="flex" file="flex-2.6.4.tar.gz" path="https://github.com/westes/flex/releases/download/v2.6.4/flex-2.6.4.tar.gz"
   buildMakeProject project="flex" srcdir="flex-2.6.4" prefix="$SUBPROJECT_DIR/flex-2.6.4/build/dist" skipbootstrap="true"
@@ -801,7 +821,7 @@ fi
 if [ ! -f "./venvfolder/bin/activate" ]; then
   printlines project="virtualenv" task="check" msg="not found"
   if [ $NO_DOWNLOAD -eq 0 ] && [ ! -f "virtualenv.pyz" ]; then
-    wget https://bootstrap.pypa.io/virtualenv.pyz 2>&1 | printlines project="virtualenv" task="download"
+    wget --show-progress --progress=bar:force https://bootstrap.pypa.io/virtualenv.pyz 2>&1 | printlines project="virtualenv" task="wget"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="virtualenv" task="wget" msg="failed to fetch https://bootstrap.pypa.io/virtualenv.pyz"
       exit 1;
@@ -829,7 +849,7 @@ fi
 if [ $NO_DOWNLOAD -eq 0 ]; then
   if [ ! -z "$(progVersionCheck program=meson linenumber=1 lineindex=0 major=0 minor=63 micro=2)" ]; then
     printlines project="meson" task="check" msg="not found"
-    unbufferCall "python3 -m pip install --progress-bar on meson --upgrade" 2>&1 | printlines project="meson" task="install"
+    unbufferCall "python3 -m pip install --progress-bar on meson --upgrade" 2>&1 | printlines project="meson" task="pip"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="meson" task="install" msg="Failed to install meson via pip. Please try to install meson manually."
       exit 1
@@ -840,7 +860,7 @@ if [ $NO_DOWNLOAD -eq 0 ]; then
 
   if [ ! -z "$(progVersionCheck program=ninja)" ]; then
     printlines project="ninja" task="check" msg="not found"
-    unbufferCall "python3 -m pip install --progress-bar on ninja --upgrade" 2>&1 | printlines project="ninja" task="install"
+    unbufferCall "python3 -m pip install --progress-bar on ninja --upgrade" 2>&1 | printlines project="ninja" task="pip"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="ninja" task="check" msg="Failed to install ninja via pip. Please try to install ninja manually."
       exit 1
@@ -855,21 +875,6 @@ fi
 # pullOrClone path="https://gitlab.gnome.org/GNOME/gtk.git" tag="3.24.34"
 # buildMesonProject srcdir="gtk" prefix="$SUBPROJECT_DIR/gtk/dist" mesonargs="-Dtests=false -Dintrospection=false -Ddemos=false -Dexamples=false -Dlibepoxy:tests=false"
 # if [ $FAILED -eq 1 ]; then exit 1; fi
-
-################################################################
-# 
-#    Build unzip for gsoap
-#       
-################################################################
-export PATH=$SUBPROJECT_DIR/unzip60/build/dist/bin:$PATH
-if [ ! -z "$(progVersionCheck program=unzip paramoverride="-v")" ]; then
-  printlines project="unzip" task="check" msg="not found"
-  downloadAndExtract project="unzip file="unzip60.tar.gz" path="https://sourceforge.net/projects/infozip/files/UnZip%206.x%20%28latest%29/UnZip%206.0/unzip60.tar.gz/download"
-  buildMakeProject project="unzip srcdir="unzip60" make="-f unix/Makefile generic" installargs="prefix=$SUBPROJECT_DIR/unzip60/build/dist MANDIR=$SUBPROJECT_DIR/unzip60/build/dist/share/man/man1 -f unix/Makefile"
-else
-  printlines project="unzip" task="check" msg="found"
-fi
-
 
 ################################################################
 # 
@@ -892,72 +897,6 @@ if [ ! -z "$(progVersionCheck program=cmake linenumber=1 lineindex=2 major=3 min
   buildMakeProject project="cmake" srcdir="cmake-3.25.2" prefix="$SUBPROJECT_DIR/cmake-3.25.2/build/dist" skipbootstrap="true"
 else
   printlines project="cmake" task="check" msg="found"
-fi
-
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/zlib-1.2.13/build/dist/lib/pkgconfig
-if [ ! -z "$(pkgCheck name=zlib minver=1.2.11)" ]; then
-  printlines project="zlib" task="check" msg="not found"
-  downloadAndExtract project="zlib" file="zlib-1.2.13.tar.gz" path="https://www.zlib.net/zlib-1.2.13.tar.gz"
-  buildMakeProject project="zlib" srcdir="zlib-1.2.13" prefix="$SUBPROJECT_DIR/zlib-1.2.13/build/dist"
-else
-  printlines project="zlib" task="check" msg="found"
-fi
-
-################################################################
-# 
-#    Build gSoap
-#       
-################################################################
-gsoap_version=2.8.134
-export PATH=$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin:$PATH
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/gsoap-2.8/build/dist/lib/pkgconfig
-if [ ! -z "$(pkgCheck name=gsoap minver=$gsoap_version)" ]; then
-  printlines project="gsoap" task="check" msg="not found"
-  SSL_PREFIX=$(pkg-config --variable=prefix openssl)
-  if [ "$SSL_PREFIX" != "/usr" ]; then
-    SSL_INCLUDE=$(\pkg-config --variable=includedir openssl)
-    SSL_LIBS=$(pkg-config --variable=libdir openssl)
-  fi
-  
-  ZLIB_PREFIX=$(pkg-config --variable=prefix zlib)
-  if [ "$ZLIB_PREFIX" != "/usr" ]; then
-    ZLIB_INCLUDE=$(pkg-config --variable=includedir zlib)
-    ZLIB_LIBS=$(pkg-config --variable=libdir zlib)
-  fi
-
-  inc_path=""
-  if [ ! -z "$SSL_INCLUDE" ] && [ "$SSL_INCLUDE" != "/usr/include" ]; then
-    if [ -z "$inc_path" ]; then
-      inc_path="$SSL_INCLUDE"
-    else
-      inc_path="$inc_path:$SSL_INCLUDE"
-    fi
-  fi
-  if [ ! -z "$ZLIB_INCLUDE" ] && [ "$SSL_INCLUDE" != "/usr/include" ]; then
-    if [ -z "$inc_path" ]; then
-      inc_path="$ZLIB_INCLUDE"
-    else
-      inc_path="$inc_path:$ZLIB_INCLUDE"
-    fi
-  fi
-  if [ ! -z "$CPLUS_INCLUDE_PATH" ] && [ "$SSL_INCLUDE" != "/usr/include" ]; then
-    if [ -z "$inc_path" ]; then
-      inc_path="$CPLUS_INCLUDE_PATH"
-    else
-      inc_path="$inc_path:$CPLUS_INCLUDE_PATH"
-    fi
-  fi
-
-  rm -rf $SUBPROJECT_DIR/gsoap-2.8/ #Make sure we dont extract over an old version
-  downloadAndExtract project="gsoap" file="gsoap_$gsoap_version.zip" path="https://sourceforge.net/projects/gsoap2/files/gsoap_$gsoap_version.zip/download"
-  C_INCLUDE_PATH="$inc_path" \
-  CPLUS_INCLUDE_PATH="$inc_path" \
-  LIBRARY_PATH="$SSL_LIBS:$ZLIB_LIBS:$LIBRARY_PATH" \
-  LD_LIBRARY_PATH="$SSL_LIBS:$ZLIB_LIBS:$LD_LIBRARY_PATH" \
-  LIBS='-ldl -lpthread' \
-  buildMakeProject project="gsoap" srcdir="gsoap-2.8" prefix="$SUBPROJECT_DIR/gsoap-2.8/build/dist" autogen="skip" configure="--with-openssl=/usr/lib/ssl"
-else
-  printlines project="gsoap" task="check" msg="found"
 fi
 
 ################################################################
@@ -1005,13 +944,74 @@ fi
 ################################################################
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/OnvifSoapLib/build/dist/lib/pkgconfig
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/libntlm-1.8/build/dist/lib/pkgconfig
+export PATH=$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin:$PATH
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/gsoap-2.8/build/dist/lib/pkgconfig
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/zlib-1.2.13/build/dist/lib/pkgconfig
 rebuild=$(checkGitRepoState repo="OnvifSoapLib" package="onvifsoap")
 
 if [ $rebuild != 0 ]; then
   #Clean up previous build in case of failure. This will prevent from falling back on the old version
-  rm -rf $SUBPROJECT_DIR/OnvifSoapLib/build/dist/*
-  
+  rm -rf $SUBPROJECT_DIR/OnvifSoapLib/build/dist/*  
   printlines project="onvifsoap" task="check" msg="not found"
+
+  if [ ! -z "$(pkgCheck name=zlib minver=1.2.11)" ]; then
+    printlines project="zlib" task="check" msg="not found"
+    downloadAndExtract project="zlib" file="zlib-1.2.13.tar.gz" path="https://www.zlib.net/zlib-1.2.13.tar.gz"
+    buildMakeProject project="zlib" srcdir="zlib-1.2.13" prefix="$SUBPROJECT_DIR/zlib-1.2.13/build/dist"
+  else
+    printlines project="zlib" task="check" msg="found"
+  fi
+
+  gsoap_version=2.8.134
+  if [ ! -z "$(pkgCheck name=gsoap minver=$gsoap_version)" ]; then
+    printlines project="gsoap" task="check" msg="not found"
+    SSL_PREFIX=$(pkg-config --variable=prefix openssl)
+    if [ "$SSL_PREFIX" != "/usr" ]; then
+      SSL_INCLUDE=$(\pkg-config --variable=includedir openssl)
+      SSL_LIBS=$(pkg-config --variable=libdir openssl)
+    fi
+    
+    ZLIB_PREFIX=$(pkg-config --variable=prefix zlib)
+    if [ "$ZLIB_PREFIX" != "/usr" ]; then
+      ZLIB_INCLUDE=$(pkg-config --variable=includedir zlib)
+      ZLIB_LIBS=$(pkg-config --variable=libdir zlib)
+    fi
+
+    inc_path=""
+    if [ ! -z "$SSL_INCLUDE" ] && [ "$SSL_INCLUDE" != "/usr/include" ]; then
+      if [ -z "$inc_path" ]; then
+        inc_path="$SSL_INCLUDE"
+      else
+        inc_path="$inc_path:$SSL_INCLUDE"
+      fi
+    fi
+    if [ ! -z "$ZLIB_INCLUDE" ] && [ "$SSL_INCLUDE" != "/usr/include" ]; then
+      if [ -z "$inc_path" ]; then
+        inc_path="$ZLIB_INCLUDE"
+      else
+        inc_path="$inc_path:$ZLIB_INCLUDE"
+      fi
+    fi
+    if [ ! -z "$CPLUS_INCLUDE_PATH" ] && [ "$SSL_INCLUDE" != "/usr/include" ]; then
+      if [ -z "$inc_path" ]; then
+        inc_path="$CPLUS_INCLUDE_PATH"
+      else
+        inc_path="$inc_path:$CPLUS_INCLUDE_PATH"
+      fi
+    fi
+
+    rm -rf $SUBPROJECT_DIR/gsoap-2.8/ #Make sure we dont extract over an old version
+    downloadAndExtract project="gsoap" file="gsoap_$gsoap_version.zip" path="https://sourceforge.net/projects/gsoap2/files/gsoap_$gsoap_version.zip/download"
+    C_INCLUDE_PATH="$inc_path" \
+    CPLUS_INCLUDE_PATH="$inc_path" \
+    LIBRARY_PATH="$SSL_LIBS:$ZLIB_LIBS:$LIBRARY_PATH" \
+    LD_LIBRARY_PATH="$SSL_LIBS:$ZLIB_LIBS:$LD_LIBRARY_PATH" \
+    LIBS='-ldl -lpthread' \
+    buildMakeProject project="gsoap" srcdir="gsoap-2.8" prefix="$SUBPROJECT_DIR/gsoap-2.8/build/dist" autogen="skip" configure="--with-openssl=/usr/lib/ssl"
+  else
+    printlines project="gsoap" task="check" msg="found"
+  fi
+
   if [ ! -z "$(pkgCheck name=libntlm minver=v1.5)" ]; then
     printlines project="libntlm" task="check" msg="not found"
     downloadAndExtract project="libntlm" file="libntlm-1.8.tar.gz" path="https://download-mirror.savannah.gnu.org/releases/libntlm/libntlm-1.8.tar.gz"
@@ -1194,7 +1194,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
 
   #Global check if gstreamer is already built
   if [ $gst_ret != 0 ]; then
-    buildGetTextAndAutoPoint
+    checkGetTextAndAutoPoint
 
     ################################################################
     # 
@@ -1233,7 +1233,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
       python3 -c 'from setuptools import setup'
       if [ $? != 0 ]; then
         printlines project="setuptools" task="check" msg="not found"
-        unbufferCall "python3 -m pip install --progress-bar on setuptools --upgrade" 2>&1 | printlines project="setuptools" task="install"
+        unbufferCall "python3 -m pip install --progress-bar on setuptools --upgrade" 2>&1 | printlines project="setuptools" task="pip"
         if [ "${PIPESTATUS[0]}" -ne 0 ]; then
           printError project="setuptools" task="install" msg="Failed to setuptools ninja via pip. Please try to install setuptools manually."
           exit 1
@@ -1246,7 +1246,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
       ret=$?
       if [ $ret != 0 ]; then
         printlines project="jinja2" task="jinja2" msg="not found"
-        unbufferCall "python3 -m pip install --progress-bar on jinja2 --upgrade" 2>&1 | printlines project="jinja2" task="install"
+        unbufferCall "python3 -m pip install --progress-bar on jinja2 --upgrade" 2>&1 | printlines project="jinja2" task="pip"
         if [ "${PIPESTATUS[0]}" -ne 0 ]; then
           printError project="jinja2" task="install" msg="Failed to jinja2 ninja via pip. Please try to install jinja2 manually."
           exit 1
@@ -1554,7 +1554,7 @@ configArgs=$@
 printlines project="onvifmgr" task="build" msg="configure $configArgs"
 cd $WORK_DIR
 
-unbufferCall "$SCRT_DIR/configure $configArgs" 2>&1 | printlines project="onvifmgr" task="configure"
+$SCRT_DIR/configure $configArgs 2>&1 | printlines project="onvifmgr" task="configure"
 if [ "${PIPESTATUS[0]}" -ne 0 ]; then
   printError project="onvifmgr" task="build" msg="Failed to configure OnvifDeviceManager"
 else
