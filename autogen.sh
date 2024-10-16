@@ -894,7 +894,7 @@ export PATH=$PATH:$SUBPROJECT_DIR/cmake-3.25.2/build/dist/bin
 if [ ! -z "$(progVersionCheck program=cmake linenumber=1 lineindex=2 major=3 minor=16 micro=3 )" ]; then
   printlines project="cmake" task="check" msg="not found"
   downloadAndExtract project="cmake" file="cmake-3.25.2.tar.gz" path="https://github.com/Kitware/CMake/releases/download/v3.25.2/cmake-3.25.2.tar.gz"
-  buildMakeProject project="cmake" srcdir="cmake-3.25.2" prefix="$SUBPROJECT_DIR/cmake-3.25.2/build/dist" skipbootstrap="true"
+  buildMakeProject project="cmake" srcdir="cmake-3.25.2" prefix="$SUBPROJECT_DIR/cmake-3.25.2/build/dist" skipbootstrap="true" configure="--parallel=$(nproc)"
 else
   printlines project="cmake" task="check" msg="found"
 fi
@@ -1366,7 +1366,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dcreate-log-dirs=false"
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dlocalstatedir=$SUBPROJECT_DIR/systemd-256/build/dist/localstate"
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dsshconfdir=$SUBPROJECT_DIR/systemd-256/build/dist/sshcfg"
-        downloadAndExtract file="v256.tar.gz" path="https://github.com/systemd/systemd/archive/refs/tags/v256.tar.gz"
+        downloadAndExtract project="udev" file="v256.tar.gz" path="https://github.com/systemd/systemd/archive/refs/tags/v256.tar.gz"
         C_INCLUDE_PATH=$SUBPROJECT_DIR/libcap/dist/usr/include \
         LIBRARY_PATH=$SUBPROJECT_DIR/libcap/dist/lib64 \
         buildMesonProject project="udev" srcdir="systemd-256" prefix="$SUBPROJECT_DIR/systemd-256/build/dist" mesonargs="$SYSD_MESON_ARGS"
