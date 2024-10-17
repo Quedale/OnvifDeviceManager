@@ -7,9 +7,12 @@ NO_DOWNLOAD=0
 
 #Save current working directory to run configure in
 WORK_DIR=$(pwd)
-
 #Get project root directory based on autogen.sh file location
 SCRT_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
+if [[ $SCRT_DIR = *" "* ]]; then #This is an autoconf workaround to support whitespace in $PATH
+  printError project="onvifmgr" task="init" msg="Whitespace found in current working directory."$'\n'"please move the project to a location without whitespace in its path."
+  exit 1
+fi
 SUBPROJECT_DIR=$SCRT_DIR/subprojects
 
 #Cache folder for downloaded sources
@@ -52,9 +55,7 @@ do
 done
 
 #Set debug flag on current project
-if [ $ENABLE_DEBUG -eq 1 ]; then
-  set -- "$@" "--enable-debug=yes"
-fi
+[ $ENABLE_DEBUG -eq 1 ] && set -- "$@" "--enable-debug=yes"
 
 unbufferCall(){
   if [ ! -z "$UNBUFFER_COMMAND" ]; then
@@ -142,11 +143,12 @@ printError(){
 }
 
 printNotice(){
-  local msg project task
+  local msg project task color
   local "${@}"
-  printlines project="${project}" task="${task}" color=${BHIGREEN} msg="*****************************"
-  printlines project="${project}" task="${task}" color=${BHIGREEN} prefix=" * " msg="${msg}"
-  printlines project="${project}" task="${task}" color=${BHIGREEN} msg="*****************************"
+  [[ ! -z "${color}" ]] && incolor="${color}" || incolor="${BHIGREEN}"
+  printlines project="${project}" task="${task}" color=${incolor} msg="*****************************"
+  printlines project="${project}" task="${task}" color=${incolor} prefix=" * " msg="${msg}"
+  printlines project="${project}" task="${task}" color=${incolor} msg="*****************************"
 }
 
 ############################################
@@ -190,28 +192,27 @@ downloadAndExtract (){
 
   if [ ! -f "$dest_val" ]; then
     printlines project="${project}" task="wget" msg="downloading: ${path}"
-    current=$(pwd)
-    cd $pathprefix #Changing directory so that wget logs only the filename
+    cd "$pathprefix" #Changing directory so that wget logs only the filename
     wget --show-progress --progress=bar:force ${path} -O ${file} 2>&1 | printlines project="${project}" task="wget";
-    cd $current
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="wget" msg="failed to fetch ${path}"
-      [[ ! -z "${noexit}" ]] && FAILED=1 && return || exit 1;
+      [[ ! -z "${noexit}" ]] && FAILED=1 && cd "$OLDPWD" && return || exit 1;
     fi
+    cd "$OLDPWD"
   else
     printlines project="${project}" task="wget" msg="source already downloaded"
   fi
 
   printlines project="${project}" task="wget" msg="extracting : ${file}"
-  if [[ ${pathprefix}${file} == *.tar.gz ]]; then
-    tar xfz ${pathprefix}${file} 2>&1 | printlines project="${project}" task="extract";
-  elif [[ ${pathprefix}${file} == *.tar.xz ]]; then
-    tar xf ${pathprefix}${file} 2>&1 | printlines project="${project}" task="extract";
-  elif [[ ${pathprefix}${file} == *.tar.bz2 ]]; then
-    tar xjf ${pathprefix}${file} 2>&1 | printlines project="${project}" task="extract";
-  elif [[ ${pathprefix}${file} == *.zip ]]; then
+  if [[ "${pathprefix}${file}" == *.tar.gz ]]; then
+    tar xfz "${pathprefix}${file}" 2>&1 | printlines project="${project}" task="extract";
+  elif [[ "${pathprefix}${file}" == *.tar.xz ]]; then
+    tar xf "${pathprefix}${file}" 2>&1 | printlines project="${project}" task="extract";
+  elif [[ "${pathprefix}${file}" == *.tar.bz2 ]]; then
+    tar xjf "${pathprefix}${file}" 2>&1 | printlines project="${project}" task="extract";
+  elif [[ "${pathprefix}${file}" == *.zip ]]; then
     checkUnzip
-    unzip -oq ${pathprefix}${file} 2>&1 | printlines project="${project}" task="extract";
+    unzip -oq "${pathprefix}${file}" 2>&1 | printlines project="${project}" task="extract";
   else
     printError project="${project}" task="wget" msg="downloaded file not found. ${file}"
     [[ ! -z "${noexit}" ]] && FAILED=1 && return || exit 1;
@@ -312,8 +313,8 @@ pullOrClone (){
 
   if [ $FAILED -eq 0 ] && [ ! -z "$SRC_CACHE_DIR" ] && [ -z "${ignorecache}" ]; then
     printlines project="${project}" task="git" msg="copy repo from cache"$"$dest_val"
-    rm -rf $name
-    cp -r $dest_val ./$name
+    rm -rf "$name"
+    cp -r "$dest_val" "./$name"
   fi
 }
 
@@ -328,18 +329,17 @@ buildMakeProject(){
 
   build_start=$SECONDS
 
-  printlines project="${project}" task="build" msg="src: ${srcdir}"
-  printlines project="${project}" task="build" msg="prefix: ${prefix}"
+  printlines project="${project}" task="build" msg="src: '${srcdir}'"
+  printlines project="${project}" task="build" msg="prefix: '${prefix}'"
   
-  curr_dir=$(pwd)
-  cd ${srcdir}
-
-  rel_path="."
   if [ "${outoftree}" == "true" ] 
   then
-    mkdir -p build
-    cd build
+    mkdir -p "${srcdir}/build"
+    cd "${srcdir}/build"
     rel_path=".."
+  else
+    cd "${srcdir}"
+    rel_path="."
   fi
 
   if [ -f "$rel_path/bootstrap" ] && [ -z "${skipbootstrap}" ]; then
@@ -347,7 +347,7 @@ buildMakeProject(){
     unbufferCall "$rel_path/bootstrap ${bootstrap}" 2>&1 | printlines project="${project}" task="bootstrap"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="bootstrap" msg="$rel_path/bootstrap failed ${srcdir}"
-      [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
+      [[ ! -z "${noexit}" ]] && FAILED=1 && cd "$OLDPWD" && return || exit 1;
     fi
   fi
 
@@ -356,7 +356,7 @@ buildMakeProject(){
     unbufferCall "$rel_path/bootstrap.sh ${bootstrap}" 2>&1 | printlines project="${project}" task="bootstrap.sh"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="bootstrap.sh" msg="$rel_path/bootstrap.sh failed ${srcdir}"
-      [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
+      [[ ! -z "${noexit}" ]] && FAILED=1 && cd "$OLDPWD" && return || exit 1;
     fi
   fi
   if [ -f "$rel_path/autogen.sh" ] && [ "${autogen}" != "skip" ]; then
@@ -364,7 +364,7 @@ buildMakeProject(){
     unbufferCall "$rel_path/autogen.sh ${autogen}" 2>&1 | printlines project="${project}" task="autogen.sh"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="autogen.sh" msg="Autogen failed ${srcdir}"
-      [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
+      [[ ! -z "${noexit}" ]] && FAILED=1 && cd "$OLDPWD" && return || exit 1;
     fi
   fi
 
@@ -374,7 +374,7 @@ buildMakeProject(){
     unbufferCall "autoreconf ${autoreconf}" 2>&1 | printlines project="${project}" task="autoreconf"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="autoreconf" msg="Autoreconf failed ${srcdir}"
-      [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
+      [[ ! -z "${noexit}" ]] && FAILED=1 && cd "$OLDPWD" && return || exit 1;
     fi
   fi
   
@@ -401,7 +401,7 @@ buildMakeProject(){
       "'${cmakedir}'" 2>&1 | printlines project="${project}" task="cmake"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="cmake" msg="failed ${srcdir}"
-      [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
+      [[ ! -z "${noexit}" ]] && FAILED=1 && cd "$OLDPWD" && return || exit 1;
     fi
   fi
 
@@ -411,7 +411,7 @@ buildMakeProject(){
     unbufferCall "bash -c \"${configcustom}\"" 2>&1 | printlines project="${project}" task="bash"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="bash" msg="command failed: ${configcustom}"
-      [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
+      [[ ! -z "${noexit}" ]] && FAILED=1 && cd "$OLDPWD" && return || exit 1;
     fi
   fi
 
@@ -419,22 +419,22 @@ buildMakeProject(){
     printlines project="${project}" task="configure" msg="src: ${srcdir}"
     printlines project="${project}" task="configure" msg="arguments: ${configure}"
     unbufferCall "$rel_path/configure " \
-        "--prefix=${prefix} " \
+        "--prefix='${prefix}' " \
         "${configure}" 2>&1 | printlines project="${project}" task="configure"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="configure" msg="$rel_path/configure failed ${srcdir}"
-      [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
+      [[ ! -z "${noexit}" ]] && FAILED=1 && cd "$OLDPWD" && return || exit 1;
     fi
   else
     printlines project="${project}" task="configure" msg="no configuration available"
   fi
 
   printlines project="${project}" task="compile" msg="src: ${srcdir}"
-  printlines project="${project}" task="compile" msg="arguments: ${makeargs}"
+  printlines project="${project}" task="compile" msg="arguments: '${makeargs}'"
   unbufferCall "make -j$(nproc) ${make}" 2>&1 | printlines project="${project}" task="compile"
   if [ "${PIPESTATUS[0]}" -ne 0 ]; then
     printError project="${project}" task="compile" msg="make failed ${srcdir}"
-    [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
+    [[ ! -z "${noexit}" ]] && FAILED=1 && cd "$OLDPWD" && return || exit 1;
   fi
 
   printlines project="${project}" task="install" msg="src: ${srcdir}"
@@ -442,13 +442,13 @@ buildMakeProject(){
   unbufferCall "make -j$(nproc) ${make} install ${installargs}" 2>&1 | printlines project="${project}" task="install"
   if [ "${PIPESTATUS[0]}" -ne 0 ]; then
     printError project="${project}" task="install" msg="failed ${srcdir}"
-    [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
+    [[ ! -z "${noexit}" ]] && FAILED=1 && cd "$OLDPWD" && return || exit 1;
   fi
 
   build_time=$(( SECONDS - build_start ))
   displaytime project="${project}" task="build" time=$build_time label="Build runtime: "
 
-  cd $curr_dir
+  cd "$OLDPWD"
 }
 
 ############################################
@@ -462,8 +462,8 @@ buildMesonProject() {
 
   build_start=$SECONDS
 
-  printlines project="${project}" task="meson" msg="src: ${srcdir}"
-  printlines project="${project}" task="meson" msg="prefix: ${prefix}"
+  printlines project="${project}" task="meson" msg="src: '${srcdir}'"
+  printlines project="${project}" task="meson" msg="prefix: '${prefix}'"
 
   curr_dir=$(pwd)
 
@@ -489,13 +489,13 @@ buildMesonProject() {
   fi
   
   if [ ! -z "${clean}" ]; then
-    rm -rf ${srcdir}/$build_dir
+    rm -rf "${srcdir}/$build_dir"
   fi
 
   if [ ! -d "${srcdir}/$build_dir" ]; then
-      mkdir -p ${srcdir}/$build_dir
+      mkdir -p "${srcdir}/$build_dir"
 
-      cd ${srcdir}
+      cd "${srcdir}"
       if [ -d "./subprojects" ]; then
         printlines project="${project}" task="meson" msg="download subprojects ${srcdir}"
         #     meson subprojects download
@@ -507,7 +507,7 @@ buildMesonProject() {
         unbufferCall "bash -c \"${setuppatch}\"" 2>&1 | printlines project="${project}" task="bash"
         if [ "${PIPESTATUS[0]}" -ne 0 ]; then
           printError project="${project}" task="bash" msg="command failed: ${srcdir}"
-          [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
+          [[ ! -z "${noexit}" ]] && FAILED=1 && cd "$OLDPWD" && return || exit 1;
         fi
       fi
       btype="release"
@@ -518,18 +518,18 @@ buildMesonProject() {
       unbufferCall "meson setup $build_dir " \
           "${mesonargs} " \
           "--default-library=$default_lib " \
-          "--prefix=${prefix} " \
+          "--prefix='${prefix}' " \
           "$bindir_val " \
           "--libdir=lib " \
           "--includedir=include " \
           "--buildtype=$btype" 2>&1 | printlines project="${project}" task="meson"
       if [ "${PIPESTATUS[0]}" -ne 0 ]; then
         printError project="${project}" task="meson" msg="setup failed ${srcdir}"
-        rm -rf $build_dir
-        [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
+        rm -rf "$build_dir"
+        [[ ! -z "${noexit}" ]] && FAILED=1 && cd "$OLDPWD" && return || exit 1;
       fi
   else
-      cd ${srcdir}
+      cd "${srcdir}"
       if [ -d "./subprojects" ]; then
         printlines project="${project}" task="meson" msg="update ${srcdir}"
         #     meson subprojects update
@@ -540,7 +540,7 @@ buildMesonProject() {
         unbufferCall "bash -c \"${setuppatch}\"" 2>&1 | printlines project="${project}" task="bash"
         if [ "${PIPESTATUS[0]}" -ne 0 ]; then
           printError project="${project}" task="bash" msg="command failed ${srcdir}"
-          [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
+          [[ ! -z "${noexit}" ]] && FAILED=1 && cd "$OLDPWD" && return || exit 1;
         fi
       fi
       btype="release"
@@ -551,7 +551,7 @@ buildMesonProject() {
       unbufferCall "meson setup $build_dir " \
           "${mesonargs} " \
           "--default-library=$default_lib " \
-          "--prefix=${prefix} " \
+          "--prefix='${prefix}' " \
           "$bindir_val " \
           "--libdir=lib " \
           "--includedir=include " \
@@ -559,8 +559,8 @@ buildMesonProject() {
           "--reconfigure" 2>&1 | printlines project="${project}" task="meson"
       if [ "${PIPESTATUS[0]}" -ne 0 ]; then
         printError project="${project}" task="meson" msg="setup failed ${srcdir}"
-        rm -rf $build_dir
-        [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
+        rm -rf "$build_dir"
+        [[ ! -z "${noexit}" ]] && FAILED=1 && cd "$OLDPWD" && return || exit 1;
       fi
   fi
 
@@ -571,19 +571,19 @@ buildMesonProject() {
   printf '\033[?7h' #Small hack to prevent meson from cropping progress line
   if [ $status -ne 0 ]; then
     printError project="${project}" task="meson" msg="compile failed ${srcdir}"
-    [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
+    [[ ! -z "${noexit}" ]] && FAILED=1 && cd "$OLDPWD" && return || exit 1;
   fi
 
   printlines project="${project}" task="meson" msg="install ${srcdir}"
   DESTDIR=${destdir} unbufferCall "meson install -C $build_dir" 2>&1 | printlines project="${project}" task="install"
   if [ "${PIPESTATUS[0]}" -ne 0 ]; then
     printError project="${project}" task="meson" msg="install failed ${srcdir}"
-    [[ ! -z "${noexit}" ]] && FAILED=1 && cd $curr_dir && return || exit 1;
+    [[ ! -z "${noexit}" ]] && FAILED=1 && cd "$OLDPWD" && return || exit 1;
   fi
 
   build_time=$(( SECONDS - build_start ))
   displaytime project="${project}" task="build" time=$build_time label="Build runtime: "
-  cd $curr_dir
+  cd "$OLDPWD"
 
 }
 
@@ -650,20 +650,20 @@ progVersionCheck(){
   fi
 }
 
-export PATH=$SUBPROJECT_DIR/unzip60/build/dist/bin:$PATH
+export PATH="$SUBPROJECT_DIR/unzip60/build/dist/bin":$PATH
 HAS_UNZIP=0
 checkUnzip(){
   if [ $HAS_UNZIP -eq 0 ] && [ ! -z "$(progVersionCheck program=unzip paramoverride="-v")" ]; then
     printlines project="unzip" task="check" msg="not found"
     downloadAndExtract project="unzip" file="unzip60.tar.gz" path="https://sourceforge.net/projects/infozip/files/UnZip%206.x%20%28latest%29/UnZip%206.0/unzip60.tar.gz/download"
-    buildMakeProject project="unzip" srcdir="unzip60" make="-f unix/Makefile generic" installargs="prefix=$SUBPROJECT_DIR/unzip60/build/dist MANDIR=$SUBPROJECT_DIR/unzip60/build/dist/share/man/man1 -f unix/Makefile"
+    buildMakeProject project="unzip" srcdir="unzip60" make="-f unix/Makefile generic" installargs=" prefix=$SUBPROJECT_DIR/unzip60/build/dist MANDIR=$SUBPROJECT_DIR/unzip60/build/dist/share/man/man1 -f unix/Makefile"
   elif [ $HAS_UNZIP -eq 0 ]; then
     printlines project="unzip" task="check" msg="found"
   fi
   HAS_UNZIP=1
 }
 
-export PATH=$PATH:$SUBPROJECT_DIR/gettext-0.21.1/dist/bin
+export PATH="$SUBPROJECT_DIR/gettext-0.21.1/dist/bin":$PATH
 HAS_GETTEXT=0
 checkGetTextAndAutoPoint(){
   if [ $HAS_GETTEXT -eq 0 ] && \
@@ -739,16 +739,16 @@ fi
 unbuffer echo "test" 2> /dev/null 1> /dev/null
 [ $? == 0 ] && UNBUFFER_COMMAND="unbuffer" && printlines project="unbuffer" task="check" msg="found" || printlines project="unbuffer" task="check" msg="not found"
 
-mkdir -p $SUBPROJECT_DIR
-mkdir -p $SRC_CACHE_DIR
+mkdir -p "$SUBPROJECT_DIR"
+mkdir -p "$SRC_CACHE_DIR"
 
-cd $SUBPROJECT_DIR
+cd "$SUBPROJECT_DIR"
 
 export ACLOCAL_PATH="$ACLOCAL_PATH:/usr/share/aclocal" #When using locally built autoconf, we need to add system path
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$(pkg-config --variable pc_path pkg-config); #When using locally built pkgconf, we need to add system path
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$(pkg-config --variable pc_path pkg-config)" #When using locally built pkgconf, we need to add system path
 
 #Setup gnu tools
-# export PATH=$SUBPROJECT_DIR/make-4.4.1/build/dist/bin:$PATH
+# export PATH="$SUBPROJECT_DIR/make-4.4.1/build/dist/bin":$PATH
 # if [ ! -z "$(progVersionCheck program=make linenumber=1 lineindex=2 major=4 minor=4 micro=1 )" ]; then
 #   echo "building make from source..."
 #   downloadAndExtract file="make-4.4.1.tar.gz" path="https://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz"
@@ -768,8 +768,8 @@ else
   printlines project="m4" task="check" msg="found"
 fi
 
-export PATH=$SUBPROJECT_DIR/autoconf-2.72/build/dist/bin:$PATH
-export ACLOCAL_PATH="$SUBPROJECT_DIR/autoconf-2.72/build/dist/share/autoconf:$ACLOCAL_PATH"
+export PATH="$SUBPROJECT_DIR/autoconf-2.72/build/dist/bin":$PATH
+export ACLOCAL_PATH="$SUBPROJECT_DIR/autoconf-2.72/build/dist/share/autoconf":$ACLOCAL_PATH
 if [ ! -z "$(progVersionCheck program=autoconf linenumber=1 lineindex=3 major=2 minor=70)" ]; then
   printlines project="autoconf" task="check" msg="not found"
   downloadAndExtract project="autoconf" file="autoconf-2.72.tar.xz" path="https://ftp.gnu.org/gnu/autoconf/autoconf-2.72.tar.xz"
@@ -778,8 +778,8 @@ else
   printlines project="autoconf" task="check" msg="found"
 fi
 
-export PATH=$SUBPROJECT_DIR/automake-1.17/build/dist/bin:$PATH
-export ACLOCAL_PATH="$SUBPROJECT_DIR/automake-1.17/build/dist/share/aclocal-1.17:$ACLOCAL_PATH"
+export PATH="$SUBPROJECT_DIR/automake-1.17/build/dist/bin":$PATH
+export ACLOCAL_PATH="$SUBPROJECT_DIR/automake-1.17/build/dist/share/aclocal-1.17":$ACLOCAL_PATH
 if [ ! -z "$(progVersionCheck program=automake linenumber=1 lineindex=3 major=1 minor=16 micro=1)" ]; then
   printlines project="automake" task="check" msg="not found"
   downloadAndExtract project="automake" file="automake-1.17.tar.xz" path="https://ftp.gnu.org/gnu/automake/automake-1.17.tar.xz"
@@ -788,8 +788,8 @@ else
   printlines project="automake" task="check" msg="found"
 fi
 
-export PATH=$SUBPROJECT_DIR/libtool-2.5.3/build/dist/bin:$PATH
-export ACLOCAL_PATH="$SUBPROJECT_DIR/libtool-2.5.3/build/dist/share/aclocal:$ACLOCAL_PATH"
+export PATH="$SUBPROJECT_DIR/libtool-2.5.3/build/dist/bin":$PATH
+export ACLOCAL_PATH="$SUBPROJECT_DIR/libtool-2.5.3/build/dist/share/aclocal":$ACLOCAL_PATH
 if [ ! -z "$(progVersionCheck program=libtoolize linenumber=1 lineindex=3 major=2 minor=4 micro=6)" ]; then
   printlines project="libtool" task="check" msg="not found"
   downloadAndExtract project="libtool" file="libtool-2.5.3.tar.xz" path="https://ftp.gnu.org/gnu/libtool/libtool-2.5.3.tar.xz"
@@ -798,7 +798,7 @@ else
   printlines project="libtool" task="check" msg="found"
 fi
 
-export PATH=$SUBPROJECT_DIR/flex-2.6.4/build/dist/bin:$PATH
+export PATH="$SUBPROJECT_DIR/flex-2.6.4/build/dist/bin":$PATH
 if [ ! -z "$(progVersionCheck program=flex linenumber=1 lineindex=1 major=2 minor=6 micro=4 )" ]; then
   checkGetTextAndAutoPoint
   printlines project="flex" task="check" msg="not found"
@@ -808,7 +808,7 @@ else
   printlines project="flex" task="check" msg="found"
 fi
 
-export PATH=$SUBPROJECT_DIR/bison-3.8.2/build/dist/bin:$PATH
+export PATH="$SUBPROJECT_DIR/bison-3.8.2/build/dist/bin":$PATH
 if [ ! -z "$(progVersionCheck program=bison linenumber=1 lineindex=3 major=3 minor=5 micro=1 )" ]; then
   printlines project="bison" task="check" msg="not found"
   downloadAndExtract project="bison" file="bison-3.8.2.tar.xz" path="https://ftp.gnu.org/gnu/bison/bison-3.8.2.tar.xz"
@@ -881,16 +881,16 @@ fi
 #    Build Openssl for gsoap and onvifsoap
 #       
 ################################################################
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/openssl/build/dist/lib/pkgconfig
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/openssl/build/dist/lib/pkgconfig"
 if [ ! -z "$(pkgCheck name=libcrypto minver=1.1.1f)" ]; then
   printlines project="openssl" task="check" msg="not found"
   pullOrClone project="openssl" path="https://github.com/openssl/openssl.git" tag="OpenSSL_1_1_1w"
-  buildMakeProject project="openssl" srcdir="openssl" configcustom="./config --prefix=$SUBPROJECT_DIR/openssl/build/dist --openssldir=$SUBPROJECT_DIR/openssl/build/dist/ssl -static"
+  buildMakeProject project="openssl" srcdir="openssl" configcustom="./config --prefix='$SUBPROJECT_DIR/openssl/build/dist' --openssldir='$SUBPROJECT_DIR/openssl/build/dist/ssl' -static"
 else
   printlines project="openssl" task="check" msg="found"
 fi
 
-export PATH=$PATH:$SUBPROJECT_DIR/cmake-3.25.2/build/dist/bin
+export PATH="$SUBPROJECT_DIR/cmake-3.25.2/build/dist/bin":$PATH
 if [ ! -z "$(progVersionCheck program=cmake linenumber=1 lineindex=2 major=3 minor=16 micro=3 )" ]; then
   printlines project="cmake" task="check" msg="not found"
   downloadAndExtract project="cmake" file="cmake-3.25.2.tar.gz" path="https://github.com/Kitware/CMake/releases/download/v3.25.2/cmake-3.25.2.tar.gz"
@@ -905,8 +905,8 @@ fi
 #   sudo apt-get install libglib2.0-dev (gstreamer minimum 2.64.0)
 # 
 ################################################################
-export PATH=$PATH:$SUBPROJECT_DIR/glib-2.74.1/dist/bin
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/glib-2.74.1/dist/lib/pkgconfig
+export PATH="$SUBPROJECT_DIR/glib-2.74.1/dist/bin":$PATH
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/glib-2.74.1/dist/lib/pkgconfig"
 if [ ! -z "$(pkgCheck name=glib-2.0 minver=2.64.0)" ]; then
   printlines project="glib" task="check" msg="not found"
   downloadAndExtract project="glib" file="glib-2.74.1.tar.xz" path="https://download.gnome.org/sources/glib/2.74/glib-2.74.1.tar.xz"
@@ -920,18 +920,18 @@ fi
 #    Build cutils
 #       
 ################################################################
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/CUtils/build/dist/lib/pkgconfig
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/CUtils/build/dist/lib/pkgconfig"
 rebuild=$(checkGitRepoState repo="CUtils" package="cutils")
 
 if [ $rebuild != 0 ]; then
   printlines project="cutils" task="check" msg="not found"
   #OnvifSoapLib depends on it and will also require a rebuild
-  rm -rf $SUBPROJECT_DIR/CUtils/build
-  rm -rf $SUBPROJECT_DIR/OnvifSoapLib/build
+  rm -rf "$SUBPROJECT_DIR/CUtils/build"
+  rm -rf "$SUBPROJECT_DIR/OnvifSoapLib/build"
   
   pullOrClone project="cutils" path=https://github.com/Quedale/CUtils.git ignorecache="true"
   #Clean up previous build in case of failure. This will prevent from falling back on the old version
-  rm -rf $SUBPROJECT_DIR/CUtils/build/dist/*
+  rm -rf "$SUBPROJECT_DIR/CUtils/build/dist/*"
   buildMakeProject project="cutils" srcdir="CUtils" prefix="$SUBPROJECT_DIR/CUtils/build/dist" cmakedir=".." outoftree=true cmakeclean=true
 else
   printlines project="cutils" task="check" msg="found"
@@ -942,16 +942,16 @@ fi
 #    Build OnvifSoapLib
 #       
 ################################################################
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/OnvifSoapLib/build/dist/lib/pkgconfig
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/libntlm-1.8/build/dist/lib/pkgconfig
-export PATH=$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin:$PATH
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/gsoap-2.8/build/dist/lib/pkgconfig
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/zlib-1.2.13/build/dist/lib/pkgconfig
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/OnvifSoapLib/build/dist/lib/pkgconfig"
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/libntlm-1.8/build/dist/lib/pkgconfig"
+export PATH="$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin":$PATH
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/gsoap-2.8/build/dist/lib/pkgconfig"
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/zlib-1.2.13/build/dist/lib/pkgconfig"
 rebuild=$(checkGitRepoState repo="OnvifSoapLib" package="onvifsoap")
 
 if [ $rebuild != 0 ]; then
   #Clean up previous build in case of failure. This will prevent from falling back on the old version
-  rm -rf $SUBPROJECT_DIR/OnvifSoapLib/build/dist/*  
+  rm -rf "$SUBPROJECT_DIR/OnvifSoapLib/build/dist/*" 
   printlines project="onvifsoap" task="check" msg="not found"
 
   if [ ! -z "$(pkgCheck name=zlib minver=1.2.11)" ]; then
@@ -1000,7 +1000,7 @@ if [ $rebuild != 0 ]; then
       fi
     fi
 
-    rm -rf $SUBPROJECT_DIR/gsoap-2.8/ #Make sure we dont extract over an old version
+    rm -rf "$SUBPROJECT_DIR/gsoap-2.8/" #Make sure we dont extract over an old version
     downloadAndExtract project="gsoap" file="gsoap_$gsoap_version.zip" path="https://sourceforge.net/projects/gsoap2/files/gsoap_$gsoap_version.zip/download"
     C_INCLUDE_PATH="$inc_path" \
     CPLUS_INCLUDE_PATH="$inc_path" \
@@ -1025,9 +1025,9 @@ if [ $rebuild != 0 ]; then
   nodownload=""
   if [ "$NO_DOWNLOAD" -eq 1 ]; then nodownload="--no-download"; fi
 
-  GSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8 \
+  GSOAP_SRC_DIR="$SUBPROJECT_DIR/gsoap-2.8" \
   C_INCLUDE_PATH="$(pkg-config --variable=includedir openssl):$(pkg-config --variable=includedir zlib):$C_INCLUDE_PATH" \
-  buildMakeProject project="onvifsoap" srcdir="OnvifSoapLib" prefix="$SUBPROJECT_DIR/OnvifSoapLib/build/dist" cmakedir=".." cmakeargs="-DGSOAP_SRC_DIR=$SUBPROJECT_DIR/gsoap-2.8" bootstrap="$nodownload --skip-gsoap $skipwsdl" outoftree=true cmakeclean=true
+  buildMakeProject project="onvifsoap" srcdir="OnvifSoapLib" prefix="$SUBPROJECT_DIR/OnvifSoapLib/build/dist" cmakedir=".." cmakeargs="-DGSOAP_SRC_DIR='$SUBPROJECT_DIR/gsoap-2.8'" bootstrap="$nodownload --skip-gsoap $skipwsdl" outoftree=true cmakeclean=true
 else
   printlines project="onvifsoap" task="check" msg="found"
 fi
@@ -1038,7 +1038,7 @@ fi
 #   sudo apt install llibasound2-dev (tested 1.2.7.2)
 # 
 ################################################################
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/alsa-lib/build/dist/lib/pkgconfig
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/alsa-lib/build/dist/lib/pkgconfig"
 if [ ! -z "$(pkgCheck name=alsa minver=1.2.2)" ]; then
   printlines project="alsa" task="check" msg="not found"
   pullOrClone project="alsa" path=git://git.alsa-project.org/alsa-lib.git tag=v1.2.8
@@ -1052,10 +1052,10 @@ fi
 #    Build Gstreamer dependency
 #       sudo apt install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 ################################################################
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/FFmpeg/dist/lib/pkgconfig
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/gstreamer/build_omx/dist/lib/gstreamer-1.0/pkgconfig
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/gstreamer/build/dist/lib/pkgconfig
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/gstreamer/build/dist/lib/gstreamer-1.0/pkgconfig
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/FFmpeg/dist/lib/pkgconfig"
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/gstreamer/build_omx/dist/lib/gstreamer-1.0/pkgconfig"
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/gstreamer/build/dist/lib/pkgconfig"
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/gstreamer/build/dist/lib/gstreamer-1.0/pkgconfig"
 
 gst_ret=0
 GSTREAMER_LATEST=1.24.8
@@ -1164,19 +1164,19 @@ if [ ! -z "$(checkGstreamerPkg version=$GSTREAMER_VERSION)" ]; then
   gst_ret=1;
 fi
 
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/pulseaudio/build/dist/lib/pkgconfig
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/libde265/dist/lib/pkgconfig
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/libx11/dist/lib/pkgconfig
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/macros/dist/lib/pkgconfig
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/pulseaudio/build/dist/lib/pkgconfig"
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/libde265/dist/lib/pkgconfig"
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/libx11/dist/lib/pkgconfig"
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/macros/dist/lib/pkgconfig"
 
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/systemd-256/build/dist/lib/pkgconfig
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/libgudev/build/dist/lib/pkgconfig
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/libcap/dist/lib64/pkgconfig
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/util-linux/dist/lib/pkgconfig
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$SUBPROJECT_DIR/libsndfile/dist/lib/pkgconfig
-export PATH=$SUBPROJECT_DIR/gperf-3.1/dist/bin:$PATH
-export PATH=$SUBPROJECT_DIR/nasm-2.15.05/dist/bin:$PATH
-export PATH=$SUBPROJECT_DIR/FFmpeg/dist/bin:$PATH
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/systemd-256/build/dist/lib/pkgconfig"
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/libgudev/build/dist/lib/pkgconfig"
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/libcap/dist/lib64/pkgconfig"
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/util-linux/dist/lib/pkgconfig"
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/libsndfile/dist/lib/pkgconfig"
+export PATH="$SUBPROJECT_DIR/gperf-3.1/dist/bin":$PATH
+export PATH="$SUBPROJECT_DIR/nasm-2.15.05/dist/bin":$PATH
+export PATH="$SUBPROJECT_DIR/FFmpeg/dist/bin":$PATH
 
 #Check to see if gstreamer exist on the system
 if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
@@ -1212,11 +1212,11 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
         printlines project="gperf" task="check" msg="found"
       fi
 
-      if [ ! -z "$(pkgCheck name=libcap minver=2.53)" ]; then
+      if [ ! -z "$(pkgCheck name=libcap minver=2.32)" ]; then
         printlines project="libcap" task="check" msg="not found"
         #old link git://git.kernel.org/pub/scm/linux/kernel/git/morgan/libcap.git
         pullOrClone project="libcap" path=https://kernel.googlesource.com/pub/scm/libs/libcap/libcap tag=libcap-2.69
-        buildMakeProject project="libcap" srcdir="libcap" prefix="$SUBPROJECT_DIR/libcap/dist" installargs="DESTDIR=$SUBPROJECT_DIR/libcap/dist"
+        buildMakeProject project="libcap" srcdir="libcap" prefix="$SUBPROJECT_DIR/libcap/dist" installargs="DESTDIR='$SUBPROJECT_DIR/libcap/dist'"
       else
         printlines project="libcap" task="check" msg="found"
       fi
@@ -1242,7 +1242,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
         printlines project="setuptools" task="check" msg="found"
       fi
 
-      python3 -c 'import jinja2'
+      python3 -c 'import jinja2' 2> /dev/null
       ret=$?
       if [ $ret != 0 ]; then
         printlines project="jinja2" task="jinja2" msg="not found"
@@ -1361,14 +1361,14 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Danalyze=false"
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dbpf-framework=false"
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dkernel-install=false"
-        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dsysvinit-path=$SUBPROJECT_DIR/systemd-256/build/dist/init.d"
-        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dbashcompletiondir=$SUBPROJECT_DIR/systemd-256/build/dist/bash-completion"
+        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dsysvinit-path='$SUBPROJECT_DIR/systemd-256/build/dist/init.d'"
+        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dbashcompletiondir='$SUBPROJECT_DIR/systemd-256/build/dist/bash-completion'"
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dcreate-log-dirs=false"
-        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dlocalstatedir=$SUBPROJECT_DIR/systemd-256/build/dist/localstate"
-        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dsshconfdir=$SUBPROJECT_DIR/systemd-256/build/dist/sshcfg"
+        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dlocalstatedir='$SUBPROJECT_DIR/systemd-256/build/dist/localstate'"
+        SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dsshconfdir='$SUBPROJECT_DIR/systemd-256/build/dist/sshcfg'"
         downloadAndExtract project="udev" file="v256.tar.gz" path="https://github.com/systemd/systemd/archive/refs/tags/v256.tar.gz"
-        C_INCLUDE_PATH=$SUBPROJECT_DIR/libcap/dist/usr/include \
-        LIBRARY_PATH=$SUBPROJECT_DIR/libcap/dist/lib64 \
+        C_INCLUDE_PATH="$SUBPROJECT_DIR/libcap/dist/usr/include" \
+        LIBRARY_PATH="$SUBPROJECT_DIR/libcap/dist/lib64" \
         buildMesonProject project="udev" srcdir="systemd-256" prefix="$SUBPROJECT_DIR/systemd-256/build/dist" mesonargs="$SYSD_MESON_ARGS"
 
       else
@@ -1376,8 +1376,8 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
       fi
 
       pullOrClone project="gudev" path=https://gitlab.gnome.org/GNOME/libgudev.git tag=237
-      C_INCLUDE_PATH=$SUBPROJECT_DIR/systemd-256/build/dist/include \
-      LIBRARY_PATH=$SUBPROJECT_DIR/libcap/dist/lib64:$SUBPROJECT_DIR/systemd-256/build/dist/lib \
+      C_INCLUDE_PATH="$SUBPROJECT_DIR/systemd-256/build/dist/include" \
+      LIBRARY_PATH="$SUBPROJECT_DIR/libcap/dist/lib64":"$SUBPROJECT_DIR/systemd-256/build/dist/lib" \
       buildMesonProject project="gudev" srcdir="libgudev" prefix="$SUBPROJECT_DIR/libgudev/build/dist" mesonargs="-Dvapi=disabled -Dtests=disabled -Dintrospection=disabled"
 
     else
@@ -1448,13 +1448,13 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
       if [ ! -z "$(pkgCheck name=xorg-macros minver=1.19.1)" ]; then
         printlines project="xmacro" task="check" msg="not found"
         pullOrClone project="xmacro" path="https://gitlab.freedesktop.org/xorg/util/macros.git" tag="util-macros-1.20.0"
-        buildMakeProject project="xmacro" srcdir="macros" prefix="$SUBPROJECT_DIR/macros/dist" configure="--datarootdir=$SUBPROJECT_DIR/macros/dist/lib"
+        buildMakeProject project="xmacro" srcdir="macros" prefix="$SUBPROJECT_DIR/macros/dist" configure="--datarootdir='$SUBPROJECT_DIR/macros/dist/lib'"
       else
         printlines project="xmacro" task="check" msg="found"
       fi
 
       pullOrClone project="x11" path="https://gitlab.freedesktop.org/xorg/lib/libx11.git" tag="libX11-1.8.8"
-      ACLOCAL_PATH="$SUBPROJECT_DIR/macros/dist/lib/aclocal:$ACLOCAL_PATH" \
+      ACLOCAL_PATH="$SUBPROJECT_DIR/macros/dist/lib/aclocal":$ACLOCAL_PATH \
       buildMakeProject project="x11" srcdir="libx11" prefix="$SUBPROJECT_DIR/libx11/dist"
     else
       printlines project="x11" task="check" msg="found"
@@ -1490,7 +1490,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
 
             pullOrClone project="ffmpeg" path="https://github.com/FFmpeg/FFmpeg.git" tag=n6.1.1
             buildMakeProject project="ffmpeg" srcdir="FFmpeg" prefix="$SUBPROJECT_DIR/FFmpeg/dist" configure="$FFMPEG_CONFIGURE_ARGS"
-            rm -rf $SUBPROJECT_DIR/FFmpeg/dist/lib/*.so
+            rm -rf "$SUBPROJECT_DIR/FFmpeg/dist/lib/*.so"
         else
             printlines project="ffmpeg" task="check" msg="found"
         fi
@@ -1531,7 +1531,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
     # echo "revision=v2.0.0" >> subprojects/tinyalsa.wrap
     # MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:tinyalsa=enabled"
 
-    LIBRARY_PATH=$LD_LIBRARY_PATH:$SUBPROJECT_DIR/systemd-256/dist/lib \
+    LIBRARY_PATH=$LD_LIBRARY_PATH:"$SUBPROJECT_DIR/systemd-256/dist/lib" \
     buildMesonProject project="gstreamer" srcdir="gstreamer" prefix="$SUBPROJECT_DIR/gstreamer/build/dist" mesonargs="$MESON_PARAMS" builddir="build"
   else
       printlines project="latest-gstreamer" task="check" msg="found"
@@ -1542,17 +1542,22 @@ fi
 
 printlines project="onvifmgr" task="build" msg="bootstrap"
 #Change to the project folder to run autoconf and automake
-cd $SCRT_DIR
+cd "$SCRT_DIR"
 #Initialize project
 aclocal 2>&1 | printlines project="onvifmgr" task="aclocal"
+[ "${PIPESTATUS[0]}" -ne 0 ] && printError project="onvifmgr" task="aclocal" msg="Failed to bootstrap OnvifDeviceManager" && exit 1
 autoconf 2>&1 | printlines project="onvifmgr" task="autoconf"
-automake --add-missing 2>&1 | printlines project="onvifmgr" task="automake"
-autoreconf 2>&1 | printlines project="onvifmgr" task="autoreconf"
+[ "${PIPESTATUS[0]}" -ne 0 ] && printError project="onvifmgr" task="autoconf" msg="Failed to bootstrap OnvifDeviceManager" && exit 1
 libtoolize 2>&1 | printlines project="onvifmgr" task="libtoolize"
+[ "${PIPESTATUS[0]}" -ne 0 ] && printError project="onvifmgr" task="libtoolize" msg="Failed to bootstrap OnvifDeviceManager" && exit 1
+automake --add-missing 2>&1 | printlines project="onvifmgr" task="automake"
+[ "${PIPESTATUS[0]}" -ne 0 ] && printError project="onvifmgr" task="automake" msg="Failed to bootstrap OnvifDeviceManager" && exit 1
+autoreconf 2>&1 | printlines project="onvifmgr" task="autoreconf"
+[ "${PIPESTATUS[0]}" -ne 0 ] && printError project="onvifmgr" task="autoreconf" msg="Failed to bootstrap OnvifDeviceManager" && exit 1
 
 configArgs=$@
 printlines project="onvifmgr" task="build" msg="configure $configArgs"
-cd $WORK_DIR
+cd "$WORK_DIR"
 
 $SCRT_DIR/configure $configArgs 2>&1 | printlines project="onvifmgr" task="configure"
 if [ "${PIPESTATUS[0]}" -ne 0 ]; then
