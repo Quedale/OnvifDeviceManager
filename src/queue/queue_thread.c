@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
-#include "cobject.h"
 #include "clogger.h"
 #include "threads.h"
 
@@ -107,7 +106,7 @@ void * priv_QueueThread_call(void * data){
             g_signal_emit (queue_thread, signals[STATE_CHANGED], 0, EVENTQUEUE_DISPATCHED /* details */);
         }
         QueueEvent__cleanup(event_queue);
-        CObject__destroy((CObject*)event_queue);
+        g_object_unref(event_queue);
     }
 
 exit:
@@ -128,7 +127,7 @@ QueueThread__set_property (GObject      *object,
     QueueThreadPrivate *priv = QueueThread__get_instance_private (thread);
     switch (prop_id){
         case PROP_QUEUE:
-            priv->queue = g_value_get_object (value);;
+            priv->queue = g_value_get_object (value);
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);

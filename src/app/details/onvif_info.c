@@ -58,6 +58,7 @@ typedef struct {
     char ** macs;
     char * version;
     char * uri;
+    QueueEvent * qevt; //Keep reference to check iscancelled before rendering result
 
 } InfoGUIUpdate;
 
@@ -130,8 +131,8 @@ gboolean * onvif_info_gui_update (void * user_data){
         C_TRAIL("onvif_info_gui_update - invalid device.");
         goto exit;
     }
-
-    if(!OnvifMgrDeviceRow__is_selected(update->device)){
+    
+    if(!OnvifMgrDeviceRow__is_selected(update->device) || QueueEvent__is_cancelled(update->qevt)){
         goto exit;
     }
 
@@ -206,11 +207,12 @@ exit:
     free(update->version);
     free(update->uri);
     g_object_unref(update->device);
+    g_object_unref(update->qevt);
     free(update);
     return FALSE;
 }
 
-void _update_details_page_cleanup(int cancelled, void * user_data){
+void _update_details_page_cleanup(QueueEvent * qevt, int cancelled, void * user_data){
     InfoDataUpdate * input = (InfoDataUpdate *) user_data;
     if(cancelled){
         //If cancelled, dispatch finish signal
@@ -220,7 +222,7 @@ void _update_details_page_cleanup(int cancelled, void * user_data){
     free(input);
 }
 
-void _update_details_page(void * user_data){
+void _update_details_page(QueueEvent * qevt, void * user_data){
     OnvifDeviceHostnameInfo * hostname = NULL;
     OnvifDeviceInformation * dev_info = NULL;
     OnvifDeviceInterfaces * interfaces = NULL;
@@ -242,23 +244,23 @@ void _update_details_page(void * user_data){
     OnvifDeviceService * devserv = OnvifDevice__get_device_service(onvif_device);
 
     hostname = OnvifDeviceService__getHostname(devserv);
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device) || QueueEvent__is_cancelled(qevt))
         goto exit;
 
     dev_info = OnvifDeviceService__getDeviceInformation(devserv);
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device) || QueueEvent__is_cancelled(qevt))
         goto exit;
 
     interfaces = OnvifDeviceService__getNetworkInterfaces(devserv);
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device) || QueueEvent__is_cancelled(qevt))
         goto exit;
 
     scopes = OnvifDeviceService__getScopes(devserv);
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device) || QueueEvent__is_cancelled(qevt))
         goto exit;
 
     caps = OnvifDeviceService__getCapabilities(devserv);
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device))
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device) || QueueEvent__is_cancelled(qevt))
         goto exit;
 
     //Initialize idle update data struct
@@ -267,6 +269,7 @@ void _update_details_page(void * user_data){
     gui_update->device = input->device;
     gui_update->mac_count = 0;
     gui_update->macs= NULL;
+    gui_update->qevt = qevt;
 
     //GetHostname fault handling
     SoapFault * fault = SoapObject__get_fault(SOAP_OBJECT(hostname));
@@ -415,6 +418,7 @@ void _update_details_page(void * user_data){
 
     gui_update->uri = OnvifBaseService__get_endpoint(ONVIF_BASE_SERVICE(devserv));
     g_object_ref(gui_update->device);
+    g_object_ref(gui_update->qevt);
     gdk_threads_add_idle(G_SOURCE_FUNC(onvif_info_gui_update),gui_update);
 exit:
     if(hostname)

@@ -63,7 +63,7 @@ gboolean gui_ProfilesDialog__show_profiles(void * user_data){
     return FALSE;
 }
 
-void _priv_ProfilesDialog__load_profiles(void * user_data){
+void _priv_ProfilesDialog__load_profiles(QueueEvent * qevt, void * user_data){
     ProfilesDialog* cdialog = (ProfilesDialog*)user_data;
     OnvifMediaService * mserv = OnvifDevice__get_media_service(OnvifMgrDeviceRow__get_device(cdialog->device));
     OnvifMediaProfiles * profiles = OnvifMediaService__get_profiles(mserv);

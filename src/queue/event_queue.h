@@ -28,8 +28,8 @@ struct _EventQueueClass
 
 EventQueue* EventQueue__new(); 
 
-void EventQueue__insert(EventQueue* queue, void * scope, void (*callback)(void * user_data), gpointer user_data, void (*cleanup_cb)(int cancelled, void * user_data));
-void EventQueue__insert_plain(EventQueue* self, void * scope, void (*callback)(void * user_data), void * user_data, void (*cleanup_cb)(int cancelled, void * user_data));
+void EventQueue__insert(EventQueue* queue, void * scope, void (*callback)(QueueEvent * qevt, void * user_data), gpointer user_data, void (*cleanup_cb)(QueueEvent * qevt, int cancelled, void * user_data));
+void EventQueue__insert_plain(EventQueue* self, void * scope, void (*callback)(QueueEvent * qevt, void * user_data), void * user_data, void (*cleanup_cb)(QueueEvent * qevt, int cancelled, void * user_data));
 QueueEvent * EventQueue__pop(EventQueue* self);
 void EventQueue__start(EventQueue* self);
 void EventQueue__stop(EventQueue* self, int nthread);
@@ -38,5 +38,7 @@ int EventQueue__get_pending_event_count(EventQueue * self);
 int EventQueue__get_thread_count(EventQueue * self);
 void EventQueue__cancel_scopes(EventQueue * self, void ** scopes, int count);
 void EventQueue__wait_condition(EventQueue * self, P_MUTEX_TYPE lock);
+
+G_END_DECLS
 
 #endif

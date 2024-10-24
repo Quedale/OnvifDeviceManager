@@ -4,7 +4,7 @@
 #include <string.h>
 #include "clogger.h"
 
-void evt_callback(void * user_data){
+void evt_callback(QueueEvent * qevt, void * user_data){
     printf("evt_callback\n");
     char * data = (char *) user_data;
 
@@ -12,7 +12,7 @@ void evt_callback(void * user_data){
 
 }
 
-void evt_cleanup_callback(int cancelled, void * user_data){
+void evt_cleanup_callback(QueueEvent * qevt, int cancelled, void * user_data){
 
 }
 

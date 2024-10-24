@@ -106,7 +106,7 @@ char * AppSettings__get_config_path(){
 }
 
 //Background task to save settings (invokes internal callbacks)
-void _save_settings(void * user_data){
+void _save_settings(QueueEvent * qevt, void * user_data){
     AppSettings * self = (AppSettings *) user_data;
 
     char * path = AppSettings__get_config_path();
