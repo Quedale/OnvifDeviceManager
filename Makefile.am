@@ -21,12 +21,6 @@ playerdemo_SOURCES = $(top_srcdir)/src/demo/player-demo.c \
 					$(top_srcdir)/src/gst/overlay.c \
 					$(top_srcdir)/src/gst/gstrtspplayer.c \
 					$(top_srcdir)/src/gst/src_retriever.c \
-					$(top_srcdir)/src/gst/gtk/gstplugin.c \
-					$(top_srcdir)/src/gst/gtk/gstgtkbasesink.c \
-					$(top_srcdir)/src/gst/gtk/gstgtksink.c \
-					$(top_srcdir)/src/gst/gtk/gstgtkutils.c \
-					$(top_srcdir)/src/gst/gtk/gtkgstbasewidget.c \
-					$(top_srcdir)/src/gst/gtk/gtkgstwidget.c \
 					$(top_srcdir)/src/gst/backchannel.c
 playerdemo_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0 cutils` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
 

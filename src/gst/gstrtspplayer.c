@@ -1,5 +1,4 @@
 #include "gstrtspplayer.h"
-#include "gtk/gstgtkbasesink.h"
 #include "clogger.h"
 #include "overlay.h"
 #include "backchannel.h"
