@@ -5,6 +5,7 @@ void safely_quit_gtk_main(void * user_data){
     gtk_main_quit();
 }
 void * _thread_destruction(void * event){
+    c_log_set_thread_color(ANSI_COLOR_RED, P_THREAD_ID);
     C_INFO("Starting clean up thread...\n");
     OnvifApp * app = (OnvifApp *) event;
     

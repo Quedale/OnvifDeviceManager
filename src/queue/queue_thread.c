@@ -19,6 +19,7 @@ enum
 
 typedef struct {
     P_THREAD_TYPE pthread;
+    int started;
     EventQueue * queue;
     P_MUTEX_TYPE sleep_lock;
     P_MUTEX_TYPE cancel_lock;
@@ -55,7 +56,8 @@ void QueueThread__dispose(GObject * obj){
     QueueThreadPrivate *priv = QueueThread__get_instance_private (QUEUE_THREAD(obj));
     P_MUTEX_CLEANUP(priv->sleep_lock);
     P_MUTEX_CLEANUP(priv->cancel_lock);
-
+    priv->started = 0;
+    priv->cancelled = 0;
     G_OBJECT_CLASS (QueueThread__parent_class)->dispose (obj);
 }
 
@@ -70,7 +72,6 @@ QueueThread * QueueThread__get_current(){
 }
 
 void * priv_QueueThread_call(void * data){
-    C_DEBUG("Started...");
     queue_thread = (QueueThread*) data;
     event_queue = NULL;
     QueueThreadPrivate *priv = QueueThread__get_instance_private (queue_thread);
@@ -110,7 +111,6 @@ void * priv_QueueThread_call(void * data){
     }
 
 exit:
-    C_INFO("Finished...");
     g_signal_emit (queue_thread, signals[STATE_CHANGED], 0, EVENTQUEUE_FINISHED /* details */);
     g_object_unref(queue_thread);
     P_THREAD_EXIT;
@@ -194,10 +194,20 @@ void QueueThread__init(QueueThread * self){
     
     P_MUTEX_SETUP(priv->sleep_lock);
     P_MUTEX_SETUP(priv->cancel_lock);
+    priv->started = 0;
+    priv->cancelled = 0;
+}
 
+void QueueThread__start(QueueThread * self){
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (QUEUE_IS_THREAD (self));
+
+    QueueThreadPrivate *priv = QueueThread__get_instance_private (self);
+    g_return_if_fail (priv->started == 0); 
     g_object_ref(self);
     P_THREAD_CREATE(priv->pthread, priv_QueueThread_call, self);
     P_THREAD_DETACH(priv->pthread);
+    priv->started = 1;
 }
 
 QueueThread * QueueThread__new(EventQueue* queue){

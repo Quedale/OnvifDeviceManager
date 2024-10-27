@@ -72,7 +72,6 @@ void * AppDialog__get_user_data(AppDialog * self){
 void AppDialog__init(AppDialog* self, GtkWidget * (*create_ui)(AppDialogEvent *)) {
     CObject__init((CObject*)self);
     CObject__set_destroy_callback((CObject*)self,priv_AppDialolg__destroy);
-    C_TRACE("init");
     self->title = NULL;
     self->submit_label = NULL;
     self->visible = 0;
@@ -108,7 +107,6 @@ void AppDialog__show(AppDialog* dialog, void (*submit_callback)(AppDialogEvent *
         return;
     }
 
-    C_DEBUG("show");
     dialog->visible = 1;
 
     //Set input userdata for current dialog session

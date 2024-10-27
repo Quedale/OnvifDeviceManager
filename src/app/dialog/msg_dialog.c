@@ -57,7 +57,6 @@ void MsgDialog__reset(MsgDialog* self) {
 }
 
 MsgDialog * MsgDialog__create(){
-    C_TRACE("create");
     MsgDialog * dialog = malloc(sizeof(MsgDialog));
     dialog->elements = malloc(sizeof(DialogElements));
     dialog->icon = NULL;

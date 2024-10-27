@@ -47,6 +47,7 @@ struct _QueueThreadClass
 QueueThread * QueueThread__new(EventQueue* queue); 
 void QueueThread__cancel(QueueThread* self);
 int QueueThread__is_cancelled(QueueThread* self);
+void QueueThread__start(QueueThread * self);
 
 //Thread-local function returning the current context pointers
 //Designed to be used within background events

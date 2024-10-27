@@ -25,7 +25,6 @@ const char * CredentialsDialog__get_password(CredentialsDialog * self){
 }
 
 CredentialsDialog * CredentialsDialog__create(){
-    C_TRACE("create");
     CredentialsDialog * dialog = malloc(sizeof(CredentialsDialog));
     dialog->elements = malloc(sizeof(DialogElements));
     AppDialog__init((AppDialog*)dialog,priv_CredentialsDialog__create_ui);

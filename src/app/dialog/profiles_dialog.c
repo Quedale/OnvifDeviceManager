@@ -22,7 +22,6 @@ typedef struct {
 } GUIProfileEvent;
 
 GtkWidget * priv_ProfilesDialog__create_ui(AppDialogEvent * event){
-    C_TRACE("priv_ProfilesDialog__create_ui");
     ProfilesDialog * dialog = (ProfilesDialog *) event->dialog; 
     DialogElements * elements = (DialogElements *) dialog->elements;
 
@@ -117,7 +116,6 @@ ProfilesDialog * ProfilesDialog__create(EventQueue * queue, void (* clicked)  (P
     dialog->queue = queue;
     dialog->device = NULL;
     dialog->profile_selected = clicked;
-    C_TRACE("create");
     AppDialog__init((AppDialog *)dialog, priv_ProfilesDialog__create_ui);
     CObject__set_allocated((CObject *) dialog);
     AppDialog__set_destroy_callback((AppDialog*)dialog,priv_ProfilesDialog__destroy);

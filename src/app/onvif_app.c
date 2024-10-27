@@ -478,6 +478,7 @@ void OnvifApp__eq_dispatch_cb(EventQueue * queue, QueueEventType type, OnvifApp 
     int pending = EventQueue__get_pending_event_count(queue);
     int total = EventQueue__get_thread_count(queue);
 
+    if(type == EVENTQUEUE_FINISHED) total--;
     C_TRACE("EventQueue %s : %d/%d/%d",g_enum_to_nick(QUEUE_TYPE_EVENTTYPE,type),running,pending,total);
 
     char str[10];

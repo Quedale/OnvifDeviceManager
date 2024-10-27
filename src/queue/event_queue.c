@@ -21,11 +21,20 @@ typedef struct {
     P_COND_TYPE sleep_cond;
     P_MUTEX_TYPE pool_lock;
     P_MUTEX_TYPE threads_lock;
+    P_MUTEX_TYPE signal_lock;
 } EventQueuePrivate;
 
 static guint signals[LAST_SIGNAL] = { 0 };
 
 G_DEFINE_TYPE_WITH_PRIVATE(EventQueue, EventQueue_, G_TYPE_OBJECT)
+
+void EventQueue__emit_pool_changed(EventQueue * self, QueueEventType type){
+    EventQueuePrivate *priv = EventQueue__get_instance_private (self);
+
+    P_MUTEX_LOCK(priv->signal_lock); //notify can be called async from multiple threads. Preventing simultanious emit
+    g_signal_emit (self, signals[POOL_CHANGED], 0, type /* details */);
+    P_MUTEX_UNLOCK(priv->signal_lock);
+}
 
 void EventQueue__wait_finish(EventQueue* self){
     int val = -1;
@@ -34,7 +43,7 @@ void EventQueue__wait_finish(EventQueue* self){
     }
 }
 
-void EventQueue__finalize(GObject * obj){
+void EventQueue__dispose(GObject * obj){
     EventQueue * queue = QUEUE_EVENTQUEUE(obj);
     EventQueuePrivate *priv = EventQueue__get_instance_private (queue);
 
@@ -44,22 +53,35 @@ void EventQueue__finalize(GObject * obj){
         EventQueue__stop(queue,tcount);
         EventQueue__wait_finish(queue);
     }
-    g_list_free(priv->events);
-    g_list_free(priv->threads);
-    g_list_free(priv->running_events);
+    if(priv->events){
+        //TODO Cancel pending event for clean up
+        g_list_free(priv->events);
+        priv->events = NULL;
+    }
+    if(priv->threads){
+        g_list_free(priv->threads);
+        priv->threads = NULL;
+    }
+
+    if(priv->running_events){
+        //Nothing to cancel here, since threads are all dead
+        g_list_free(priv->running_events);
+        priv->running_events = NULL;
+    }
 
     P_COND_CLEANUP(priv->sleep_cond);
     P_MUTEX_CLEANUP(priv->pool_lock);
     P_MUTEX_CLEANUP(priv->threads_lock);
+    P_MUTEX_CLEANUP(priv->signal_lock);
 
-    G_OBJECT_CLASS (EventQueue__parent_class)->finalize (obj);
+    G_OBJECT_CLASS (EventQueue__parent_class)->dispose (obj);
 }
 
 static void
 EventQueue__class_init (EventQueueClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
-    object_class->finalize = EventQueue__finalize;
+    object_class->dispose = EventQueue__dispose;
 
     GType params[1];
     params[0] = QUEUE_TYPE_EVENTTYPE | G_SIGNAL_TYPE_STATIC_SCOPE;
@@ -86,10 +108,10 @@ void EventQueue__init(EventQueue* self) {
     P_COND_SETUP(priv->sleep_cond);
     P_MUTEX_SETUP(priv->pool_lock);
     P_MUTEX_SETUP(priv->threads_lock);
+    P_MUTEX_SETUP(priv->signal_lock);
 }
 
 EventQueue* EventQueue__new() {
-    C_TRACE("create...");
     return g_object_new (QUEUE_TYPE_EVENTQUEUE, NULL);
 }
 
@@ -219,7 +241,7 @@ void EventQueue__cancel_scopes(EventQueue * self, void ** scopes, int count){
                 priv->events = g_list_remove(priv->events,evt);
                 i--;
                 evtcount--;
-                g_signal_emit (self, signals[POOL_CHANGED], 0, EVENTQUEUE_CANCELLED /* details */);
+                EventQueue__emit_pool_changed(self, EVENTQUEUE_CANCELLED);
                 QueueEvent__cleanup(evt);
                 g_object_unref(evt);
             }
@@ -263,27 +285,28 @@ void EventQueue__notify_cb(QueueThread * thread, QueueEventType type, EventQueue
             P_MUTEX_LOCK(priv->pool_lock);
             priv->running_events = g_list_remove(priv->running_events, QueueEvent__get_current());
             P_MUTEX_UNLOCK(priv->pool_lock);
+            EventQueue__emit_pool_changed(self, type);
             break;
         case EVENTQUEUE_FINISHED:
+            EventQueue__emit_pool_changed(self, type);
             EventQueue__remove_thread(self,thread);
             break;
         default:
+            EventQueue__emit_pool_changed(self, type);
             break;
     }
-    
-    g_signal_emit (self, signals[POOL_CHANGED], 0, type /* details */);
 }
 
 void EventQueue__start(EventQueue* self){
     g_return_if_fail (self != NULL);
     g_return_if_fail (QUEUE_IS_EVENTQUEUE (self));
     EventQueuePrivate *priv = EventQueue__get_instance_private (self);
-    P_MUTEX_LOCK(priv->threads_lock);
     QueueThread * qt = QueueThread__new(self);
     g_signal_connect (G_OBJECT (qt), "state-changed", G_CALLBACK (EventQueue__notify_cb), self);
-
+    P_MUTEX_LOCK(priv->threads_lock);
     priv->threads = g_list_append(priv->threads, qt);
     P_MUTEX_UNLOCK(priv->threads_lock);
+    QueueThread__start(qt);
 }
 
 void EventQueue__wait_condition(EventQueue * self, P_MUTEX_TYPE lock){

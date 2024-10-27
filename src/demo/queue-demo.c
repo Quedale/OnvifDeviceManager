@@ -5,10 +5,9 @@
 #include "clogger.h"
 
 void evt_callback(QueueEvent * qevt, void * user_data){
-    printf("evt_callback\n");
     char * data = (char *) user_data;
 
-    printf("data : %s\n",data);
+    C_DEBUG("Background Task data : %s\n",data);
 
 }
 
@@ -28,6 +27,7 @@ void eventqueue_dispatch_cb(EventQueue * queue, QueueEventType type,  void * sel
 
 int main()
 {
+    c_log_set_thread_color(ANSI_COLOR_DRK_GREEN, P_THREAD_ID);
     EventQueue * queue = EventQueue__new();
     g_signal_connect (G_OBJECT(queue), "pool-changed", G_CALLBACK (eventqueue_dispatch_cb), NULL);
 
