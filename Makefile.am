@@ -105,7 +105,7 @@ gtksliderdemo_SOURCES = $(top_srcdir)/src/demo/widget-demo.c \
 					$(top_srcdir)/src/animations/gtk/custom_gtk_progress_tracker.c
 gtksliderdemo_LDFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs gtk+-3.0 cutils` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
 
-deb$(EXEEXT):
+deb$(EXEEXT): onvifmgr
 	@echo "Creating debian packge definition..."
 	@rm -rf onvifmgr_$(APP_VERSION)
 	@mkdir onvifmgr_$(APP_VERSION)
