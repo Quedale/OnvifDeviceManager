@@ -11,6 +11,7 @@ typedef struct _OnvifDetails {
 
 
 void OnvifDetails__hide_loading_cb(GtkWidget * widget, OnvifMgrDeviceRow * device, OnvifDetails * details){
+    if(!GTK_IS_NOTEBOOK(details->details_notebook)) return; //This can happen upon app destruction
     //Checking that the finished event is the current selected page before hiding the loading indicator (Another detail page is loading or loaded)
     int current_page = gtk_notebook_get_current_page(GTK_NOTEBOOK(details->details_notebook));
     int widget_page = gtk_notebook_page_num(GTK_NOTEBOOK(details->details_notebook), widget);

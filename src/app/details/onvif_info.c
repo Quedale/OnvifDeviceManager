@@ -39,6 +39,7 @@ typedef struct {
     GtkWidget * uri_lbl;
 
     QueueEvent * previous_event;
+    gulong event_signal;
 } OnvifInfoPanelPrivate;
 
 static GParamSpec *obj_properties[N_PROPERTIES] = { NULL, };
@@ -129,12 +130,7 @@ void OnvifInfoPanel__map_event_cb (GtkWidget* self, OnvifInfoPanel * info){
 gboolean onvif_info_gui_update (void * user_data){
     InfoGUIUpdate * update = (InfoGUIUpdate *) user_data;
 
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(update->device)){
-        C_TRAIL("onvif_info_gui_update - invalid device.");
-        goto exit;
-    }
-    
-    if(!OnvifMgrDeviceRow__is_selected(update->device) || QueueEvent__is_cancelled(update->qevt)){
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(update->device) || !OnvifMgrDeviceRow__is_selected(update->device) || QueueEvent__is_cancelled(update->qevt)){
         goto exit;
     }
 
@@ -214,12 +210,13 @@ exit:
     return FALSE;
 }
 
+void update_details_event_cancelled_cb(QueueEvent * qevt, void * user_data){
+    InfoDataUpdate * input = (InfoDataUpdate *) user_data;
+    gui_signal_emit(input->info, signals[FINISHED], input->device);
+}
+
 void _update_details_page_cleanup(QueueEvent * qevt, int cancelled, void * user_data){
     InfoDataUpdate * input = (InfoDataUpdate *) user_data;
-    if(cancelled){
-        //If cancelled, dispatch finish signal
-        gui_signal_emit(input->info, signals[FINISHED], input->device);
-    }
     g_object_unref(input->device);
     free(input);
 }
@@ -452,15 +449,18 @@ void OnvifInfoPanel_update_details(OnvifInfoPanel * self){
     input->info = self;
     g_object_ref(priv->device);
     if(priv->previous_event && !QueueEvent__is_finished(priv->previous_event)) {
+        g_signal_handler_disconnect(priv->previous_event,priv->event_signal); //Removing signal to prevent loading from hiding
         QueueEvent__cancel(priv->previous_event);
         g_object_unref(priv->previous_event);
         priv->previous_event = NULL;
+        priv->event_signal = 0;
     } else if(priv->previous_event){
         g_object_unref(priv->previous_event);
     }
 
     g_signal_emit (self, signals[STARTED], 0, priv->device);
     priv->previous_event = EventQueue__insert_plain(OnvifApp__get_EventQueue(priv->app), priv->device, _update_details_page,input, _update_details_page_cleanup);
+    priv->event_signal = g_signal_connect (priv->previous_event, "cancelled", G_CALLBACK (update_details_event_cancelled_cb), input);
     g_object_ref(priv->previous_event);
 }
 

@@ -6,6 +6,7 @@
 enum {
     SIGNAL_CALL,
     SIGNAL_CLEANUP,
+    SIGNAL_CANCELLED,
     LAST_SIGNAL
 };
 
@@ -124,6 +125,18 @@ QueueEvent__class_init (QueueEventClass * klass)
                         1     /* n_params */,
                         params2  /* param_types */);
 
+    signals[SIGNAL_CANCELLED] =
+        g_signal_newv ("cancelled",
+                        G_TYPE_FROM_CLASS (klass),
+                        G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
+                        NULL /* closure */,
+                        NULL /* accumulator */,
+                        NULL /* accumulator data */,
+                        NULL /* C marshaller */,
+                        G_TYPE_NONE /* return_type */,
+                        0     /* n_params */,
+                        NULL);
+
     obj_properties[PROP_MANAGED] =
         g_param_spec_boolean ("managed",
                             "Managed Event",
@@ -172,9 +185,11 @@ void QueueEvent__cancel(QueueEvent * self){
     g_return_if_fail (QUEUE_IS_QUEUEEVENT (self));
     QueueEventPrivate *priv = QueueEvent__get_instance_private (self);
 
+    g_return_if_fail (priv->cancelled == 0);
     P_MUTEX_LOCK(priv->prop_lock);
     priv->cancelled = 1;
     P_MUTEX_UNLOCK(priv->prop_lock);
+    g_signal_emit (self, signals[SIGNAL_CANCELLED], 0);
 }
 
 void QueueEvent__finish(QueueEvent * self){
@@ -214,7 +229,7 @@ int QueueEvent__is_finished(QueueEvent * self){
 void QueueEvent__invoke(QueueEvent * self){
     g_return_if_fail (self != NULL);  //Happens if pop happens simultaniously at 0. Continue to wait on condition call
     g_return_if_fail (QUEUE_IS_QUEUEEVENT (self)); 
-    g_signal_emit (self, signals[SIGNAL_CALL], 0 /* details */);
+    g_signal_emit (self, signals[SIGNAL_CALL], 0);
 }
 
 void QueueEvent__cleanup(QueueEvent * self){
@@ -222,7 +237,7 @@ void QueueEvent__cleanup(QueueEvent * self){
     g_return_if_fail (QUEUE_IS_QUEUEEVENT (self));
     QueueEventPrivate *priv = QueueEvent__get_instance_private (self);
 
-    g_signal_emit (self, signals[SIGNAL_CLEANUP], 0, priv->cancelled /* details */);
+    g_signal_emit (self, signals[SIGNAL_CLEANUP], 0, priv->cancelled);
     if(priv->managed){
         g_object_unref(G_OBJECT(priv->user_data));
     }

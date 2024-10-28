@@ -19,6 +19,7 @@ typedef struct {
     OnvifMgrDeviceRow * device;
 
     QueueEvent * previous_event;
+    gulong event_signal;
 } OnvifNetworkPanelPrivate;
 
 static GParamSpec *obj_properties[N_PROPERTIES] = { NULL, };
@@ -176,12 +177,7 @@ gboolean onvif_network_gui_update (void * user_data){
     NetworkGUIUpdate * update = (NetworkGUIUpdate *) user_data;
     OnvifNetworkPanelPrivate *priv = OnvifNetworkPanel__get_instance_private (update->network);
 
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(priv->device)){
-        C_TRAIL("onvif_info_gui_update - invalid device.");
-        goto exit;
-    }
-
-    if(!OnvifMgrDeviceRow__is_selected(priv->device)){
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(priv->device) || !OnvifMgrDeviceRow__is_selected(priv->device) || QueueEvent__is_cancelled(update->qevt)){
         goto exit;
     }
     
@@ -206,13 +202,15 @@ exit:
     return FALSE;
 }
 
+void update_network_event_cancelled_cb(QueueEvent * qevt, void * user_data){
+    NetworkGUIUpdate * input = (NetworkGUIUpdate *) user_data;
+    OnvifNetworkPanelPrivate *priv = OnvifNetworkPanel__get_instance_private (input->network);
+    gui_signal_emit(input->network, signals[FINISHED], priv->device);
+}
+
 void _update_network_page_cleanup(QueueEvent * qevt, int cancelled, void * user_data){
     NetworkGUIUpdate * input = (NetworkGUIUpdate *) user_data;
     OnvifNetworkPanelPrivate *priv = OnvifNetworkPanel__get_instance_private (input->network);
-    if(cancelled){
-        //If cancelled, dispatch finish signal
-        gui_signal_emit(input->network, signals[FINISHED],priv->device);
-    }
     
     g_object_unref(priv->device);
     free(input);
@@ -266,15 +264,18 @@ void OnvifNetworkPanel_update_details(OnvifNetworkPanel * self){
     g_object_ref(priv->device); //Referenced cleaned up in _update_network_page_cleanup
 
     if(priv->previous_event && !QueueEvent__is_finished(priv->previous_event)) {
+        g_signal_handler_disconnect(priv->previous_event,priv->event_signal); //Removing signal to prevent loading from hiding
         QueueEvent__cancel(priv->previous_event);
         g_object_unref(priv->previous_event);
         priv->previous_event = NULL;
+        priv->event_signal = 0;
     } else if(priv->previous_event){
         g_object_unref(priv->previous_event);
     }
 
     g_signal_emit (self, signals[STARTED], 0, priv->device);
     priv->previous_event = EventQueue__insert_plain(OnvifApp__get_EventQueue(priv->app), priv->device, _update_network_page,input, _update_network_page_cleanup);
+    priv->event_signal = g_signal_connect (priv->previous_event, "cancelled", G_CALLBACK (update_network_event_cancelled_cb), input);
     g_object_ref(priv->previous_event);
 }
 

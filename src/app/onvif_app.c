@@ -621,7 +621,7 @@ static int OnvifApp__reload_device(QueueEvent * qevt, OnvifMgrDeviceRow * device
 
     if(OnvifDevice__is_authenticated(odev) && OnvifMgrDeviceRow__is_selected(device)){
         //Authenticated device counts a changed
-        g_signal_emit (app, signals[DEVICE_CHANGED], 0, device /* details */);
+        gui_signal_emit(app, signals[DEVICE_CHANGED], device);
 
         OnvifAppPrivate *priv = OnvifApp__get_instance_private (app);
         safely_start_spinner(priv->player_loading_handle);
