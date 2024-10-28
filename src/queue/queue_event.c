@@ -20,7 +20,8 @@ enum
 typedef struct {
     int managed;
     int cancelled;
-    P_MUTEX_TYPE cancel_lock;
+    int finished;
+    P_MUTEX_TYPE prop_lock;
     void * scope;
     void * user_data;
 } QueueEventPrivate;
@@ -36,7 +37,7 @@ QueueEvent__dispose (GObject *object)
     QueueEvent * self = QUEUE_QUEUEEVENT(object);
     QueueEventPrivate *priv = QueueEvent__get_instance_private (self);
 
-    P_MUTEX_CLEANUP(priv->cancel_lock);
+    P_MUTEX_CLEANUP(priv->prop_lock);
 
     G_OBJECT_CLASS (QueueEvent__parent_class)->dispose (object);
 }
@@ -149,7 +150,9 @@ QueueEvent__class_init (QueueEventClass * klass)
 
 void QueueEvent__init(QueueEvent * self){
     QueueEventPrivate *priv = QueueEvent__get_instance_private (self);
-    P_MUTEX_SETUP(priv->cancel_lock);
+    P_MUTEX_SETUP(priv->prop_lock);
+    priv->cancelled = 0;
+    priv->finished = 0;
 }
 
 QueueEvent* QueueEvent__new(void * scope, void (*callback)(void * user_data), void * user_data, void (*cleanup_cb)(int cancelled, void * user_data), int managed){
@@ -169,20 +172,42 @@ void QueueEvent__cancel(QueueEvent * self){
     g_return_if_fail (QUEUE_IS_QUEUEEVENT (self));
     QueueEventPrivate *priv = QueueEvent__get_instance_private (self);
 
-    P_MUTEX_LOCK(priv->cancel_lock);
+    P_MUTEX_LOCK(priv->prop_lock);
     priv->cancelled = 1;
-    P_MUTEX_UNLOCK(priv->cancel_lock);
+    P_MUTEX_UNLOCK(priv->prop_lock);
 }
 
+void QueueEvent__finish(QueueEvent * self){
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (QUEUE_IS_QUEUEEVENT (self));
+    QueueEventPrivate *priv = QueueEvent__get_instance_private (self);
+
+    g_return_if_fail (priv->cancelled == 0);
+    P_MUTEX_LOCK(priv->prop_lock);
+    priv->finished = 1;
+    P_MUTEX_UNLOCK(priv->prop_lock);
+}
 int QueueEvent__is_cancelled(QueueEvent * self){
     g_return_val_if_fail (self != NULL, FALSE);
     g_return_val_if_fail (QUEUE_IS_QUEUEEVENT (self), FALSE);
     QueueEventPrivate *priv = QueueEvent__get_instance_private (self);
 
     int ret;
-    P_MUTEX_LOCK(priv->cancel_lock);
+    P_MUTEX_LOCK(priv->prop_lock);
     ret = priv->cancelled;
-    P_MUTEX_UNLOCK(priv->cancel_lock);
+    P_MUTEX_UNLOCK(priv->prop_lock);
+    return ret;
+}
+
+int QueueEvent__is_finished(QueueEvent * self){
+    g_return_val_if_fail (self != NULL, TRUE);
+    g_return_val_if_fail (QUEUE_IS_QUEUEEVENT (self), TRUE);
+    QueueEventPrivate *priv = QueueEvent__get_instance_private (self);
+
+    int ret;
+    P_MUTEX_LOCK(priv->prop_lock);
+    ret = priv->finished;
+    P_MUTEX_UNLOCK(priv->prop_lock);
     return ret;
 }
 

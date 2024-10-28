@@ -22,7 +22,6 @@ void OnvifDetails__hide_loading_cb(GtkWidget * widget, OnvifMgrDeviceRow * devic
 }
 
 void OnvifDetails__show_loading_cb(GtkWidget * widget, OnvifMgrDeviceRow * device, OnvifDetails * details){
-    //TODO Cancel pending/running events
     if(GTK_IS_SPINNER(details->details_loading_handle)){
         gtk_spinner_start (GTK_SPINNER (details->details_loading_handle));
     }

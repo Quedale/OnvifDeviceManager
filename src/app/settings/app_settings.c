@@ -136,7 +136,7 @@ void apply_settings (GtkWidget *widget, AppSettings * settings) {
     set_button_state(settings,FALSE);
     gtk_spinner_start (GTK_SPINNER (settings->loading_handle));
 
-    OnvifApp__dispatch(settings->app,settings->app,_save_settings,settings,NULL);
+    EventQueue__insert_plain(OnvifApp__get_EventQueue(settings->app),settings->app,_save_settings,settings,NULL);
 }
 
 void AppSettings__reset_settings(AppSettings * self){

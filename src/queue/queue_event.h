@@ -23,7 +23,9 @@ struct _QueueEventClass
 QueueEvent* QueueEvent__new(); 
 void * QueueEvent__get_scope(QueueEvent * evt);
 void QueueEvent__cancel(QueueEvent * self);
+void QueueEvent__finish(QueueEvent * self); //This is only meant to be called by QueueThread
 int QueueEvent__is_cancelled(QueueEvent * self);
+int QueueEvent__is_finished(QueueEvent * self);
 void QueueEvent__invoke(QueueEvent * self);
 void QueueEvent__cleanup(QueueEvent * self);
 

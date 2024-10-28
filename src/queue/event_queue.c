@@ -239,14 +239,14 @@ void EventQueue__stop(EventQueue* self, int nthread){
     P_MUTEX_UNLOCK(priv->threads_lock);
 }
 
-void EventQueue__insert_private(EventQueue* self, void * scope, void (*callback)(QueueEvent * qevt, void * user_data), void * user_data, void (*cleanup_cb)(QueueEvent * qevt, int cancelled, void * user_data), int managed){
-    g_return_if_fail (self != NULL);
-    g_return_if_fail (QUEUE_IS_EVENTQUEUE (self));
+QueueEvent * EventQueue__insert_private(EventQueue* self, void * scope, void (*callback)(QueueEvent * qevt, void * user_data), void * user_data, void (*cleanup_cb)(QueueEvent * qevt, int cancelled, void * user_data), int managed){
+    g_return_val_if_fail (self != NULL, NULL);
+    g_return_val_if_fail (QUEUE_IS_EVENTQUEUE (self), NULL);
     EventQueuePrivate *priv = EventQueue__get_instance_private (self);
-
+    QueueEvent * record = NULL;
     if(!QueueEvent__get_current() || !QueueEvent__is_cancelled(QueueEvent__get_current())){
         P_MUTEX_LOCK(priv->pool_lock);
-        QueueEvent * record = QueueEvent__new(scope, callback,user_data, cleanup_cb, managed);
+        record = QueueEvent__new(scope, callback,user_data, cleanup_cb, managed);
         priv->events = g_list_append(priv->events, record);
         P_MUTEX_UNLOCK(priv->pool_lock);
         P_COND_SIGNAL(priv->sleep_cond);
@@ -260,17 +260,18 @@ void EventQueue__insert_private(EventQueue* self, void * scope, void (*callback)
             g_object_unref(G_OBJECT(user_data));
         }
     }
+    return record;
 }
 
-void EventQueue__insert_plain(EventQueue* self, void * scope, void (*callback)(QueueEvent * qevt, void * user_data), void * user_data, void (*cleanup_cb)(QueueEvent * qevt, int cancelled, void * user_data)){
-    g_return_if_fail (self != NULL);
-    g_return_if_fail (QUEUE_IS_EVENTQUEUE (self));
-    EventQueue__insert_private(self,scope, callback, user_data,cleanup_cb, 0);
+QueueEvent * EventQueue__insert_plain(EventQueue* self, void * scope, void (*callback)(QueueEvent * qevt, void * user_data), void * user_data, void (*cleanup_cb)(QueueEvent * qevt, int cancelled, void * user_data)){
+    g_return_val_if_fail (self != NULL, NULL);
+    g_return_val_if_fail (QUEUE_IS_EVENTQUEUE (self), NULL);
+    return EventQueue__insert_private(self,scope, callback, user_data,cleanup_cb, 0);
 }
 
-void EventQueue__insert(EventQueue* self, void * scope, void (*callback)(QueueEvent * qevt, void * user_data), gpointer user_data, void (*cleanup_cb)(QueueEvent * qevt, int cancelled, void * user_data)){
-    g_return_if_fail (self != NULL);
-    g_return_if_fail (QUEUE_IS_EVENTQUEUE (self));
+QueueEvent * EventQueue__insert(EventQueue* self, void * scope, void (*callback)(QueueEvent * qevt, void * user_data), gpointer user_data, void (*cleanup_cb)(QueueEvent * qevt, int cancelled, void * user_data)){
+    g_return_val_if_fail (self != NULL, NULL);
+    g_return_val_if_fail (QUEUE_IS_EVENTQUEUE (self), NULL);
 
     if(G_IS_OBJECT(user_data)){
         g_object_ref(G_OBJECT(user_data));
@@ -278,7 +279,7 @@ void EventQueue__insert(EventQueue* self, void * scope, void (*callback)(QueueEv
         C_FIXME("Invalid GObject. Use EventQueue_insert_plain instead.");
     }
 
-    EventQueue__insert_private(self,scope, callback, user_data,cleanup_cb, 1);
+    return EventQueue__insert_private(self,scope, callback, user_data,cleanup_cb, 1);
 }
 
 void EventQueue__cancel_scopes(EventQueue * self, void ** scopes, int count){

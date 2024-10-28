@@ -105,6 +105,7 @@ void * priv_QueueThread_call(void * data){
         if(QueueEvent__is_cancelled(event_queue)){
             g_signal_emit (queue_thread, signals[STATE_CHANGED], 0, EVENTQUEUE_CANCELLED /* details */);
         } else {
+            QueueEvent__finish(event_queue);
             g_signal_emit (queue_thread, signals[STATE_CHANGED], 0, EVENTQUEUE_DISPATCHED /* details */);
         }
         QueueEvent__cleanup(event_queue);

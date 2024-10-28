@@ -37,6 +37,8 @@ typedef struct {
     GtkWidget * mac_lbl;
     GtkWidget * version_lbl;
     GtkWidget * uri_lbl;
+
+    QueueEvent * previous_event;
 } OnvifInfoPanelPrivate;
 
 static GParamSpec *obj_properties[N_PROPERTIES] = { NULL, };
@@ -444,14 +446,22 @@ void OnvifInfoPanel_update_details(OnvifInfoPanel * self){
     if(!OnvifDevice__is_authenticated(odev)){
         return;
     }
-    
-    g_signal_emit (self, signals[STARTED], 0, priv->device);
 
     InfoDataUpdate * input = malloc(sizeof(InfoDataUpdate));
     input->device = priv->device;
     input->info = self;
     g_object_ref(priv->device);
-    OnvifApp__dispatch(priv->app, priv->device, _update_details_page,input, _update_details_page_cleanup);
+    if(priv->previous_event && !QueueEvent__is_finished(priv->previous_event)) {
+        QueueEvent__cancel(priv->previous_event);
+        g_object_unref(priv->previous_event);
+        priv->previous_event = NULL;
+    } else if(priv->previous_event){
+        g_object_unref(priv->previous_event);
+    }
+
+    g_signal_emit (self, signals[STARTED], 0, priv->device);
+    priv->previous_event = EventQueue__insert_plain(OnvifApp__get_EventQueue(priv->app), priv->device, _update_details_page,input, _update_details_page_cleanup);
+    g_object_ref(priv->previous_event);
 }
 
 void OnvifInfoPanel_clear_details(OnvifInfoPanel * self){

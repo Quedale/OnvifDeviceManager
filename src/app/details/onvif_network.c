@@ -17,6 +17,8 @@ enum
 typedef struct {
     OnvifApp * app;
     OnvifMgrDeviceRow * device;
+
+    QueueEvent * previous_event;
 } OnvifNetworkPanelPrivate;
 
 static GParamSpec *obj_properties[N_PROPERTIES] = { NULL, };
@@ -256,15 +258,24 @@ void OnvifNetworkPanel_update_details(OnvifNetworkPanel * self){
     if(!OnvifDevice__is_authenticated(odev)){
         return;
     }
-    
-    g_signal_emit (self, signals[STARTED], 0, priv->device);
 
     NetworkGUIUpdate * input = malloc(sizeof(NetworkGUIUpdate));
     input->network = self;
     input->inet = NULL;
 
     g_object_ref(priv->device); //Referenced cleaned up in _update_network_page_cleanup
-    OnvifApp__dispatch(priv->app, priv->device, _update_network_page,input,_update_network_page_cleanup);
+
+    if(priv->previous_event && !QueueEvent__is_finished(priv->previous_event)) {
+        QueueEvent__cancel(priv->previous_event);
+        g_object_unref(priv->previous_event);
+        priv->previous_event = NULL;
+    } else if(priv->previous_event){
+        g_object_unref(priv->previous_event);
+    }
+
+    g_signal_emit (self, signals[STARTED], 0, priv->device);
+    priv->previous_event = EventQueue__insert_plain(OnvifApp__get_EventQueue(priv->app), priv->device, _update_network_page,input, _update_network_page_cleanup);
+    g_object_ref(priv->previous_event);
 }
 
 void OnvifNetworkPanel_clear_details(OnvifNetworkPanel * self){

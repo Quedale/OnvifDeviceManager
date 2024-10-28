@@ -1056,9 +1056,9 @@ MsgDialog * OnvifApp__get_msg_dialog(OnvifApp * self){
     return priv->msg_dialog;
 }
 
-void OnvifApp__dispatch(OnvifApp* self, void * scope, void (*callback)(QueueEvent * qevt, void * user_data), void * user_data, void (*cleanup)(QueueEvent * qevt, int cancelled, void * user_data)){
-    g_return_if_fail (self != NULL);
-    g_return_if_fail (ONVIFMGR_IS_APP (self));
+EventQueue * OnvifApp__get_EventQueue(OnvifApp* self){
+    g_return_val_if_fail (self != NULL, NULL);
+    g_return_val_if_fail (ONVIFMGR_IS_APP (self), NULL);
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (self);
-    EventQueue__insert_plain(priv->queue, scope, callback,user_data, cleanup);
+    return priv->queue;
 }
