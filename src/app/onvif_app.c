@@ -55,15 +55,15 @@ G_DEFINE_TYPE_WITH_CODE(OnvifApp, OnvifApp_, G_TYPE_OBJECT, G_ADD_PRIVATE (Onvif
 static void OnvifApp__profile_changed_cb (OnvifMgrDeviceRow *device);
 void OnvifApp__cred_dialog_login_cb(AppDialogEvent * event);
 void OnvifApp__cred_dialog_cancel_cb(AppDialogEvent * event);
-static gboolean * OnvifApp__discovery_finished_cb (OnvifApp * self);
-static gboolean * OnvifApp__disocvery_found_server_cb (DiscoveryEvent * event);
+static gboolean OnvifApp__discovery_finished_cb (OnvifApp * self);
+static gboolean OnvifApp__disocvery_found_server_cb (DiscoveryEvent * event);
 static int OnvifApp__device_already_exist(OnvifApp * app, char * xaddr);
 static void OnvifApp__add_device(OnvifApp * app, OnvifMgrDeviceRow * omgr_device);
 static void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row);
 static int OnvifApp__reload_device(QueueEvent * qevt, OnvifMgrDeviceRow * device);
 static void OnvifApp__display_device(OnvifApp * self, OnvifMgrDeviceRow * device);
 
-gboolean * idle_select_device(void * user_data){
+gboolean idle_select_device(void * user_data){
     OnvifMgrDeviceRow * device = ONVIFMGR_DEVICEROW(user_data);
     if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) && gtk_list_box_row_is_selected(GTK_LIST_BOX_ROW(device))){
         OnvifApp__select_device(OnvifMgrDeviceRow__get_app(device),GTK_LIST_BOX_ROW(device));
@@ -73,26 +73,26 @@ gboolean * idle_select_device(void * user_data){
 }
 
 
-gboolean * idle_show_credentialsdialog (void * user_data){
+gboolean idle_show_credentialsdialog (void * user_data){
     OnvifMgrDeviceRow * device = ONVIFMGR_DEVICEROW(user_data);
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (OnvifMgrDeviceRow__get_app(device));
     AppDialog__show((AppDialog *) priv->cred_dialog,OnvifApp__cred_dialog_login_cb, OnvifApp__cred_dialog_cancel_cb,device);
     return FALSE;
 }
 
-gboolean * idle_hide_dialog (void * user_data){
+gboolean idle_hide_dialog (void * user_data){
     AppDialog * dialog = (AppDialog *) user_data;
     AppDialog__hide(dialog);
     return FALSE;
 }
 
-gboolean * idle_hide_dialog_loading (void * user_data){
+gboolean idle_hide_dialog_loading (void * user_data){
     AppDialog * dialog = (AppDialog *) user_data;
     AppDialog__hide_loading(dialog);
     return FALSE;
 }
 
-gboolean * idle_add_device(void * user_data){
+gboolean idle_add_device(void * user_data){
     OnvifMgrDeviceRow * dev = ONVIFMGR_DEVICEROW(user_data);
     OnvifApp__add_device(OnvifMgrDeviceRow__get_app(dev),dev);
     return FALSE;
@@ -387,7 +387,7 @@ exit:
 }
 
 
-static gboolean * OnvifApp__disocvery_found_server_cb (DiscoveryEvent * event) {
+static gboolean OnvifApp__disocvery_found_server_cb (DiscoveryEvent * event) {
     C_TRACE("OnvifApp__found_server_cb");
     DiscoveredServer * server = event->server;
     OnvifApp * app = (OnvifApp *) event->data;
@@ -583,7 +583,7 @@ void OnvifApp__row_selected_cb (GtkWidget *widget,   GtkListBoxRow* row, OnvifAp
     OnvifApp__select_device(app,row);
 }
 
-static gboolean * OnvifApp__discovery_finished_cb (OnvifApp * self) {
+static gboolean OnvifApp__discovery_finished_cb (OnvifApp * self) {
     C_TRACE("OnvifApp__discovery_finished_cb");
     if(!COwnableObject__has_owner(COWNABLE_OBJECT(self))){
         goto exit;

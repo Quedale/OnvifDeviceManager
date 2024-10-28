@@ -1,8 +1,9 @@
 #include "onvif_app_shutdown.h"
 #include "clogger.h"
 
-void safely_quit_gtk_main(void * user_data){
+gboolean safely_quit_gtk_main(void * user_data){
     gtk_main_quit();
+    return FALSE;
 }
 void * _thread_destruction(void * event){
     c_log_set_thread_color(ANSI_COLOR_RED, P_THREAD_ID);

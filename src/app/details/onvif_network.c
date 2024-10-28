@@ -170,7 +170,7 @@ GtkWidget * OnvifNetworkPanelPrivate__create_network_widget(OnvifDeviceInterface
     return frame;
 }
 
-gboolean * onvif_network_gui_update (void * user_data){
+gboolean onvif_network_gui_update (void * user_data){
     NetworkGUIUpdate * update = (NetworkGUIUpdate *) user_data;
     OnvifNetworkPanelPrivate *priv = OnvifNetworkPanel__get_instance_private (update->network);
 

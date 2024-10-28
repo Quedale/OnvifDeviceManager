@@ -443,7 +443,7 @@ struct create_video_data{
     int done;
 };
 
-void GstRtspPlayerPrivate__idle_attach_video_pad(void * user_data){
+gboolean GstRtspPlayerPrivate__idle_attach_video_pad(void * user_data){
     struct create_video_data * data = (struct create_video_data *) user_data;
     GstPad *sink_pad;
 
@@ -465,6 +465,7 @@ exit:
     data->done = 1;
     C_TRACE("GstRtspPlayerPrivate__idle_attach_video_pad - done");
     P_COND_BROADCAST(data->cond);
+    return FALSE;
 }
 
 static void

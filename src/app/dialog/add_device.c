@@ -75,7 +75,7 @@ static void protocol_check_cb (GtkToggleButton *source, GtkWidget * txtport) {
     }
 }
 
-gboolean * gui_AddDeviceDialog__set_error(void * user_data){
+gboolean gui_AddDeviceDialog__set_error(void * user_data){
     AddDeviceDialogErrorData * data = (AddDeviceDialogErrorData *) user_data;
     DialogElements * elements = (DialogElements *) data->dialog->elements;
 

@@ -15,16 +15,16 @@ typedef struct {
 G_DEFINE_TYPE_WITH_PRIVATE(OnvifTaskManager, OnvifTaskManager_, GTK_TYPE_BOX)
 static GParamSpec *obj_properties[N_PROPERTIES] = { NULL, };
 
-void OnvifTaskManager__eq_dispatch_cb(EventQueue * queue, QueueEventType type, OnvifTaskManager * self){
-    // OnvifTaskManagerPrivate *priv = OnvifTaskManager__get_instance_private (self);
+void OnvifTaskManager__eq_added_cb(EventQueue * queue, QueueEvent * evt, OnvifTaskManager * self){
+    C_DEBUG("Task Manager : Event Added");
+}
 
-    // int running = EventQueue__get_running_event_count(queue);
-    // int pending = EventQueue__get_pending_event_count(queue);
-    // int total = EventQueue__get_thread_count(queue);
+void OnvifTaskManager__eq_finished_cb(EventQueue * queue, QueueEvent * evt, OnvifTaskManager * self){
+    C_DEBUG("Task Manager : Event finished");
+}
 
-    // C_TRACE("EventQueue %s : %d/%d/%d",g_enum_to_nick(QUEUE_TYPE_EVENTTYPE,type),running,pending,total);
-
-    //TODO Update Task Manager Model
+void OnvifTaskManager__eq_started_cb(EventQueue * queue, QueueEvent * evt, OnvifTaskManager * self){
+    C_DEBUG("Task Manager : Event Started");
 }
 
 static void
@@ -45,7 +45,9 @@ OnvifTaskManager__set_property (GObject      *object,
     switch (prop_id){
         case PROP_QUEUE:
             priv->queue = g_value_get_object (value);
-            g_signal_connect (G_OBJECT(priv->queue), "pool-changed", G_CALLBACK (OnvifTaskManager__eq_dispatch_cb), self);
+            g_signal_connect (G_OBJECT(priv->queue), "evt-added", G_CALLBACK (OnvifTaskManager__eq_added_cb), self);
+            g_signal_connect (G_OBJECT(priv->queue), "evt-started", G_CALLBACK (OnvifTaskManager__eq_started_cb), self);
+            g_signal_connect (G_OBJECT(priv->queue), "evt-finished", G_CALLBACK (OnvifTaskManager__eq_finished_cb), self);
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);

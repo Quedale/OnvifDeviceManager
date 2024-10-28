@@ -41,6 +41,7 @@ QueueEventType__get_type (void)
                         { EVENTQUEUE_DISPATCHING,   "EVENTQUEUE_DISPATCHING",   "Dispatching"},
                         { EVENTQUEUE_DISPATCHED,    "EVENTQUEUE_DISPATCHED",    "Dispatched"},
                         { EVENTQUEUE_CANCELLED,     "EVENTQUEUE_CANCELLED",     "Cancelled"},
+                        { EVENTQUEUE_ADDED,         "EVENTQUEUE_ADDED",         "Added"},
                         { EVENTQUEUE_STARTED,       "EVENTQUEUE_STARTED",       "Started"},
                         { EVENTQUEUE_FINISHED,      "EVENTQUEUE_FINISHED",      "Finished"},
                         { 0,                        NULL,                       NULL}

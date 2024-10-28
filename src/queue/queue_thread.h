@@ -15,8 +15,9 @@ typedef enum {
   EVENTQUEUE_DISPATCHING            = 0,
   EVENTQUEUE_DISPATCHED             = 1,
   EVENTQUEUE_CANCELLED              = 2,
-  EVENTQUEUE_STARTED                = 3,
-  EVENTQUEUE_FINISHED                = 4
+  EVENTQUEUE_ADDED                  = 3,
+  EVENTQUEUE_STARTED                = 4,
+  EVENTQUEUE_FINISHED                = 5
 } QueueEventType;
 
 #ifndef g_enum_to_nick

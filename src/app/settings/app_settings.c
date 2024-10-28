@@ -44,11 +44,12 @@ void priv_AppSettings_state_changed_cb(GtkWidget * widget, AppSettings * self){
 }
 
 //GUI callback when apply finished
-void save_done(void * user_data){
+gboolean save_done(void * user_data){
     AppSettings * settings = (AppSettings *) user_data;
     priv_AppSettings_state_changed(settings);
     set_settings_state(settings,TRUE);
     gtk_spinner_stop (GTK_SPINNER (settings->loading_handle));
+    return FALSE;
 }
 
 char * AppSettings__get_config_path(){

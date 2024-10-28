@@ -10,6 +10,9 @@
 
 enum {
     POOL_CHANGED,
+    EVT_ADDED,
+    EVT_STARTED,
+    EVT_FINISHED,
     LAST_SIGNAL
 };
 
@@ -28,11 +31,28 @@ static guint signals[LAST_SIGNAL] = { 0 };
 
 G_DEFINE_TYPE_WITH_PRIVATE(EventQueue, EventQueue_, G_TYPE_OBJECT)
 
-void EventQueue__emit_pool_changed(EventQueue * self, QueueEventType type){
+void EventQueue__emit_signal(EventQueue * self, QueueEvent * evt, QueueEventType type){
     EventQueuePrivate *priv = EventQueue__get_instance_private (self);
 
     P_MUTEX_LOCK(priv->signal_lock); //notify can be called async from multiple threads. Preventing simultanious emit
-    g_signal_emit (self, signals[POOL_CHANGED], 0, type /* details */);
+    switch(type){
+        case EVENTQUEUE_DISPATCHED:
+        case EVENTQUEUE_CANCELLED:
+            g_signal_emit (self, signals[EVT_FINISHED], 0, evt);
+            break;
+        case EVENTQUEUE_DISPATCHING:
+            g_signal_emit (self, signals[EVT_STARTED], 0, evt);
+            break;
+        case EVENTQUEUE_ADDED:
+            g_signal_emit (self, signals[EVT_ADDED], 0, evt);
+            break;
+        case EVENTQUEUE_STARTED:
+        case EVENTQUEUE_FINISHED:
+        default:
+            break;
+    }
+
+    g_signal_emit (self, signals[POOL_CHANGED], 0, type);
     P_MUTEX_UNLOCK(priv->signal_lock);
 }
 
@@ -96,6 +116,44 @@ EventQueue__class_init (EventQueueClass *klass)
                         G_TYPE_NONE /* return_type */,
                         1     /* n_params */,
                         params  /* param_types */);
+    
+    params[0] = QUEUE_TYPE_QUEUEEVENT | G_SIGNAL_TYPE_STATIC_SCOPE;
+    signals[EVT_ADDED] =
+        g_signal_newv ("evt-added",
+                        G_TYPE_FROM_CLASS (klass),
+                        G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
+                        NULL /* closure */,
+                        NULL /* accumulator */,
+                        NULL /* accumulator data */,
+                        NULL /* C marshaller */,
+                        G_TYPE_NONE /* return_type */,
+                        1     /* n_params */,
+                        params  /* param_types */);
+
+    signals[EVT_STARTED] =
+        g_signal_newv ("evt-started",
+                        G_TYPE_FROM_CLASS (klass),
+                        G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
+                        NULL /* closure */,
+                        NULL /* accumulator */,
+                        NULL /* accumulator data */,
+                        NULL /* C marshaller */,
+                        G_TYPE_NONE /* return_type */,
+                        1     /* n_params */,
+                        params  /* param_types */);
+
+    signals[EVT_FINISHED] =
+        g_signal_newv ("evt-finished",
+                        G_TYPE_FROM_CLASS (klass),
+                        G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
+                        NULL /* closure */,
+                        NULL /* accumulator */,
+                        NULL /* accumulator data */,
+                        NULL /* C marshaller */,
+                        G_TYPE_NONE /* return_type */,
+                        1     /* n_params */,
+                        params  /* param_types */);
+    
 }
 
 void EventQueue__init(EventQueue* self) {
@@ -185,11 +243,14 @@ void EventQueue__insert_private(EventQueue* self, void * scope, void (*callback)
     g_return_if_fail (self != NULL);
     g_return_if_fail (QUEUE_IS_EVENTQUEUE (self));
     EventQueuePrivate *priv = EventQueue__get_instance_private (self);
-    P_MUTEX_LOCK(priv->pool_lock);
 
     if(!QueueEvent__get_current() || !QueueEvent__is_cancelled(QueueEvent__get_current())){
+        P_MUTEX_LOCK(priv->pool_lock);
         QueueEvent * record = QueueEvent__new(scope, callback,user_data, cleanup_cb, managed);
         priv->events = g_list_append(priv->events, record);
+        P_MUTEX_UNLOCK(priv->pool_lock);
+        P_COND_SIGNAL(priv->sleep_cond);
+        EventQueue__emit_signal(self,record,EVENTQUEUE_ADDED);
     } else {
         C_WARN("Ignoring event dispatched from cancelled event...");
         if(cleanup_cb){
@@ -199,9 +260,6 @@ void EventQueue__insert_private(EventQueue* self, void * scope, void (*callback)
             g_object_unref(G_OBJECT(user_data));
         }
     }
-
-    P_MUTEX_UNLOCK(priv->pool_lock);
-    P_COND_SIGNAL(priv->sleep_cond);
 }
 
 void EventQueue__insert_plain(EventQueue* self, void * scope, void (*callback)(QueueEvent * qevt, void * user_data), void * user_data, void (*cleanup_cb)(QueueEvent * qevt, int cancelled, void * user_data)){
@@ -241,7 +299,7 @@ void EventQueue__cancel_scopes(EventQueue * self, void ** scopes, int count){
                 priv->events = g_list_remove(priv->events,evt);
                 i--;
                 evtcount--;
-                EventQueue__emit_pool_changed(self, EVENTQUEUE_CANCELLED);
+                EventQueue__emit_signal(self, evt, EVENTQUEUE_CANCELLED);
                 QueueEvent__cleanup(evt);
                 g_object_unref(evt);
             }
@@ -285,14 +343,14 @@ void EventQueue__notify_cb(QueueThread * thread, QueueEventType type, EventQueue
             P_MUTEX_LOCK(priv->pool_lock);
             priv->running_events = g_list_remove(priv->running_events, QueueEvent__get_current());
             P_MUTEX_UNLOCK(priv->pool_lock);
-            EventQueue__emit_pool_changed(self, type);
+            EventQueue__emit_signal(self, QueueEvent__get_current(), type);
             break;
         case EVENTQUEUE_FINISHED:
-            EventQueue__emit_pool_changed(self, type);
+            EventQueue__emit_signal(self, QueueEvent__get_current(), type);
             EventQueue__remove_thread(self,thread);
             break;
         default:
-            EventQueue__emit_pool_changed(self, type);
+            EventQueue__emit_signal(self, QueueEvent__get_current(), type);
             break;
     }
 }

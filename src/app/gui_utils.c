@@ -18,17 +18,23 @@ typedef struct {
     gpointer param;
 } IdleSignalEmit;
 
-void idle_signal_emit (void * user_data){
+gboolean idle_signal_emit (void * user_data){
     IdleSignalEmit * data = (IdleSignalEmit*)user_data;
     g_signal_emit (data->instance, data->signalid, 0, data->param);
+    g_object_unref(data->instance);
+    if(data->param && G_IS_OBJECT(data->param))g_object_unref(data->param);
     free(data);
+    return FALSE;
 }
 
 void gui_signal_emit(gpointer instance, guint singalid, gpointer param){
+    g_return_if_fail(G_IS_OBJECT(instance));
     IdleSignalEmit * emit = malloc(sizeof(IdleSignalEmit));
     emit->instance= instance;
     emit->signalid = singalid;
     emit->param = param;
+    g_object_ref(emit->instance);
+    if(G_IS_OBJECT(param)) g_object_ref(param);
     gdk_threads_add_idle(G_SOURCE_FUNC(idle_signal_emit),emit);
 }
 
@@ -40,7 +46,7 @@ void gui_container_remove(GtkWidget * widget, gpointer user_data){
     gtk_container_remove(GTK_CONTAINER(user_data),widget);
 }
 
-gboolean * gui_update_widget_image_priv(void * user_data){
+gboolean gui_update_widget_image_priv(void * user_data){
     ImageGUIUpdate * iguiu = (ImageGUIUpdate *) user_data;
 
     if(GTK_IS_WIDGET(iguiu->handle)){
@@ -68,7 +74,7 @@ void gui_update_widget_image(GtkWidget * image, GtkWidget * handle){
     gdk_threads_add_idle(G_SOURCE_FUNC(gui_update_widget_image_priv),iguiu);
 }
 
-gboolean * gui_set_label_text_priv (void * user_data){
+gboolean gui_set_label_text_priv (void * user_data){
     GUILabelUpdate * update = (GUILabelUpdate *) user_data;
     gtk_label_set_text(GTK_LABEL(update->label),update->text);
 
@@ -87,7 +93,7 @@ void gui_set_label_text (GtkWidget * widget, char * value){
     gdk_threads_add_idle(G_SOURCE_FUNC(gui_set_label_text_priv),iguiu);
 }
 
-gboolean * gui_widget_destroy_cb (void * user_data){
+gboolean gui_widget_destroy_cb (void * user_data){
     GtkWidget * widget = (GtkWidget *) user_data;
     if(GTK_IS_WIDGET(widget)){
         gtk_widget_destroy(widget);
@@ -99,11 +105,12 @@ void safely_destroy_widget(GtkWidget * widget){
     gdk_threads_add_idle(G_SOURCE_FUNC(gui_widget_destroy_cb),widget);
 }
 
-void idle_start_spinner(void * user_data){
+gboolean idle_start_spinner(void * user_data){
     GtkWidget * widget = (GtkWidget *) user_data;
     if(GTK_IS_SPINNER(widget)){
         gtk_spinner_start (GTK_SPINNER (widget));
     }
+    return FALSE;
 }
 
 void safely_start_spinner(GtkWidget * widget){

@@ -124,7 +124,7 @@ void OnvifInfoPanel__map_event_cb (GtkWidget* self, OnvifInfoPanel * info){
     }
 }
 
-gboolean * onvif_info_gui_update (void * user_data){
+gboolean onvif_info_gui_update (void * user_data){
     InfoGUIUpdate * update = (InfoGUIUpdate *) user_data;
 
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(update->device)){
