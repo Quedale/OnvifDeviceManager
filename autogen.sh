@@ -1205,7 +1205,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
   if [ ! -z "$(checkGstreamerPkg project="gstreamer" version=$GSTREAMER_VERSION static=true)" ]; then
     gst_ret=1;
   fi
-  if [ $ENABLE_LIBAV -eq 1 ] && [ ! -z "$(pkgCheck project="gstlibav" name=gstlibav minver=$GSTREAMER_VERSION)" ]; then
+  if [ $ENABLE_LIBAV -eq 1 ] && [ ! -z "$(pkgCheck project="gstreamer-libav" name=gstlibav minver=$GSTREAMER_VERSION)" ]; then
     gst_ret=1;
   fi
 
