@@ -589,18 +589,24 @@ buildMesonProject() {
 }
 
 pkgCheck() {
-  local name minver
+  local name minver project
   local "${@}"
 
   min_ver=""
   if [ ! -z ${minver} ]; then
     min_ver=" >= ${minver}"
   fi
-  echo $(pkg-config --print-errors --errors-to-stdout "${name} $min_ver");
+  output=$(pkg-config --print-errors --errors-to-stdout "${name} $min_ver");
+  if [ -z "$output" ]; then
+    printlines project="${project}" task="check" msg="found"
+  else
+    printlines project="${project}" task="check" msg="not found"
+    echo 1
+  fi
 }
 
 progVersionCheck(){
-  local major minor micro linenumber lineindex program paramoverride startcut length
+  local major minor micro linenumber lineindex program paramoverride startcut length project
   local "${@}"
 
   varparam="--version"
@@ -614,7 +620,8 @@ progVersionCheck(){
   test=$(${program} $varparam 2> /dev/null)
   ret=$?
   if [[ $ret -ne 0 ]]; then
-      echo "${program} not installed or not function $test"
+      printlines project="${project}" task="check" msg="not found"
+      echo 1
       return
   fi
 
@@ -622,7 +629,6 @@ progVersionCheck(){
   firstLineArray=(${FIRSTLINE//;/ })
   versionString=${firstLineArray[${lineindex}]};
 
-  # printf "${GREEN}%s${NC}\n" "$versionString" >&2
   [[ ! -z "${startcut}" ]] && [[ -z "${length}" ]] && versionString=${versionString:2}
   [[ ! -z "${startcut}" ]] && [[ ! -z "${length}" ]] && versionString=${versionString:$startcut:$length}
   [[ -z "${startcut}" ]] && [[ ! -z "${length}" ]] && versionString=${versionString:0:$length}
@@ -632,25 +638,35 @@ progVersionCheck(){
   actualminor=${versionArray[1]}
   actualmicro=${versionArray[2]}
 
-  if [ -z "$major"  ]; then return; fi
+  if [ -z "$major"  ]; then 
+    printlines project="${project}" task="check" msg="found"
+    return; 
+  fi
+
   if [[ -z "$actualmajor"  || ! "$actualmajor" == ?(-)+([[:digit:]]) ]]; then echo "Unexpected ${program} version ouput[1] \"$FIRSTLINE\" \"$versionString\""; return; fi
   if [ "$actualmajor" -gt "$major" ]; then
+    printlines project="${project}" task="check" msg="found"
     return;
   elif [ "$actualmajor" -lt "$major" ]; then
-    echo "${program} version is too old[1]. $actualmajor.$actualminor.$actualmicro < $major.$minor.$micro"
+    printlines project="${project}" task="check" msg="version is too old. $actualmajor.$actualminor.$actualmicro < $major.$minor.$micro"
+    echo 1
   else
     if [ -z "$minor"  ]; then return; fi
     if [[ -z "$actualminor"  || ! "$actualminor" == ?(-)+([[:digit:]]) ]]; then echo "Unexpected ${program} version ouput[2] \"$FIRSTLINE\" \"$versionString\""; return; fi
     if [ "$actualminor" -gt "$minor" ]; then
+      printlines project="${project}" task="check" msg="found"
       return;
     elif [ "$actualminor" -lt "$minor" ]; then
-      echo "${program} version is too old[2]. $actualmajor.$actualminor.$actualmicro < $major.$minor.$micro"
+      printlines project="${project}" task="check" msg="version is too old. $actualmajor.$actualminor.$actualmicro < $major.$minor.$micro"
+      echo 1
     else
       if [ -z "$micro"  ]; then return; fi
       if [[ -z "$actualmicro"  || ! "$actualmicro" == ?(-)+([[:digit:]]) ]]; then echo "Unexpected ${program} version ouput[3] \"$FIRSTLINE\" \"$versionString\""; return; fi
       if [ ! -z "$micro" ] && [ "$actualmicro" -lt "$micro" ]; then
-        echo "${program} version is too old[3]. $actualmajor.$actualminor.$actualmicro < $major.$minor.$micro"
+        printlines project="${project}" task="check" msg="version is too old. $actualmajor.$actualminor.$actualmicro < $major.$minor.$micro"
+        echo 1
       else
+        printlines project="${project}" task="check" msg="found"
         return
       fi
     fi
@@ -675,12 +691,9 @@ function checkLibrary {
 export PATH="$SUBPROJECT_DIR/unzip60/build/dist/bin":$PATH
 HAS_UNZIP=0
 checkUnzip(){
-  if [ $HAS_UNZIP -eq 0 ] && [ ! -z "$(progVersionCheck program=unzip paramoverride="-v")" ]; then
-    printlines project="unzip" task="check" msg="not found"
+  if [ $HAS_UNZIP -eq 0 ] && [ ! -z "$(progVersionCheck project="unzip" program=unzip paramoverride="-v")" ]; then
     downloadAndExtract project="unzip" file="unzip60.tar.gz" path="https://sourceforge.net/projects/infozip/files/UnZip%206.x%20%28latest%29/UnZip%206.0/unzip60.tar.gz/download"
     buildMakeProject project="unzip" srcdir="unzip60" make="-f unix/Makefile generic" installargs=" prefix=$SUBPROJECT_DIR/unzip60/build/dist MANDIR=$SUBPROJECT_DIR/unzip60/build/dist/share/man/man1 -f unix/Makefile"
-  elif [ $HAS_UNZIP -eq 0 ]; then
-    printlines project="unzip" task="check" msg="found"
   fi
   HAS_UNZIP=1
 }
@@ -689,13 +702,10 @@ export PATH="$SUBPROJECT_DIR/gettext-0.21.1/dist/bin":$PATH
 HAS_GETTEXT=0
 checkGetTextAndAutoPoint(){
   if [ $HAS_GETTEXT -eq 0 ] && \
-     ([ ! -z "$(progVersionCheck program=gettextize linenumber=1 lineindex=3 major=0 minor=9 micro=18 )" ] || 
-      [ ! -z "$(progVersionCheck program=autopoint linenumber=1 lineindex=3 major=0 minor=9 micro=18 )" ]); then
-    printlines project="gettext" task="check" msg="not found"
+     ([ ! -z "$(progVersionCheck project="gettext" program=gettextize linenumber=1 lineindex=3 major=0 minor=9 micro=18 )" ] || 
+      [ ! -z "$(progVersionCheck project="autopoint" program=autopoint linenumber=1 lineindex=3 major=0 minor=9 micro=18 )" ]); then
     downloadAndExtract project="gettext" file="gettext-0.21.1.tar.gz" path="https://ftp.gnu.org/pub/gnu/gettext/gettext-0.21.1.tar.gz"
     buildMakeProject project="gettext" srcdir="gettext-0.21.1" prefix="$SUBPROJECT_DIR/gettext-0.21.1/dist" autogen="skip"
-  elif [ $HAS_GETTEXT -eq 0 ]; then
-    printlines project="gettext" task="check" msg="found"
   fi
   HAS_GETTEXT=1
 }
@@ -706,12 +716,9 @@ export PATH="$SUBPROJECT_DIR/perl-5.40.0/build/bin":$PATH
 HAS_PERL=0
 checkPerl(){
   if [ $HAS_PERL -eq 0 ] && \
-      [ ! -z "$(progVersionCheck program=perl linenumber=2 lineindex=8 major=5 minor=38 micro=0 startcut=2 length=6)" ]; then
-      printlines project="perl" task="check" msg="not found"
+      [ ! -z "$(progVersionCheck project="perl" program=perl linenumber=2 lineindex=8 major=5 minor=38 micro=0 startcut=2 length=6)" ]; then
       downloadAndExtract project="perl" file="perl-5.40.0.tar.gz" path="https://www.cpan.org/src/5.0/perl-5.40.0.tar.gz"
       buildMakeProject project="perl" srcdir="perl-5.40.0" skipbootstrap="true" configcustom="./Configure -des -Dprefix=$SUBPROJECT_DIR/perl-5.40.0/build"
-  elif [ $HAS_PERL -eq 0 ]; then
-    printlines project="perl" task="check" msg="found"
   fi
   HAS_PERL=1
 }
@@ -754,7 +761,7 @@ checkGitRepoState(){
     ret=-1
   fi
 
-  if [ $ret == 0 ] && [ ! -z "${package}" ] && [ ! -z "$(pkgCheck name=${package})" ]; then
+  if [ $ret == 0 ] && [ ! -z "${package}" ] && [ ! -z "$(pkgCheck name=${package} project=${project})" ]; then
     ret=1
   fi
 
@@ -763,24 +770,32 @@ checkGitRepoState(){
 
 # Hard dependency check
 MISSING_DEP=0
-if [ ! -z "$(progVersionCheck program='make')" ]; then
+if [ ! -z "$(progVersionCheck project="make" program='make')" ]; then
   MISSING_DEP=1
-  printlines project="make" task="check" msg="not found"
 fi
 
-if [ ! -z "$(progVersionCheck program=pkg-config)" ]; then
+if [ ! -z "$(progVersionCheck project="pkg-config" program=pkg-config)" ]; then
   MISSING_DEP=1
-  printlines project="pkg-config" task="check" msg="not found"
 fi
 
-if [ ! -z "$(progVersionCheck program=g++)" ]; then
+if [ ! -z "$(progVersionCheck project="g++" program=g++)" ]; then
   MISSING_DEP=1
-  printlines project="g++" task="check" msg="not found"
 fi
 
-if [ ! -z "$(pkgCheck name=gtk+-3.0)" ]; then
+if [ ! -z "$(progVersionCheck project="git" program=git)" ]; then
   MISSING_DEP=1
-  printlines project="gtk3" task="check" msg="not found"
+fi
+
+if [ ! -z "$(progVersionCheck project="tar" program=tar)" ]; then
+  MISSING_DEP=1
+fi
+
+if [ ! -z "$(progVersionCheck project="wget" program=wget)" ]; then
+  MISSING_DEP=1
+fi
+
+if [ ! -z "$(pkgCheck project="gtk3" name=gtk+-3.0)" ]; then
+  MISSING_DEP=1
 fi
 
 if [ $MISSING_DEP -eq 1 ]; then
@@ -811,62 +826,44 @@ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$(pkg-config --variable pc_path pkg-con
 # fi
 
 export PATH=$SUBPROJECT_DIR/m4-1.4.19/build/dist/bin:$PATH
-if [ ! -z "$(progVersionCheck program=m4 linenumber=1 lineindex=3 major=1 minor=4 micro=18 )" ]; then
-  printlines project="m4" task="check" msg="not found"
+if [ ! -z "$(progVersionCheck project="m4" program=m4 linenumber=1 lineindex=3 major=1 minor=4 micro=18 )" ]; then
   downloadAndExtract project="m4" file="m4-1.4.19.tar.xz" path="https://ftp.gnu.org/gnu/m4/m4-1.4.19.tar.xz"
   buildMakeProject project="m4" srcdir="m4-1.4.19" prefix="$SUBPROJECT_DIR/m4-1.4.19/build/dist" skipbootstrap="true"
-else
-  printlines project="m4" task="check" msg="found"
 fi
 
 export PATH="$SUBPROJECT_DIR/autoconf-2.72/build/dist/bin":$PATH
 export ACLOCAL_PATH="$SUBPROJECT_DIR/autoconf-2.72/build/dist/share/autoconf":$ACLOCAL_PATH
-if [ ! -z "$(progVersionCheck program=autoconf linenumber=1 lineindex=3 major=2 minor=70)" ]; then
-  printlines project="autoconf" task="check" msg="not found"
+if [ ! -z "$(progVersionCheck project="autoconf" program=autoconf linenumber=1 lineindex=3 major=2 minor=70)" ]; then
   checkPerl
   downloadAndExtract project="autoconf" file="autoconf-2.72.tar.xz" path="https://ftp.gnu.org/gnu/autoconf/autoconf-2.72.tar.xz"
   buildMakeProject project="autoconf" srcdir="autoconf-2.72" prefix="$SUBPROJECT_DIR/autoconf-2.72/build/dist" skipbootstrap="true"
-else
-  printlines project="autoconf" task="check" msg="found"
 fi
 
 export PATH="$SUBPROJECT_DIR/automake-1.17/build/dist/bin":$PATH
 export ACLOCAL_PATH="$SUBPROJECT_DIR/automake-1.17/build/dist/share/aclocal-1.17":$ACLOCAL_PATH
-if [ ! -z "$(progVersionCheck program=automake linenumber=1 lineindex=3 major=1 minor=16 micro=1)" ]; then
-  printlines project="automake" task="check" msg="not found"
+if [ ! -z "$(progVersionCheck project="automake" program=automake linenumber=1 lineindex=3 major=1 minor=16 micro=1)" ]; then
   downloadAndExtract project="automake" file="automake-1.17.tar.xz" path="https://ftp.gnu.org/gnu/automake/automake-1.17.tar.xz"
   buildMakeProject project="automake" srcdir="automake-1.17" prefix="$SUBPROJECT_DIR/automake-1.17/build/dist" skipbootstrap="true"
-else
-  printlines project="automake" task="check" msg="found"
 fi
 
 export PATH="$SUBPROJECT_DIR/libtool-2.5.3/build/dist/bin":$PATH
 export ACLOCAL_PATH="$SUBPROJECT_DIR/libtool-2.5.3/build/dist/share/aclocal":$ACLOCAL_PATH
-if [ ! -z "$(progVersionCheck program=libtoolize linenumber=1 lineindex=3 major=2 minor=4 micro=6)" ]; then
-  printlines project="libtool" task="check" msg="not found"
+if [ ! -z "$(progVersionCheck project="libtool" program=libtoolize linenumber=1 lineindex=3 major=2 minor=4 micro=6)" ]; then
   downloadAndExtract project="libtool" file="libtool-2.5.3.tar.xz" path="https://ftp.gnu.org/gnu/libtool/libtool-2.5.3.tar.xz"
   buildMakeProject project="libtool" srcdir="libtool-2.5.3" prefix="$SUBPROJECT_DIR/libtool-2.5.3/build/dist" skipbootstrap="true"
-else
-  printlines project="libtool" task="check" msg="found"
 fi
 
 export PATH="$SUBPROJECT_DIR/flex-2.6.4/build/dist/bin":$PATH
-if [ ! -z "$(progVersionCheck program=flex linenumber=1 lineindex=1 major=2 minor=6 micro=4 )" ]; then
+if [ ! -z "$(progVersionCheck project="flex" program=flex linenumber=1 lineindex=1 major=2 minor=6 micro=4 )" ]; then
   checkGetTextAndAutoPoint
-  printlines project="flex" task="check" msg="not found"
   downloadAndExtract project="flex" file="flex-2.6.4.tar.gz" path="https://github.com/westes/flex/releases/download/v2.6.4/flex-2.6.4.tar.gz"
   buildMakeProject project="flex" srcdir="flex-2.6.4" prefix="$SUBPROJECT_DIR/flex-2.6.4/build/dist" skipbootstrap="true"
-else
-  printlines project="flex" task="check" msg="found"
 fi
 
 export PATH="$SUBPROJECT_DIR/bison-3.8.2/build/dist/bin":$PATH
-if [ ! -z "$(progVersionCheck program=bison linenumber=1 lineindex=3 major=3 minor=5 micro=1 )" ]; then
-  printlines project="bison" task="check" msg="not found"
+if [ ! -z "$(progVersionCheck project="bison" program=bison linenumber=1 lineindex=3 major=3 minor=5 micro=1 )" ]; then
   downloadAndExtract project="bison" file="bison-3.8.2.tar.xz" path="https://ftp.gnu.org/gnu/bison/bison-3.8.2.tar.xz"
   buildMakeProject project="bison" srcdir="bison-3.8.2" prefix="$SUBPROJECT_DIR/bison-3.8.2/build/dist" skipbootstrap="true"
-else
-  printlines project="bison" task="check" msg="found"
 fi
 
 #Setting up Virtual Python environment
@@ -899,26 +896,20 @@ fi
 
 #Setup meson
 if [ $NO_DOWNLOAD -eq 0 ]; then
-  if [ ! -z "$(progVersionCheck program=meson linenumber=1 lineindex=0 major=0 minor=63 micro=2)" ]; then
-    printlines project="meson" task="check" msg="not found"
+  if [ ! -z "$(progVersionCheck project="meson" program=meson linenumber=1 lineindex=0 major=0 minor=63 micro=2)" ]; then
     unbufferCall "python3 -m pip install --progress-bar on meson --upgrade" 2>&1 | printlines project="meson" task="pip"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="meson" task="install" msg="Failed to install meson via pip. Please try to install meson manually."
       exit 1
     fi
-  else
-    printlines project="meson" task="check" msg="found"
   fi
 
-  if [ ! -z "$(progVersionCheck program=ninja)" ]; then
-    printlines project="ninja" task="check" msg="not found"
+  if [ ! -z "$(progVersionCheck project="ninja" program=ninja)" ]; then
     unbufferCall "python3 -m pip install --progress-bar on ninja --upgrade" 2>&1 | printlines project="ninja" task="pip"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="ninja" task="check" msg="Failed to install ninja via pip. Please try to install ninja manually."
       exit 1
     fi
-  else
-    printlines project="ninja" task="check" msg="found"
   fi
 else
   printlines project="onvifmgr" task="check" msg="Skipping pip install. NO_DOWNLOAD is set."
@@ -934,22 +925,16 @@ fi
 #       
 ################################################################
 export PKG_CONFIG_PATH="$SUBPROJECT_DIR/openssl/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
-if [ ! -z "$(pkgCheck name=libcrypto minver=1.1.1f)" ]; then
-  printlines project="openssl" task="check" msg="not found"
+if [ ! -z "$(pkgCheck project="openssl" name=libcrypto minver=1.1.1f)" ]; then
   checkGlibc
   pullOrClone project="openssl" path="https://github.com/openssl/openssl.git" tag="OpenSSL_1_1_1w"
   buildMakeProject project="openssl" srcdir="openssl" configcustom="./config --prefix='$SUBPROJECT_DIR/openssl/build/dist' --openssldir='$SUBPROJECT_DIR/openssl/build/dist/ssl' -static"
-else
-  printlines project="openssl" task="check" msg="found"
 fi
 
 export PATH="$SUBPROJECT_DIR/cmake-3.25.2/build/dist/bin":$PATH
-if [ ! -z "$(progVersionCheck program=cmake linenumber=1 lineindex=2 major=3 minor=16 micro=3 )" ]; then
-  printlines project="cmake" task="check" msg="not found"
+if [ ! -z "$(progVersionCheck project="cmake" program=cmake linenumber=1 lineindex=2 major=3 minor=16 micro=3 )" ]; then
   downloadAndExtract project="cmake" file="cmake-3.25.2.tar.gz" path="https://github.com/Kitware/CMake/releases/download/v3.25.2/cmake-3.25.2.tar.gz"
   buildMakeProject project="cmake" srcdir="cmake-3.25.2" prefix="$SUBPROJECT_DIR/cmake-3.25.2/build/dist" skipbootstrap="true" configure="--parallel=$(nproc)"
-else
-  printlines project="cmake" task="check" msg="found"
 fi
 
 ################################################################
@@ -960,12 +945,9 @@ fi
 ################################################################
 export PATH="$SUBPROJECT_DIR/glib-2.74.1/dist/bin":$PATH
 export PKG_CONFIG_PATH="$SUBPROJECT_DIR/glib-2.74.1/dist/lib/pkgconfig":$PKG_CONFIG_PATH
-if [ ! -z "$(pkgCheck name=glib-2.0 minver=2.64.0)" ]; then
-  printlines project="glib" task="check" msg="not found"
+if [ ! -z "$(pkgCheck project="glib" name=glib-2.0 minver=2.64.0)" ]; then
   downloadAndExtract project="glib" file="glib-2.74.1.tar.xz" path="https://download.gnome.org/sources/glib/2.74/glib-2.74.1.tar.xz"
   buildMesonProject project="glib" srcdir="glib-2.74.1" prefix="$SUBPROJECT_DIR/glib-2.74.1/dist" mesonargs="-Dpcre2:test=false -Dpcre2:grep=false -Dxattr=false -Db_lundef=false -Dtests=false -Dglib_debug=disabled -Dglib_assert=false -Dglib_checks=false"
-else
-  printlines project="glib" task="check" msg="found"
 fi
 
 ################################################################
@@ -974,10 +956,9 @@ fi
 #       
 ################################################################
 export PKG_CONFIG_PATH="$SUBPROJECT_DIR/CUtils/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
-rebuild=$(checkGitRepoState repo="CUtils" package="cutils")
+rebuild=$(checkGitRepoState project="cutils" repo="CUtils" package="cutils")
 
 if [ $rebuild != 0 ]; then
-  printlines project="cutils" task="check" msg="not found"
   #OnvifSoapLib depends on it and will also require a rebuild
   rm -rf "$SUBPROJECT_DIR/CUtils/build"
   rm -rf "$SUBPROJECT_DIR/OnvifSoapLib/build"
@@ -986,8 +967,6 @@ if [ $rebuild != 0 ]; then
   #Clean up previous build in case of failure. This will prevent from falling back on the old version
   rm -rf "$SUBPROJECT_DIR/CUtils/build/dist/*"
   buildMakeProject project="cutils" srcdir="CUtils" prefix="$SUBPROJECT_DIR/CUtils/build/dist" cmakedir=".." outoftree=true cmakeclean=true
-else
-  printlines project="cutils" task="check" msg="found"
 fi
 
 ################################################################
@@ -1000,24 +979,19 @@ export PKG_CONFIG_PATH="$SUBPROJECT_DIR/libntlm-1.8/build/dist/lib/pkgconfig":$P
 export PATH="$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin":$PATH
 export PKG_CONFIG_PATH="$SUBPROJECT_DIR/gsoap-2.8/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
 export PKG_CONFIG_PATH="$SUBPROJECT_DIR/zlib-1.2.13/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
-rebuild=$(checkGitRepoState repo="OnvifSoapLib" package="onvifsoap")
+rebuild=$(checkGitRepoState repo="OnvifSoapLib" project="onvifsoap" package="onvifsoap")
 
 if [ $rebuild != 0 ]; then
   #Clean up previous build in case of failure. This will prevent from falling back on the old version
   rm -rf "$SUBPROJECT_DIR/OnvifSoapLib/build/dist/*" 
-  printlines project="onvifsoap" task="check" msg="not found"
 
-  if [ ! -z "$(pkgCheck name=zlib minver=1.2.11)" ]; then
-    printlines project="zlib" task="check" msg="not found"
+  if [ ! -z "$(pkgCheck project="zlib" name=zlib minver=1.2.11)" ]; then
     downloadAndExtract project="zlib" file="zlib-1.2.13.tar.gz" path="https://www.zlib.net/zlib-1.2.13.tar.gz"
     buildMakeProject project="zlib" srcdir="zlib-1.2.13" prefix="$SUBPROJECT_DIR/zlib-1.2.13/build/dist"
-  else
-    printlines project="zlib" task="check" msg="found"
   fi
 
   gsoap_version=2.8.134
-  if [ ! -z "$(pkgCheck name=gsoap minver=$gsoap_version)" ]; then
-    printlines project="gsoap" task="check" msg="not found"
+  if [ ! -z "$(pkgCheck project="gsoap" name=gsoap minver=$gsoap_version)" ]; then
     SSL_PREFIX=$(pkg-config --variable=prefix openssl)
     if [ "$SSL_PREFIX" != "/usr" ]; then
       SSL_INCLUDE=$(\pkg-config --variable=includedir openssl)
@@ -1061,16 +1035,11 @@ if [ $rebuild != 0 ]; then
     LD_LIBRARY_PATH="$SSL_LIBS:$ZLIB_LIBS:$LD_LIBRARY_PATH" \
     LIBS='-ldl -lpthread' \
     buildMakeProject project="gsoap" srcdir="gsoap-2.8" prefix="$SUBPROJECT_DIR/gsoap-2.8/build/dist" autogen="skip" configure="--with-openssl=/usr/lib/ssl"
-  else
-    printlines project="gsoap" task="check" msg="found"
   fi
 
-  if [ ! -z "$(pkgCheck name=libntlm minver=v1.5)" ]; then
-    printlines project="libntlm" task="check" msg="not found"
+  if [ ! -z "$(pkgCheck project="libntlm" name=libntlm minver=v1.5)" ]; then
     downloadAndExtract project="libntlm" file="libntlm-1.8.tar.gz" path="https://download-mirror.savannah.gnu.org/releases/libntlm/libntlm-1.8.tar.gz"
     buildMakeProject project="libntlm" srcdir="libntlm-1.8" skipbootstrap="true" prefix="$SUBPROJECT_DIR/libntlm-1.8/build/dist" configure="--enable-shared=no" #TODO support shared linking
-  else 
-    printlines project="libntlm" task="check" msg="found"
   fi
 
   pullOrClone project="onvifsoap" path=https://github.com/Quedale/OnvifSoapLib.git ignorecache="true"
@@ -1081,8 +1050,6 @@ if [ $rebuild != 0 ]; then
   GSOAP_SRC_DIR="$SUBPROJECT_DIR/gsoap-2.8" \
   C_INCLUDE_PATH="$(pkg-config --variable=includedir openssl):$(pkg-config --variable=includedir zlib):$C_INCLUDE_PATH" \
   buildMakeProject project="onvifsoap" srcdir="OnvifSoapLib" prefix="$SUBPROJECT_DIR/OnvifSoapLib/build/dist" cmakedir=".." cmakeargs="-DGSOAP_SRC_DIR='$SUBPROJECT_DIR/gsoap-2.8'" bootstrap="$nodownload --skip-gsoap $skipwsdl" outoftree=true cmakeclean=true
-else
-  printlines project="onvifsoap" task="check" msg="found"
 fi
 
 ################################################################
@@ -1092,12 +1059,9 @@ fi
 # 
 ################################################################
 export PKG_CONFIG_PATH="$SUBPROJECT_DIR/alsa-lib/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
-if [ ! -z "$(pkgCheck name=alsa minver=1.2.2)" ]; then
-  printlines project="alsa" task="check" msg="not found"
+if [ ! -z "$(pkgCheck project="alsa" name=alsa minver=1.2.2)" ]; then
   pullOrClone project="alsa" path=git://git.alsa-project.org/alsa-lib.git tag=v1.2.8
   buildMakeProject project="alsa" srcdir="alsa-lib" prefix="$SUBPROJECT_DIR/alsa-lib/build/dist" configure="--enable-static=no --enable-shared=yes" autoreconf="-vif"
-else
-  printlines project="alsa" task="check" msg="found"
 fi
 
 ################################################################
@@ -1178,33 +1142,33 @@ gst_bad_plugins=(
 if [ $ENABLE_NVCODEC != 0 ]; then gst_bad_plugins+=("nvcodec;gstnvcodec"); fi
 
 checkGstreamerPkg () {
-  local static version # reset first
+  local static version project # reset first
   local "${@}"
 
   gstpkgret=0;
   if [ -z "${static}" ]; then
     for gst_p in ${gst_core[@]}; do
       IFS=";" read -r -a arr <<< "${gst_p}"
-      if [ ! -z "$(pkgCheck name=${arr[1]} minver=${version})" ]; then
+      if [ ! -z "$(pkgCheck project=${arr[0]} name=${arr[1]} minver=${version})" ]; then
         printf "  missing core package ${arr[0]} >= ${version}\n";
       fi
     done
   else
     for gst_p in ${gst_base_plugins[@]}; do
       IFS=";" read -r -a arr <<< "${gst_p}"
-      if [ ! -z "$(pkgCheck name=${arr[1]} minver=${version})" ]; then
+      if [ ! -z "$(pkgCheck project=${project}-${arr[0]} name=${arr[1]} minver=${version})" ]; then
         printf "  missing base plugin ${arr[0]} >= ${version}\n";
       fi
     done
     for gst_p in ${gst_good_plugins[@]}; do
       IFS=";" read -r -a arr <<< "${gst_p}"
-      if [ ! -z "$(pkgCheck name=${arr[1]} minver=${version})" ]; then
+      if [ ! -z "$(pkgCheck project=${project}-${arr[0]} name=${arr[1]} minver=${version})" ]; then
         printf "  missing good plugin ${arr[0]} >= ${version}\n";
       fi
     done
     for gst_p in ${gst_bad_plugins[@]}; do
       IFS=";" read -r -a arr <<< "${gst_p}"
-      if [ ! -z "$(pkgCheck name=${arr[1]} minver=${version})" ]; then
+      if [ ! -z "$(pkgCheck project=${project}-${arr[0]} name=${arr[1]} minver=${version})" ]; then
         printf "  missing bad plugin ${arr[0]} >= ${version}\n";
       fi
     done
@@ -1212,8 +1176,7 @@ checkGstreamerPkg () {
 }
 
 #Gstreamer install on system doesn't break down by plugin, but groups them under base,good,bad,ugly
-if [ ! -z "$(checkGstreamerPkg version=$GSTREAMER_VERSION)" ]; then
-  printlines project="gstreamer" task="check" msg="not found"$'\n'"$(checkGstreamerPkg version=$GSTREAMER_VERSION)"
+if [ ! -z "$(checkGstreamerPkg project="gstreamer" version=$GSTREAMER_VERSION)" ]; then
   gst_ret=1;
 fi
 
@@ -1239,12 +1202,10 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
   gst_ret=0;
   GSTREAMER_VERSION=$GSTREAMER_LATEST; #If we are to build something, build latest
   #Gstreamer static plugins needs to be checked individually
-  if [ ! -z "$(checkGstreamerPkg version=$GSTREAMER_VERSION static=true)" ]; then
-    printlines project="latest-gstreamer" task="check" msg="Gstreamer static library not built.. "$'\n'"$(checkGstreamerPkg version=$GSTREAMER_VERSION static=true)"
+  if [ ! -z "$(checkGstreamerPkg project="gstreamer" version=$GSTREAMER_VERSION static=true)" ]; then
     gst_ret=1;
   fi
-  if [ $ENABLE_LIBAV -eq 1 ] && [ ! -z "$(pkgCheck name=gstlibav minver=$GSTREAMER_VERSION)" ]; then
-    printlines project="latest-gstreamer" task="check" msg="missing libav plugin >= $GSTREAMER_VERSION"
+  if [ $ENABLE_LIBAV -eq 1 ] && [ ! -z "$(pkgCheck project="gstlibav" name=gstlibav minver=$GSTREAMER_VERSION)" ]; then
     gst_ret=1;
   fi
 
@@ -1258,32 +1219,22 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
     #   sudo apt install libgudev-1.0-dev (tested 232)
     # 
     ################################################################
-    if [ ! -z "$(pkgCheck name=gudev-1.0 minver=232)" ]; then
-      printlines project="gudev" task="check" msg="not found"
-      if [ ! -z "$(progVersionCheck program=gperf)" ]; then
-        printlines project="gperf" task="check" msg="not found"
+    if [ ! -z "$(pkgCheck project="gudev" name=gudev-1.0 minver=232)" ]; then
+      if [ ! -z "$(progVersionCheck project="gperf" program=gperf)" ]; then
         downloadAndExtract project="gperf" file="gperf-3.1.tar.gz" path="http://ftp.gnu.org/pub/gnu/gperf/gperf-3.1.tar.gz"
         buildMakeProject project="gperf" srcdir="gperf-3.1" prefix="$SUBPROJECT_DIR/gperf-3.1/dist" autogen="skip"
-      else
-        printlines project="gperf" task="check" msg="found"
       fi
 
-      if [ ! -z "$(pkgCheck name=libcap minver=2.32)" ]; then
-        printlines project="libcap" task="check" msg="not found"
+      if [ ! -z "$(pkgCheck project="libcap" name=libcap minver=2.32)" ]; then
         #old link git://git.kernel.org/pub/scm/linux/kernel/git/morgan/libcap.git
         pullOrClone project="libcap" path=https://kernel.googlesource.com/pub/scm/libs/libcap/libcap tag=libcap-2.69
         buildMakeProject project="libcap" srcdir="libcap" prefix="$SUBPROJECT_DIR/libcap/dist" installargs="DESTDIR='$SUBPROJECT_DIR/libcap/dist'"
-      else
-        printlines project="libcap" task="check" msg="found"
       fi
 
       #TODO build autopoint... (Mint linux)
-      if [ ! -z "$(pkgCheck name=mount minver=2.34.0)" ]; then
-        printlines project="mount" task="check" msg="not found"
+      if [ ! -z "$(pkgCheck project="mount" name=mount minver=2.34.0)" ]; then
         pullOrClone project="mount" path=https://github.com/util-linux/util-linux.git tag=v2.38.1
         buildMakeProject project="mount" srcdir="util-linux" prefix="$SUBPROJECT_DIR/util-linux/dist" configure="--disable-rpath --disable-bash-completion --disable-makeinstall-setuid --disable-makeinstall-chown"
-      else
-        printlines project="mount" task="check" msg="found"
       fi
 
       python3 -c 'from setuptools import setup'
@@ -1311,8 +1262,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
         printlines project="jinja2" task="check" msg="found"
       fi
 
-      if [ ! -z "$(pkgCheck name=libudev minver=256)" ]; then
-        printlines project="udev" task="check" msg="not found"
+      if [ ! -z "$(pkgCheck project="udev" name=libudev minver=256)" ]; then
         SYSD_MESON_ARGS="-Dauto_features=disabled"
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dmode=developer"
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dlink-udev-shared=false"
@@ -1426,18 +1376,12 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
         C_INCLUDE_PATH="$SUBPROJECT_DIR/libcap/dist/usr/include" \
         LIBRARY_PATH="$SUBPROJECT_DIR/libcap/dist/lib64":"$SUBPROJECT_DIR/libcap/dist":$LIBRARY_PATH \
         buildMesonProject project="udev" srcdir="systemd-256" prefix="$SUBPROJECT_DIR/systemd-256/build/dist" mesonargs="$SYSD_MESON_ARGS"
-
-      else
-        printlines project="udev" task="check" msg="found"
       fi
 
       pullOrClone project="gudev" path=https://gitlab.gnome.org/GNOME/libgudev.git tag=237
       C_INCLUDE_PATH="$SUBPROJECT_DIR/systemd-256/build/dist/include" \
       LIBRARY_PATH="$SUBPROJECT_DIR/libcap/dist/lib64":"$SUBPROJECT_DIR/systemd-256/build/dist/lib" \
       buildMesonProject project="gudev" srcdir="libgudev" prefix="$SUBPROJECT_DIR/libgudev/build/dist" mesonargs="-Dvapi=disabled -Dtests=disabled -Dintrospection=disabled"
-
-    else
-      printlines project="gudev" task="check" msg="found"
     fi
 
     ################################################################
@@ -1446,11 +1390,9 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
     #   sudo apt install libpulse-dev (tested 12.2)
     # 
     ################################################################
-    if [ ! -z "$(pkgCheck name=libpulse minver=12.2)" ]; then
-      printlines project="pulse" task="check" msg="not found"
+    if [ ! -z "$(pkgCheck project="pulse" name=libpulse minver=12.2)" ]; then
 
-      if [ ! -z "$(pkgCheck name=sndfile minver=1.2.0)" ]; then
-        printlines project="sndfile" task="check" msg="not found"
+      if [ ! -z "$(pkgCheck project="sndfile" name=sndfile minver=1.2.0)" ]; then
         LIBSNDFILE_CMAKEARGS="-DBUILD_EXAMPLES=off"
         LIBSNDFILE_CMAKEARGS="$LIBSNDFILE_CMAKEARGS -DBUILD_TESTING=off"
         LIBSNDFILE_CMAKEARGS="$LIBSNDFILE_CMAKEARGS -DBUILD_SHARED_LIBS=on"
@@ -1459,8 +1401,6 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
         pullOrClone project="sndfile" path="https://github.com/libsndfile/libsndfile.git" tag=1.2.0
         mkdir "libsndfile/build"
         buildMakeProject project="sndfile" srcdir="libsndfile/build" prefix="$SUBPROJECT_DIR/libsndfile/dist" cmakedir=".." cmakeargs="$LIBSNDFILE_CMAKEARGS"
-      else
-        printlines project="sndfile" task="check" msg="found"
       fi
 
       PULSE_MESON_ARGS="-Ddaemon=false"
@@ -1472,9 +1412,6 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
       PULSE_MESON_ARGS="$PULSE_MESON_ARGS -Dzshcompletiondir=no"
       pullOrClone project="pulse" path="https://gitlab.freedesktop.org/pulseaudio/pulseaudio.git" tag=v16.1
       buildMesonProject project="pulse" srcdir="pulseaudio" prefix="$SUBPROJECT_DIR/pulseaudio/build/dist" mesonargs="$PULSE_MESON_ARGS"
-
-    else
-      printlines project="pulse" task="check" msg="found"
     fi
 
     ################################################################
@@ -1483,59 +1420,43 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
     #   sudo apt install nasm
     # 
     ################################################################
-    if [ ! -z "$(progVersionCheck program=nasm)" ]; then
-      printlines project="nasm" task="check" msg="not found"
+    if [ ! -z "$(progVersionCheck project="nasm" program=nasm)" ]; then
       downloadAndExtract project="nasm" file=nasm-2.16.03.tar.gz path=https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/nasm-2.16.03.tar.gz
       buildMakeProject project="nasm" srcdir="nasm-2.16.03" prefix="$SUBPROJECT_DIR/nasm-2.16.03/dist"
-    else
-        printlines project="nasm" task="check" msg="found"
     fi
 
-    if [ ! -z "$(pkgCheck name=libde265 minver=v1.0.15)" ]; then
-      printlines project="libde265" task="check" msg="not found"
+    if [ ! -z "$(pkgCheck project="libde265" name=libde265 minver=v1.0.15)" ]; then
       pullOrClone project="libde265" path="https://github.com/strukturag/libde265.git" tag=v1.0.15
       buildMakeProject project="libde265" srcdir="libde265" prefix="$SUBPROJECT_DIR/libde265/dist" configure="--disable-sherlock265"
-    else
-      printlines project="libde265" task="check" msg="found"
     fi
 
-    if [ ! -z "$(pkgCheck name=x11-xcb minver=1.7.2)" ]; then
-      printlines project="x11-xcb" task="check" msg="not found"
-      if [ ! -z "$(pkgCheck name=xorg-macros minver=1.19.1)" ]; then
-        printlines project="xmacro" task="check" msg="not found"
+    if [ ! -z "$(pkgCheck project="x11-xcb" name=x11-xcb minver=1.7.2)" ]; then
+      if [ ! -z "$(pkgCheck project="xmacro" name=xorg-macros minver=1.19.1)" ]; then
         pullOrClone project="xmacro" path="https://gitlab.freedesktop.org/xorg/util/macros.git" tag="util-macros-1.20.0"
         buildMakeProject project="xmacro" srcdir="macros" prefix="$SUBPROJECT_DIR/macros/dist" configure="--datarootdir='$SUBPROJECT_DIR/macros/dist/lib'"
-      else
-        printlines project="xmacro" task="check" msg="found"
       fi
 
-      if [ ! -z "$(pkgCheck name=xtrans minver=1.4.0)" ]; then
-        printlines project="xtrans" task="check" msg="not found"
+      if [ ! -z "$(pkgCheck project="xtrans" name=xtrans minver=1.4.0)" ]; then
         pullOrClone project="xtrans" path="https://gitlab.freedesktop.org/xorg/lib/libxtrans.git" tag="xtrans-1.5.1"
         buildMakeProject project="xtrans" srcdir="libxtrans" prefix="$SUBPROJECT_DIR/libxtrans/dist"
-      else
-        printlines project="xtrans" task="check" msg="found"
       fi
 
       downloadAndExtract project="x11" file="libX11-1.8.10.tar.xz" path="https://www.x.org/archive/individual/lib/libX11-1.8.10.tar.xz"
       buildMakeProject project="x11" srcdir="libX11-1.8.10" prefix="$SUBPROJECT_DIR/libX11-1.8.10/build/dist" outoftree="true"
-    else
-      printlines project="x11" task="check" msg="found"
     fi
 
     MESON_PARAMS=""
     if [ $ENABLE_LIBAV -eq 1 ]; then
         
-        [[ ! -z "$(pkgCheck name=libavcodec minver=58.20.100)" ]] && ret1=1 || ret1=0
-        [[ ! -z "$(pkgCheck name=libavfilter minver=7.40.101)" ]] && ret2=1 || ret2=0
-        [[ ! -z "$(pkgCheck name=libavformat minver=58.20.100)" ]] && ret3=1 || ret3=0
-        [[ ! -z "$(pkgCheck name=libavutil minver=56.22.100)" ]] && ret4=1 || ret4=0
-        [[ ! -z "$(pkgCheck name=libpostproc minver=55.3.100)" ]] && ret5=1 || ret5=0
-        [[ ! -z "$(pkgCheck name=libswresample minver=3.3.100)" ]] && ret6=1 || ret6=0
-        [[ ! -z "$(pkgCheck name=libswscale minver=5.3.100)" ]] && ret7=1 || ret7=0
+        [[ ! -z "$(pkgCheck project="ffmpeg-libavcodec" name=libavcodec minver=58.20.100)" ]] && ret1=1 || ret1=0
+        [[ ! -z "$(pkgCheck project="ffmpeg-libavfilter" name=libavfilter minver=7.40.101)" ]] && ret2=1 || ret2=0
+        [[ ! -z "$(pkgCheck project="ffmpeg-libavformat" name=libavformat minver=58.20.100)" ]] && ret3=1 || ret3=0
+        [[ ! -z "$(pkgCheck project="ffmpeg-libavutil" name=libavutil minver=56.22.100)" ]] && ret4=1 || ret4=0
+        [[ ! -z "$(pkgCheck project="ffmpeg-libpostproc" name=libpostproc minver=55.3.100)" ]] && ret5=1 || ret5=0
+        [[ ! -z "$(pkgCheck project="ffmpeg-libswresample" name=libswresample minver=3.3.100)" ]] && ret6=1 || ret6=0
+        [[ ! -z "$(pkgCheck project="ffmpeg-libswscale" name=libswscale minver=5.3.100)" ]] && ret7=1 || ret7=0
 
         if [ $ret1 != 0 ] || [ $ret2 != 0 ] || [ $ret3 != 0 ] || [ $ret4 != 0 ] || [ $ret5 != 0 ] || [ $ret6 != 0 ] || [ $ret7 != 0 ]; then
-            printlines project="ffmpeg" task="check" msg="not found"
             #######################
             #
             # Custom FFmpeg build
