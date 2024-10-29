@@ -447,7 +447,7 @@ void OnvifInfoPanel_update_details(OnvifInfoPanel * self){
     InfoDataUpdate * input = malloc(sizeof(InfoDataUpdate));
     input->device = priv->device;
     input->info = self;
-    g_object_ref(priv->device);
+    g_object_ref(input->device);
     if(priv->previous_event && !QueueEvent__is_finished(priv->previous_event)) {
         g_signal_handler_disconnect(priv->previous_event,priv->event_signal); //Removing signal to prevent loading from hiding
         QueueEvent__cancel(priv->previous_event);
@@ -458,8 +458,8 @@ void OnvifInfoPanel_update_details(OnvifInfoPanel * self){
         g_object_unref(priv->previous_event);
     }
 
-    g_signal_emit (self, signals[STARTED], 0, priv->device);
-    priv->previous_event = EventQueue__insert_plain(OnvifApp__get_EventQueue(priv->app), priv->device, _update_details_page,input, _update_details_page_cleanup);
+    g_signal_emit (self, signals[STARTED], 0, input->device);
+    priv->previous_event = EventQueue__insert_plain(OnvifApp__get_EventQueue(priv->app), input->device, _update_details_page,input, _update_details_page_cleanup);
     priv->event_signal = g_signal_connect (priv->previous_event, "cancelled", G_CALLBACK (update_details_event_cancelled_cb), input);
     g_object_ref(priv->previous_event);
 }
