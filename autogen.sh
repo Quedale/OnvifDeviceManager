@@ -122,7 +122,7 @@ printlines(){
 
   #Init padding string
   if [[ -z "${padding}"  || ! "${padding}" == ?(-)+([[:digit:]]) ]]; then padding=1; fi
-  inpadding="" && for i in $(seq 1 $padding); do inpadding=$inpadding" "; done
+  inpadding="" && for i in {1..$padding}; do inpadding=$inpadding" "; done
 
   if [ ! -z "${msg}" ]; then
     echo "${msg}" | printline project="${project}" task="${task}" color="${incolor}" padding="${inpadding}" prefix="${prefix}"
@@ -138,7 +138,8 @@ printError(){
   printlines project="${project}" task="${task}" color=${RED} prefix=" * " msg="${msg}"
   printlines project="${project}" task="${task}" color=${RED} prefix=" * " padding=4 msg="Kernel: $(uname -r)"
   printlines project="${project}" task="${task}" color=${RED} prefix=" * " padding=4 msg="Kernel: $(uname -i)"
-  printlines project="${project}" task="${task}" color=${RED} prefix=" * " padding=4 msg="$(lsb_release -a 2> /dev/null)"
+  #Doesnt exist on REHL
+  # printlines project="${project}" task="${task}" color=${RED} prefix=" * " padding=4 msg="$(lsb_release -a 2> /dev/null)"
   printlines project="${project}" task="${task}" color=${RED} msg="*****************************"
 }
 
@@ -599,7 +600,7 @@ pkgCheck() {
 }
 
 progVersionCheck(){
-  local major minor micro linenumber lineindex program paramoverride
+  local major minor micro linenumber lineindex program paramoverride startcut length
   local "${@}"
 
   varparam="--version"
@@ -620,6 +621,12 @@ progVersionCheck(){
   FIRSTLINE=$(${program} ${varparam} | head -${linenumber})
   firstLineArray=(${FIRSTLINE//;/ })
   versionString=${firstLineArray[${lineindex}]};
+
+  # printf "${GREEN}%s${NC}\n" "$versionString" >&2
+  [[ ! -z "${startcut}" ]] && [[ -z "${length}" ]] && versionString=${versionString:2}
+  [[ ! -z "${startcut}" ]] && [[ ! -z "${length}" ]] && versionString=${versionString:$startcut:$length}
+  [[ -z "${startcut}" ]] && [[ ! -z "${length}" ]] && versionString=${versionString:0:$length}
+
   versionArray=(${versionString//./ })
   actualmajor=${versionArray[0]}
   actualminor=${versionArray[1]}
@@ -650,6 +657,21 @@ progVersionCheck(){
   fi
 }
 
+function checkLibrary {
+  local name static project
+  local "${@}"
+
+  [[ ! -z "${static}" ]] && staticstr=" -static" || staticstr=""
+
+  output="$(gcc -l${name}${staticstr} 2>&1)";
+  if [[ "$output" == *"undefined reference to \`main'"* ]]; then
+    printlines project="${project}" task="check" msg="found"
+  else
+    printlines project="${project}" task="check" msg="not found"
+    echo 1
+  fi
+}
+
 export PATH="$SUBPROJECT_DIR/unzip60/build/dist/bin":$PATH
 HAS_UNZIP=0
 checkUnzip(){
@@ -676,6 +698,35 @@ checkGetTextAndAutoPoint(){
     printlines project="gettext" task="check" msg="found"
   fi
   HAS_GETTEXT=1
+}
+
+
+export PERL5LIB="$SUBPROJECT_DIR/perl-5.40.0/lib":$PERL5LIB
+export PATH="$SUBPROJECT_DIR/perl-5.40.0/build/bin":$PATH
+HAS_PERL=0
+checkPerl(){
+  if [ $HAS_PERL -eq 0 ] && \
+      [ ! -z "$(progVersionCheck program=perl linenumber=2 lineindex=8 major=5 minor=38 micro=0 startcut=2 length=6)" ]; then
+      printlines project="perl" task="check" msg="not found"
+      downloadAndExtract project="perl" file="perl-5.40.0.tar.gz" path="https://www.cpan.org/src/5.0/perl-5.40.0.tar.gz"
+      buildMakeProject project="perl" srcdir="perl-5.40.0" skipbootstrap="true" configcustom="./Configure -des -Dprefix=$SUBPROJECT_DIR/perl-5.40.0/build"
+  elif [ $HAS_PERL -eq 0 ]; then
+    printlines project="perl" task="check" msg="found"
+  fi
+  HAS_PERL=1
+}
+
+
+export PATH="$SUBPROJECT_DIR/glibc-2.40/build/dist/bin":$PATH
+export LIBRARY_PATH="$SUBPROJECT_DIR/glibc-2.40/build/dist/lib":$LIBRARY_PATH
+HAS_GLIBC=0
+checkGlibc(){
+  if [ $HAS_GLIBC -eq 0 ] && \
+      [ ! -z "$(checkLibrary project="glibc" name=c static=true)" ]; then
+      downloadAndExtract project="glibc" file="glibc-2.40.tar.xz" path="https://ftp.gnu.org/gnu/glibc/glibc-2.40.tar.xz"
+      buildMakeProject project="glibc" srcdir="glibc-2.40" prefix="$SUBPROJECT_DIR/glibc-2.40/build/dist" skipbootstrap="true" outoftree="true"
+  fi
+  HAS_GLIBC=1
 }
 
 checkGitRepoState(){
@@ -772,6 +823,7 @@ export PATH="$SUBPROJECT_DIR/autoconf-2.72/build/dist/bin":$PATH
 export ACLOCAL_PATH="$SUBPROJECT_DIR/autoconf-2.72/build/dist/share/autoconf":$ACLOCAL_PATH
 if [ ! -z "$(progVersionCheck program=autoconf linenumber=1 lineindex=3 major=2 minor=70)" ]; then
   printlines project="autoconf" task="check" msg="not found"
+  checkPerl
   downloadAndExtract project="autoconf" file="autoconf-2.72.tar.xz" path="https://ftp.gnu.org/gnu/autoconf/autoconf-2.72.tar.xz"
   buildMakeProject project="autoconf" srcdir="autoconf-2.72" prefix="$SUBPROJECT_DIR/autoconf-2.72/build/dist" skipbootstrap="true"
 else
@@ -881,9 +933,10 @@ fi
 #    Build Openssl for gsoap and onvifsoap
 #       
 ################################################################
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/openssl/build/dist/lib/pkgconfig"
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/openssl/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
 if [ ! -z "$(pkgCheck name=libcrypto minver=1.1.1f)" ]; then
   printlines project="openssl" task="check" msg="not found"
+  checkGlibc
   pullOrClone project="openssl" path="https://github.com/openssl/openssl.git" tag="OpenSSL_1_1_1w"
   buildMakeProject project="openssl" srcdir="openssl" configcustom="./config --prefix='$SUBPROJECT_DIR/openssl/build/dist' --openssldir='$SUBPROJECT_DIR/openssl/build/dist/ssl' -static"
 else
@@ -906,7 +959,7 @@ fi
 # 
 ################################################################
 export PATH="$SUBPROJECT_DIR/glib-2.74.1/dist/bin":$PATH
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/glib-2.74.1/dist/lib/pkgconfig"
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/glib-2.74.1/dist/lib/pkgconfig":$PKG_CONFIG_PATH
 if [ ! -z "$(pkgCheck name=glib-2.0 minver=2.64.0)" ]; then
   printlines project="glib" task="check" msg="not found"
   downloadAndExtract project="glib" file="glib-2.74.1.tar.xz" path="https://download.gnome.org/sources/glib/2.74/glib-2.74.1.tar.xz"
@@ -920,7 +973,7 @@ fi
 #    Build cutils
 #       
 ################################################################
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/CUtils/build/dist/lib/pkgconfig"
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/CUtils/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
 rebuild=$(checkGitRepoState repo="CUtils" package="cutils")
 
 if [ $rebuild != 0 ]; then
@@ -942,11 +995,11 @@ fi
 #    Build OnvifSoapLib
 #       
 ################################################################
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/OnvifSoapLib/build/dist/lib/pkgconfig"
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/libntlm-1.8/build/dist/lib/pkgconfig"
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/OnvifSoapLib/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/libntlm-1.8/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
 export PATH="$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin":$PATH
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/gsoap-2.8/build/dist/lib/pkgconfig"
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/zlib-1.2.13/build/dist/lib/pkgconfig"
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/gsoap-2.8/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/zlib-1.2.13/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
 rebuild=$(checkGitRepoState repo="OnvifSoapLib" package="onvifsoap")
 
 if [ $rebuild != 0 ]; then
@@ -1038,7 +1091,7 @@ fi
 #   sudo apt install llibasound2-dev (tested 1.2.7.2)
 # 
 ################################################################
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/alsa-lib/build/dist/lib/pkgconfig"
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/alsa-lib/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
 if [ ! -z "$(pkgCheck name=alsa minver=1.2.2)" ]; then
   printlines project="alsa" task="check" msg="not found"
   pullOrClone project="alsa" path=git://git.alsa-project.org/alsa-lib.git tag=v1.2.8
@@ -1052,10 +1105,10 @@ fi
 #    Build Gstreamer dependency
 #       sudo apt install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 ################################################################
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/FFmpeg/dist/lib/pkgconfig"
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/gstreamer/build_omx/dist/lib/gstreamer-1.0/pkgconfig"
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/gstreamer/build/dist/lib/pkgconfig"
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/gstreamer/build/dist/lib/gstreamer-1.0/pkgconfig"
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/FFmpeg/dist/lib/pkgconfig":$PKG_CONFIG_PATH
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/gstreamer/build_omx/dist/lib/gstreamer-1.0/pkgconfig":$PKG_CONFIG_PATH
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/gstreamer/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/gstreamer/build/dist/lib/gstreamer-1.0/pkgconfig":$PKG_CONFIG_PATH
 
 gst_ret=0
 GSTREAMER_LATEST=1.24.8
@@ -1164,19 +1217,22 @@ if [ ! -z "$(checkGstreamerPkg version=$GSTREAMER_VERSION)" ]; then
   gst_ret=1;
 fi
 
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/pulseaudio/build/dist/lib/pkgconfig"
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/libde265/dist/lib/pkgconfig"
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/libx11/dist/lib/pkgconfig"
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/macros/dist/lib/pkgconfig"
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/pulseaudio/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/libde265/dist/lib/pkgconfig":$PKG_CONFIG_PATH
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/libX11-1.8.10/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/macros/dist/lib/pkgconfig":$PKG_CONFIG_PATH
 
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/systemd-256/build/dist/lib/pkgconfig"
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/libgudev/build/dist/lib/pkgconfig"
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/libcap/dist/lib64/pkgconfig"
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/util-linux/dist/lib/pkgconfig"
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$SUBPROJECT_DIR/libsndfile/dist/lib/pkgconfig"
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/systemd-256/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/libgudev/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/libcap/dist/lib64/pkgconfig":"$SUBPROJECT_DIR/libcap/dist/pkgconfig":$PKG_CONFIG_PATH
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/util-linux/dist/lib/pkgconfig":$PKG_CONFIG_PATH
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/libsndfile/dist/lib/pkgconfig":"$SUBPROJECT_DIR/libsndfile/dist/lib64/pkgconfig":$PKG_CONFIG_PATH
 export PATH="$SUBPROJECT_DIR/gperf-3.1/dist/bin":$PATH
-export PATH="$SUBPROJECT_DIR/nasm-2.15.05/dist/bin":$PATH
+export PATH="$SUBPROJECT_DIR/nasm-2.16.03/dist/bin":$PATH
 export PATH="$SUBPROJECT_DIR/FFmpeg/dist/bin":$PATH
+export ACLOCAL_PATH="$SUBPROJECT_DIR/macros/dist/lib/aclocal":$ACLOCAL_PATH
+export ACLOCAL_PATH="$SUBPROJECT_DIR/libxtrans/dist/share/aclocal":$ACLOCAL_PATH
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/libxtrans/dist/share/pkgconfig":$PKG_CONFIG_PATH
 
 #Check to see if gstreamer exist on the system
 if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
@@ -1368,7 +1424,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
         SYSD_MESON_ARGS="$SYSD_MESON_ARGS -Dsshconfdir='$SUBPROJECT_DIR/systemd-256/build/dist/sshcfg'"
         downloadAndExtract project="udev" file="v256.tar.gz" path="https://github.com/systemd/systemd/archive/refs/tags/v256.tar.gz"
         C_INCLUDE_PATH="$SUBPROJECT_DIR/libcap/dist/usr/include" \
-        LIBRARY_PATH="$SUBPROJECT_DIR/libcap/dist/lib64" \
+        LIBRARY_PATH="$SUBPROJECT_DIR/libcap/dist/lib64":"$SUBPROJECT_DIR/libcap/dist":$LIBRARY_PATH \
         buildMesonProject project="udev" srcdir="systemd-256" prefix="$SUBPROJECT_DIR/systemd-256/build/dist" mesonargs="$SYSD_MESON_ARGS"
 
       else
@@ -1429,8 +1485,8 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
     ################################################################
     if [ ! -z "$(progVersionCheck program=nasm)" ]; then
       printlines project="nasm" task="check" msg="not found"
-      downloadAndExtract project="nasm" file=nasm-2.15.05.tar.bz2 path=https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/nasm-2.15.05.tar.bz2
-      buildMakeProject project="nasm" srcdir="nasm-2.15.05" prefix="$SUBPROJECT_DIR/nasm-2.15.05/dist"
+      downloadAndExtract project="nasm" file=nasm-2.16.03.tar.gz path=https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/nasm-2.16.03.tar.gz
+      buildMakeProject project="nasm" srcdir="nasm-2.16.03" prefix="$SUBPROJECT_DIR/nasm-2.16.03/dist"
     else
         printlines project="nasm" task="check" msg="found"
     fi
@@ -1453,9 +1509,16 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
         printlines project="xmacro" task="check" msg="found"
       fi
 
-      pullOrClone project="x11" path="https://gitlab.freedesktop.org/xorg/lib/libx11.git" tag="libX11-1.8.8"
-      ACLOCAL_PATH="$SUBPROJECT_DIR/macros/dist/lib/aclocal":$ACLOCAL_PATH \
-      buildMakeProject project="x11" srcdir="libx11" prefix="$SUBPROJECT_DIR/libx11/dist"
+      if [ ! -z "$(pkgCheck name=xtrans minver=1.4.0)" ]; then
+        printlines project="xtrans" task="check" msg="not found"
+        pullOrClone project="xtrans" path="https://gitlab.freedesktop.org/xorg/lib/libxtrans.git" tag="xtrans-1.5.1"
+        buildMakeProject project="xtrans" srcdir="libxtrans" prefix="$SUBPROJECT_DIR/libxtrans/dist"
+      else
+        printlines project="xtrans" task="check" msg="found"
+      fi
+
+      downloadAndExtract project="x11" file="libX11-1.8.10.tar.xz" path="https://www.x.org/archive/individual/lib/libX11-1.8.10.tar.xz"
+      buildMakeProject project="x11" srcdir="libX11-1.8.10" prefix="$SUBPROJECT_DIR/libX11-1.8.10/build/dist" outoftree="true"
     else
       printlines project="x11" task="check" msg="found"
     fi
