@@ -50,7 +50,6 @@ typedef struct {
     GtkWidget *canvas;
     GstRtspViewMode view_mode;
 
-    P_MUTEX_TYPE prop_lock;
     P_MUTEX_TYPE player_lock;
 
     char * user;
@@ -99,6 +98,7 @@ GstRtspPlayer__dispose (GObject *gobject)
 
     if(GST_IS_ELEMENT(priv->pipeline)){
         gst_object_unref (priv->pipeline);
+        priv->pipeline = NULL;
     }
 
     RtspBackchannel__destroy(priv->backchannel);
@@ -122,7 +122,6 @@ GstRtspPlayer__dispose (GObject *gobject)
     if(priv->pass){
         free(priv->pass);
     }
-    P_MUTEX_CLEANUP(priv->prop_lock);
     P_MUTEX_CLEANUP(priv->player_lock);
 
     if(priv->video_bin){
@@ -209,16 +208,12 @@ void GstRtspPlayer__stop(GstRtspPlayer* self){
 
 void GstRtspPlayerPrivate__play(GstRtspPlayerPrivate* priv){
     P_MUTEX_LOCK(priv->player_lock);
-
-    //Restore previous session's properties
-    P_MUTEX_LOCK(priv->prop_lock);
     if(priv->user)
         g_object_set (G_OBJECT (priv->src), "user-id", priv->user, NULL);
     if(priv->pass)
         g_object_set (G_OBJECT (priv->src), "user-pw", priv->pass, NULL);
     if(priv->location)
         g_object_set (G_OBJECT (priv->src), "location", priv->location, NULL);
-    P_MUTEX_UNLOCK(priv->prop_lock);
 
     C_DEBUG("RtspPlayer__play retry[%i] - playing[%i] %s\n",priv->retry,priv->playing, priv->location);
     priv->playing = 1;
@@ -228,14 +223,13 @@ void GstRtspPlayerPrivate__play(GstRtspPlayerPrivate* priv){
     if (ret == GST_STATE_CHANGE_FAILURE) {
         C_ERROR ("Unable to set the pipeline to the playing state.\n");
         gst_object_unref (priv->pipeline);
-        goto exit;
+        priv->pipeline = NULL;
     }
 
-exit:
     P_MUTEX_UNLOCK(priv->player_lock);
 }
 
-void GstRtspPlayer__play(GstRtspPlayer* self){
+void GstRtspPlayer__play(GstRtspPlayer* self, char *url, char * user, char * pass, char * fallback_host, char * fallback_port){
     g_return_if_fail (self != NULL);
     g_return_if_fail (GST_IS_RTSPPLAYER (self));
     
@@ -244,6 +238,79 @@ void GstRtspPlayer__play(GstRtspPlayer* self){
     priv->retry = 0;
     priv->fallback = RTSP_FALLBACK_NONE;
     priv->enable_backchannel = 1;//TODO Handle parameter input...
+
+    //Updating location
+    if(!priv->location_set){
+        priv->location_set = malloc(strlen(url)+1);
+    } else {
+        priv->location_set = realloc(priv->location_set,strlen(url)+1);
+    }
+    strcpy(priv->location_set,url);
+
+    if(!priv->location){
+        priv->location = malloc(strlen(url)+1);
+    } else {
+        priv->location = realloc(priv->location,strlen(url)+1);
+    }
+    strcpy(priv->location,url);
+    
+    priv->valid_location = 0;
+
+    //Update credentials
+    if(!user){
+        free(priv->user);
+        priv->user = NULL;
+    } else {
+        if(!priv->user){
+            priv->user = malloc(strlen(user)+1);
+        } else {
+            priv->user = realloc(priv->user,strlen(user)+1);
+        }
+        strcpy(priv->user,user);
+    }
+
+    if(!pass){
+        free(priv->pass);
+        priv->pass = NULL;
+    } else {
+        if(!priv->pass){
+            priv->pass = malloc(strlen(pass)+1);
+        } else {
+            priv->pass = realloc(priv->pass,strlen(pass)+1);
+        }
+        strcpy(priv->pass,pass);
+    }
+
+    //Update port fallback
+    if(fallback_port){
+        if(!priv->port_fallback){
+            priv->port_fallback = malloc(strlen(fallback_port)+1);
+        } else {
+            priv->port_fallback = realloc(priv->port_fallback,strlen(fallback_port)+1);
+        }
+        strcpy(priv->port_fallback,fallback_port);
+    } else {
+        if(priv->port_fallback){
+            free(priv->port_fallback);
+            priv->port_fallback = NULL;
+        }
+    }
+
+    //Update host fallback
+    if(fallback_host){
+        if(!priv->host_fallback){
+            priv->host_fallback = malloc(strlen(fallback_host)+1);
+        } else {
+            priv->host_fallback = realloc(priv->host_fallback,strlen(fallback_host)+1);
+        }
+        strcpy(priv->host_fallback,fallback_host);
+    } else {
+        if(priv->host_fallback){
+            free(priv->host_fallback);
+            priv->host_fallback = NULL;
+        }
+    }
+
     GstRtspPlayerPrivate__play(priv);
 }
 
@@ -606,8 +673,10 @@ void GstRtspPlayerPrivate__inner_stop(GstRtspPlayerPrivate * priv){
     priv->dynamic_elements = NULL;
 
     //Destroy old pipeline
-    if(GST_IS_ELEMENT(priv->pipeline))
+    if(GST_IS_ELEMENT(priv->pipeline)){
         gst_object_unref (priv->pipeline);
+        priv->pipeline = NULL;
+    }
 
     // Create new pipeline
     GstRtspPlayerPrivate__setup_pipeline(priv);
@@ -1031,7 +1100,6 @@ GstRtspPlayer__init (GstRtspPlayer * self)
     g_object_ref(priv->video_bin);
     priv->audio_bin = GstRtspPlayerPrivate__create_audio_pad();
     g_object_ref(priv->audio_bin);
-    P_MUTEX_SETUP(priv->prop_lock);
     P_MUTEX_SETUP(priv->player_lock);
 
     priv->backchannel = RtspBackchannel__create();
@@ -1046,73 +1114,6 @@ GstRtspPlayer__init (GstRtspPlayer * self)
 GstRtspPlayer*  GstRtspPlayer__new (){
     GstRtspPlayer * player = g_object_new (GST_TYPE_RTSPPLAYER, NULL);
     return player;
-}
-
-void GstRtspPlayer__set_playback_url(GstRtspPlayer * self, char *url) {
-    g_return_if_fail (self != NULL);
-    g_return_if_fail (GST_IS_RTSPPLAYER (self));
-    
-    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
-    P_MUTEX_LOCK(priv->prop_lock);
-    C_INFO("set location : %s\n",url);
-    
-    if(!priv->location_set){
-        priv->location_set = malloc(strlen(url)+1);
-    } else {
-        priv->location_set = realloc(priv->location_set,strlen(url)+1);
-    }
-    strcpy(priv->location_set,url);
-
-    if(!priv->location){
-        priv->location = malloc(strlen(url)+1);
-    } else {
-        priv->location = realloc(priv->location,strlen(url)+1);
-    }
-    strcpy(priv->location,url);
-    
-    //New location, new credentials
-    //TODO Fetch cached credentials from store
-    free(priv->user);
-    free(priv->pass);
-    priv->pass = NULL;
-    priv->user = NULL;
-    priv->valid_location = 0;
-    P_MUTEX_UNLOCK(priv->prop_lock);
-}
-
-void GstRtspPlayer__set_credentials(GstRtspPlayer * self, char * user, char * pass){
-    g_return_if_fail (self != NULL);
-    g_return_if_fail (GST_IS_RTSPPLAYER (self));
-    
-    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
-
-    P_MUTEX_LOCK(priv->prop_lock);
-
-    if(!user){
-        free(priv->user);
-        priv->user = NULL;
-    } else {
-        if(!priv->user){
-            priv->user = malloc(strlen(user)+1);
-        } else {
-            priv->user = realloc(priv->user,strlen(user)+1);
-        }
-        strcpy(priv->user,user);
-    }
-
-    if(!pass){
-        free(priv->pass);
-        priv->pass = NULL;
-    } else {
-        if(!priv->pass){
-            priv->pass = malloc(strlen(pass)+1);
-        } else {
-            priv->pass = realloc(priv->pass,strlen(pass)+1);
-        }
-        strcpy(priv->pass,pass);
-    }
-
-    P_MUTEX_UNLOCK(priv->prop_lock);
 }
 
 GtkWidget * GstRtspPlayer__createCanvas(GstRtspPlayer *self){
@@ -1188,45 +1189,6 @@ void GstRtspPlayer__set_view_mode(GstRtspPlayer * self, GstRtspViewMode mode){
     if(GTK_IS_WIDGET(priv->canvas)){
         GstRtspPlayerPrivate__apply_view_mode(priv);
     }
-}
-
-void GstRtspPlayer__set_port_fallback(GstRtspPlayer* self, char * port){
-    g_return_if_fail (self != NULL);
-    g_return_if_fail (GST_IS_RTSPPLAYER (self));
-    
-    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
-    P_MUTEX_LOCK(priv->prop_lock);
-
-    if(port){
-        if(!priv->port_fallback){
-            priv->port_fallback = malloc(strlen(port)+1);
-        } else {
-            priv->port_fallback = realloc(priv->port_fallback,strlen(port)+1);
-        }
-        strcpy(priv->port_fallback,port);
-    } else {
-        if(priv->port_fallback){
-            free(priv->port_fallback);
-            priv->port_fallback = NULL;
-        }
-    }
-    
-    P_MUTEX_UNLOCK(priv->prop_lock);
-}
-
-void GstRtspPlayer__set_host_fallback(GstRtspPlayer* self, char * host){
-    g_return_if_fail (self != NULL);
-    g_return_if_fail (GST_IS_RTSPPLAYER (self));
-
-    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
-    P_MUTEX_LOCK(priv->prop_lock);
-    if(!priv->host_fallback){
-        priv->host_fallback = malloc(strlen(host)+1);
-    } else {
-        priv->host_fallback = realloc(priv->host_fallback,strlen(host)+1);
-    }
-    strcpy(priv->host_fallback,host);
-    P_MUTEX_UNLOCK(priv->prop_lock);
 }
 
 GstSnapshot * GstRtspPlayer__get_snapshot(GstRtspPlayer* self){

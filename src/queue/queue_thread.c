@@ -110,9 +110,11 @@ void * priv_QueueThread_call(void * data){
         }
         QueueEvent__cleanup(event_queue);
         g_object_unref(event_queue);
+        event_queue = NULL;
     }
 
 exit:
+    event_queue = NULL;
     g_signal_emit (queue_thread, signals[STATE_CHANGED], 0, EVENTQUEUE_FINISHED /* details */);
     g_object_unref(queue_thread);
     P_THREAD_EXIT;

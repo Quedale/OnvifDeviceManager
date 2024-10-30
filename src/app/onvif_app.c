@@ -227,23 +227,19 @@ void _play_onvif_stream(QueueEvent * qevt, void * user_data){
     
     if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) && *fault == SOAP_FAULT_NONE && !(qevt != NULL && QueueEvent__is_cancelled(qevt))){
         char * uri = OnvifMediaUri__get_uri(media_uri);
-        GstRtspPlayer__set_playback_url(priv->player,uri);
         char * port = OnvifDevice__get_port(OnvifMgrDeviceRow__get_device(device));
-        GstRtspPlayer__set_port_fallback(priv->player,port);
-        free(port);
-
         char * host = OnvifDevice__get_host(OnvifMgrDeviceRow__get_device(device));
-        GstRtspPlayer__set_host_fallback(priv->player,host);
-        free(host);
         
         OnvifCredentials * ocreds = OnvifDevice__get_credentials(odev);
         char * user = OnvifCredentials__get_username(ocreds);
         char * pass = OnvifCredentials__get_password(ocreds);
-        GstRtspPlayer__set_credentials(priv->player, user, pass);
+
+        GstRtspPlayer__play(priv->player,uri,user,pass,host,port);
+
+        free(port);
+        free(host);
         free(user);
         free(pass);
-
-        GstRtspPlayer__play(priv->player);
     } else if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device)) {
         C_TRAIL("_play_onvif_stream - invalid device.");
     }
@@ -468,22 +464,18 @@ void OnvifApp__player_started_cb(GstRtspPlayer * player, void * user_data){
     }
 }
 
-void OnvifApp__eq_dispatch_cb(EventQueue * queue, QueueEventType type, OnvifApp * self){
+void OnvifApp__eq_dispatch_cb(EventQueue * queue, QueueEventType type, int running, int pending, int threadcount, QueueEvent * evt, OnvifApp * self){
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (self);
+
+    C_TRACE("EventQueue %s : %d/%d/%d",g_enum_to_nick(QUEUE_TYPE_EVENTTYPE,type),running,pending,threadcount);
+
     if(!GTK_IS_WIDGET(priv->task_label)){
         return;
     }
-
-    int running = EventQueue__get_running_event_count(queue);
-    int pending = EventQueue__get_pending_event_count(queue);
-    int total = EventQueue__get_thread_count(queue);
-
-    if(type == EVENTQUEUE_FINISHED) total--;
-    C_TRACE("EventQueue %s : %d/%d/%d",g_enum_to_nick(QUEUE_TYPE_EVENTTYPE,type),running,pending,total);
-
+    
     char str[10];
     memset(&str,'\0',sizeof(str));
-    sprintf(str, "[%d/%d]", running + pending,total);
+    sprintf(str, "[%d/%d]", running + pending,threadcount);
 
     gui_set_label_text(priv->task_label,str);
 }
