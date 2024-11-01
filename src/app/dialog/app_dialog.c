@@ -152,7 +152,6 @@ void AppDialog__hide(AppDialog* dialog){
     if(dialog->visible == 0){
         return;
     }
-    C_DEBUG("hide");
     dialog->visible = 0;
 
     //Disconnect keyboard handler.

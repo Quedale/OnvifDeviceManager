@@ -31,7 +31,7 @@ void handler_signal(int sig) {
   size = backtrace(array, 10);
 
   // print out all the frames to stderr
-  fprintf(stderr, "Error: signal %d:\n", sig);
+  fprintf(stderr, "[%ld] Error: signal %d:\n", P_THREAD_ID, sig);
   backtrace_symbols_fd(array, size, STDERR_FILENO);
   exit(1);
 }

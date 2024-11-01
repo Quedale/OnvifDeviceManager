@@ -106,6 +106,24 @@ char * AppSettings__get_config_path(){
     return ret;
 }
 
+struct extract_data_from_gui_data{
+    AppSettings * app_settings;
+    char * stream_data;
+    char * discovery_data;
+    P_COND_TYPE cond;
+    P_MUTEX_TYPE lock;
+    int done;
+};
+
+gboolean idle_extract_data_from_gui(void * user_data){
+    struct extract_data_from_gui_data * data = (struct extract_data_from_gui_data *) user_data;
+    data->stream_data = AppSettingsStream__save(data->app_settings->stream);
+    data->discovery_data = AppSettingsDiscovery__save(data->app_settings->discovery);
+    data->done = 1;
+    P_COND_BROADCAST(data->cond);
+    return FALSE;
+}
+
 //Background task to save settings (invokes internal callbacks)
 void _save_settings(QueueEvent * qevt, void * user_data){
     AppSettings * self = (AppSettings *) user_data;
@@ -117,8 +135,18 @@ void _save_settings(QueueEvent * qevt, void * user_data){
     FILE * fptr = fopen(path,"w");
 
     if(fptr != NULL){
-        fprintf(fptr,"%s\n\n",AppSettingsStream__save(self->stream));
-        fprintf(fptr,"%s\n\n",AppSettingsDiscovery__save(self->discovery));
+        struct extract_data_from_gui_data data;
+        data.app_settings = self;
+        data.done = 0;
+        P_COND_SETUP(data.cond);
+        P_MUTEX_SETUP(data.lock);
+        g_idle_add(idle_extract_data_from_gui,&data);
+        if(!data.done) { P_COND_WAIT(data.cond, data.lock); }
+        P_COND_CLEANUP(data.cond);
+        P_MUTEX_CLEANUP(data.lock);
+
+        fprintf(fptr,"%s\n\n",data.stream_data);
+        fprintf(fptr,"%s\n\n",data.discovery_data);
         //More settings to add here
         
         fclose(fptr);

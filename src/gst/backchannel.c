@@ -100,7 +100,7 @@ void RtspBackchannel__init(RtspBackchannel * self){
     RtspBackchannel__check_mic(self);
 
     //self->mic_element
-    self->pipeline = gst_pipeline_new ("pipeline");
+    self->pipeline = gst_pipeline_new ("backchannel-pipeline");
 
     /* Create the elements */
     if(strlen(mic_element) == 0){
@@ -205,8 +205,10 @@ static void RtspBackchannel__message_handler (GstBus * bus, GstMessage * message
             g_free (debug_info);
             break;
         case GST_MESSAGE_STATE_CHANGED:
-            gst_message_parse_state_changed (message, &old_state, &new_state, &pending_state);
-            C_TRACE ("State set to %s for %s", gst_element_state_get_name (new_state), GST_OBJECT_NAME (message->src));
+            if(GST_IS_PIPELINE(message->src)){
+                gst_message_parse_state_changed (message, &old_state, &new_state, &pending_state);
+                C_TRACE ("State set to %s for %s", gst_element_state_get_name (new_state), GST_OBJECT_NAME (message->src));
+            }
             break;
         case GST_MESSAGE_WARNING:
         default:

@@ -13,34 +13,43 @@ typedef enum {
     RTSP_FALLBACK_URL
 } GstRtspPlayerFallbackType;
 
+
+struct _GstRtspPlayerSession {
+  GstRtspPlayer * player;
+  GstElement *pipeline;
+  GstElement *src;  /* RtspSrc to support backchannel */
+  GList * dynamic_elements;
+  GstRtspPlayerFallbackType fallback;
+
+  //Keep location to used on retry
+  char * location_set;
+  char * location;
+  int valid_location;
+
+  //Retry count
+  int retry;
+  char * user;
+  char * pass;
+  char * port_fallback;
+  char * host_fallback;
+  int enable_backchannel;
+  void * user_data;
+};
+
 typedef struct {
     GstRtspPlayer * owner;
-    GstElement *pipeline;
-    GstElement *src;  /* RtspSrc to support backchannel */
-    GstElement *sink;  /* Video Sink */
-    GstElement *snapsink;
+    GstRtspPlayerSession * session;
 
     //Reusable bins containing encoder and sink
     GstElement * video_bin;
     GstElement * audio_bin;
-    
-    GList * dynamic_elements;
+    GstElement *sink;  /* Video Sink */
+    GstElement *snapsink;
     GstCaps * sinkcaps; /* reference to extract native stream dimension */
-    GstRtspPlayerFallbackType fallback;
-    
-    //Backpipe related properties
-    int enable_backchannel;
-    RtspBackchannel * backchannel;
-    GstVideoOverlay *overlay; //Overlay rendered on the canvas widget
     OverlayState *overlay_state;
+    //Backpipe related properties
+    RtspBackchannel * backchannel;
 
-    //Keep location to used on retry
-    char * location_set;
-    char * location;
-    int valid_location;
-
-    //Retry count
-    int retry;
     //Playing or trying to play
     int playing;
 
@@ -51,12 +60,6 @@ typedef struct {
     GstRtspViewMode view_mode;
 
     P_MUTEX_TYPE player_lock;
-
-    char * user;
-    char * pass;
-
-    char * port_fallback;
-    char * host_fallback;
 } GstRtspPlayerPrivate;
 
 enum {
@@ -72,258 +75,109 @@ static guint signals[LAST_SIGNAL] = { 0 };
 G_DEFINE_TYPE_WITH_PRIVATE(GstRtspPlayer, GstRtspPlayer_, G_TYPE_OBJECT)
 
 static void 
-GstRtspPlayerPrivate__message_handler (GstBus * bus, GstMessage * message, GstRtspPlayerPrivate * priv);
-void GstRtspPlayerPrivate__stop(GstRtspPlayerPrivate * priv);
-void GstRtspPlayerPrivate__apply_view_mode(GstRtspPlayerPrivate * self);
+GstRtspPlayerSession__message_handler (GstBus * bus, GstMessage * message, GstRtspPlayerSession * session);
 
-static void
-GstRtspPlayer__dispose (GObject *gobject)
-{
-    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (GST_RTSPPLAYER (gobject));
-
-    //Making sure stream is stopped
-    GstRtspPlayerPrivate__stop(priv);
-
-    //Waiting for the state to finish changing
-    // GstState current_state_pipe;
-    // GstState current_state_back;
-    // int ret_1 = gst_element_get_state (self->pipeline,&current_state_pipe, NULL, GST_CLOCK_TIME_NONE);
-    // int ret_2 = RtspBackchannel__get_state(self->backchannel, &current_state_back, NULL, GST_CLOCK_TIME_NONE);
-    // while( (ret_1 && current_state_pipe != GST_STATE_NULL) || ( ret_2 && current_state_pipe != GST_STATE_NULL)){
-    //   C_DEBUG("Waiting for player to stop...\n");
-    //   ret_1 = gst_element_get_state (self->pipeline,&current_state_pipe, NULL, GST_CLOCK_TIME_NONE);
-    //   ret_2 = RtspBackchannel__get_state(self->backchannel, &current_state_back, NULL, GST_CLOCK_TIME_NONE);
-    //   sleep(0.25);
-    // }
-
-    if(GST_IS_ELEMENT(priv->pipeline)){
-        gst_object_unref (priv->pipeline);
-        priv->pipeline = NULL;
-    }
-
-    RtspBackchannel__destroy(priv->backchannel);
-    OverlayState__destroy(priv->overlay_state);
-
-    if(priv->location){
-        free(priv->location);
-    }
-    if(priv->location_set){
-        free(priv->location_set);
-    }
-    if(priv->port_fallback){
-        free(priv->port_fallback);
-    }
-    if(priv->host_fallback){
-        free(priv->host_fallback);
-    }
-    if(priv->user){
-        free(priv->user);
-    }
-    if(priv->pass){
-        free(priv->pass);
-    }
-    P_MUTEX_CLEANUP(priv->player_lock);
-
-    if(priv->video_bin){
-        g_object_unref(priv->video_bin);
-        priv->video_bin = NULL;
-    }
-
-    if(priv->audio_bin){
-        g_object_unref(priv->audio_bin);
-        priv->audio_bin = NULL;
-    }
-    /* Always chain up to the parent class; there is no need to check if
-    * the parent class implements the dispose() virtual function: it is
-    * always guaranteed to do so
-    */
-    G_OBJECT_CLASS (GstRtspPlayer__parent_class)->dispose (gobject);
-}
-
-static void
-GstRtspPlayer__class_init (GstRtspPlayerClass * klass)
-{
-
-    GObjectClass *object_class = G_OBJECT_CLASS (klass);
-
-    object_class->dispose = GstRtspPlayer__dispose;
-    
-    signals[STOPPED] =
-        g_signal_newv ("stopped",
-                G_TYPE_FROM_CLASS (klass),
-                G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
-                NULL /* closure */,
-                NULL /* accumulator */,
-                NULL /* accumulator data */,
-                NULL /* C marshaller */,
-                G_TYPE_NONE /* return_type */,
-                0     /* n_params */,
-                NULL  /* param_types */);
-
-    signals[STARTED] =
-        g_signal_newv ("started",
-                G_TYPE_FROM_CLASS (klass),
-                G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
-                NULL /* closure */,
-                NULL /* accumulator */,
-                NULL /* accumulator data */,
-                NULL /* C marshaller */,
-                G_TYPE_NONE /* return_type */,
-                0     /* n_params */,
-                NULL  /* param_types */);
-
-    signals[RETRY] =
-        g_signal_newv ("retry",
-                G_TYPE_FROM_CLASS (klass),
-                G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
-                NULL /* closure */,
-                NULL /* accumulator */,
-                NULL /* accumulator data */,
-                NULL /* C marshaller */,
-                G_TYPE_NONE /* return_type */,
-                0     /* n_params */,
-                NULL  /* param_types */);
-
-    signals[ERROR] =
-        g_signal_newv ("error",
-                G_TYPE_FROM_CLASS (klass),
-                G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
-                NULL /* closure */,
-                NULL /* accumulator */,
-                NULL /* accumulator data */,
-                NULL /* C marshaller */,
-                G_TYPE_NONE /* return_type */,
-                0     /* n_params */,
-                NULL  /* param_types */);
-
-}
-
-void GstRtspPlayer__stop(GstRtspPlayer* self){
-    g_return_if_fail (self != NULL);
-    g_return_if_fail (GST_IS_RTSPPLAYER (self));
-    
-    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
-    GstRtspPlayerPrivate__stop(priv);
-}
-
-void GstRtspPlayerPrivate__play(GstRtspPlayerPrivate* priv){
-    P_MUTEX_LOCK(priv->player_lock);
-    if(priv->user)
-        g_object_set (G_OBJECT (priv->src), "user-id", priv->user, NULL);
-    if(priv->pass)
-        g_object_set (G_OBJECT (priv->src), "user-pw", priv->pass, NULL);
-    if(priv->location)
-        g_object_set (G_OBJECT (priv->src), "location", priv->location, NULL);
-
-    C_DEBUG("RtspPlayer__play retry[%i] - playing[%i] %s\n",priv->retry,priv->playing, priv->location);
-    priv->playing = 1;
-
-    GstStateChangeReturn ret;
-    ret = gst_element_set_state (priv->pipeline, GST_STATE_PLAYING);
-    if (ret == GST_STATE_CHANGE_FAILURE) {
-        C_ERROR ("Unable to set the pipeline to the playing state.\n");
-        gst_object_unref (priv->pipeline);
-        priv->pipeline = NULL;
-    }
-
-    P_MUTEX_UNLOCK(priv->player_lock);
-}
-
-void GstRtspPlayer__play(GstRtspPlayer* self, char *url, char * user, char * pass, char * fallback_host, char * fallback_port){
-    g_return_if_fail (self != NULL);
-    g_return_if_fail (GST_IS_RTSPPLAYER (self));
-    
-    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
-
-    priv->retry = 0;
-    priv->fallback = RTSP_FALLBACK_NONE;
-    priv->enable_backchannel = 1;//TODO Handle parameter input...
+static GstRtspPlayerSession * GstRtspPlayerSession__create(GstRtspPlayer * player, char * url, char * user, char * pass, char * fallback_host, char * fallback_port, void * user_data){
+    GstRtspPlayerSession * session = malloc(sizeof(GstRtspPlayerSession));
+    session->player = player;
+    session->user_data = user_data;
 
     //Updating location
-    if(!priv->location_set){
-        priv->location_set = malloc(strlen(url)+1);
-    } else {
-        priv->location_set = realloc(priv->location_set,strlen(url)+1);
-    }
-    strcpy(priv->location_set,url);
-
-    if(!priv->location){
-        priv->location = malloc(strlen(url)+1);
-    } else {
-        priv->location = realloc(priv->location,strlen(url)+1);
-    }
-    strcpy(priv->location,url);
-    
-    priv->valid_location = 0;
+    session->location_set = malloc(strlen(url)+1);
+    strcpy(session->location_set,url);
+    session->location = malloc(strlen(url)+1);
+    strcpy(session->location,url);
+    session->valid_location = 0;
 
     //Update credentials
     if(!user){
-        free(priv->user);
-        priv->user = NULL;
+        session->user = NULL;
     } else {
-        if(!priv->user){
-            priv->user = malloc(strlen(user)+1);
-        } else {
-            priv->user = realloc(priv->user,strlen(user)+1);
-        }
-        strcpy(priv->user,user);
+        session->user = malloc(strlen(user)+1);
+        strcpy(session->user,user);
     }
 
     if(!pass){
-        free(priv->pass);
-        priv->pass = NULL;
+        session->pass = NULL;
     } else {
-        if(!priv->pass){
-            priv->pass = malloc(strlen(pass)+1);
-        } else {
-            priv->pass = realloc(priv->pass,strlen(pass)+1);
-        }
-        strcpy(priv->pass,pass);
+        session->pass = malloc(strlen(pass)+1);
+        strcpy(session->pass,pass);
     }
 
     //Update port fallback
     if(fallback_port){
-        if(!priv->port_fallback){
-            priv->port_fallback = malloc(strlen(fallback_port)+1);
-        } else {
-            priv->port_fallback = realloc(priv->port_fallback,strlen(fallback_port)+1);
-        }
-        strcpy(priv->port_fallback,fallback_port);
+        session->port_fallback = malloc(strlen(fallback_port)+1);
+        strcpy(session->port_fallback,fallback_port);
     } else {
-        if(priv->port_fallback){
-            free(priv->port_fallback);
-            priv->port_fallback = NULL;
-        }
+        session->port_fallback = NULL;
     }
 
     //Update host fallback
     if(fallback_host){
-        if(!priv->host_fallback){
-            priv->host_fallback = malloc(strlen(fallback_host)+1);
-        } else {
-            priv->host_fallback = realloc(priv->host_fallback,strlen(fallback_host)+1);
-        }
-        strcpy(priv->host_fallback,fallback_host);
+        session->host_fallback = malloc(strlen(fallback_host)+1);
+        strcpy(session->host_fallback,fallback_host);
     } else {
-        if(priv->host_fallback){
-            free(priv->host_fallback);
-            priv->host_fallback = NULL;
-        }
+        session->host_fallback = NULL;
     }
 
-    GstRtspPlayerPrivate__play(priv);
+    session->enable_backchannel = 1;
+    session->retry = 0;
+    session->dynamic_elements = NULL;
+    session->fallback = RTSP_FALLBACK_NONE;
+
+    return session;
 }
 
-/*
-Compared to play, retry is design to work after a stream failure.
-Stopping will essentially break the retry method and stop the loop.
-*/
-void GstRtspPlayer__retry(GstRtspPlayer* self){
-    g_return_if_fail (self != NULL);
-    g_return_if_fail (GST_IS_RTSPPLAYER (self));
-    
+char * GstRtspPlayerSession__get_uri(GstRtspPlayerSession * session){
+    if(!session){
+        return NULL;
+    }
+    return session->location;
+}
+
+static void GstRtspPlayerSession__destroy(GstRtspPlayerSession * session){
+    C_DEBUG("GstRtspPlayerSession__destroy");
+    if(session){
+        if(GST_IS_ELEMENT(session->pipeline)){
+            gst_object_unref (session->pipeline);
+            session->pipeline = NULL;
+        }
+        if(session->port_fallback){
+            free(session->port_fallback);
+        }
+        if(session->host_fallback){
+            free(session->host_fallback);
+        }
+        if(session->user){
+            free(session->user);
+        }
+        if(session->pass){
+            free(session->pass);
+        }
+        if(session->location){
+            free(session->location);
+        }
+        if(session->location_set){
+            free(session->location_set);
+        }
+        free(session);
+    }
+}
+
+void * GstRtspPlayerSession__get_user_data(GstRtspPlayerSession * session){
+    if(!session){
+        return NULL;
+    }
+    return session->user_data;
+}
+
+GstRtspPlayerSession *
+GstRtspPlayer__get_session (GstRtspPlayer * self)
+{
+    g_return_val_if_fail (self != NULL, NULL);
+    g_return_val_if_fail (GST_IS_RTSPPLAYER (self), NULL);
     GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
-    GstRtspPlayerPrivate__play(priv);
+    return priv->session;
 }
 
 /* Dynamically link */
@@ -332,10 +186,6 @@ on_decoder_pad_added (GstElement *element, GstPad *new_pad, gpointer data){
     GstPad *sinkpad;
     GstPadLinkReturn ret;
     GstElement *decoder = (GstElement *) data;
-    C_TRACE("on_decoder_pad_added '%s' to '%s'",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(decoder));
-    // GstCaps * pad_caps = gst_pad_get_current_caps(new_pad);
-    // gchar * caps_str = gst_caps_serialize(pad_caps,0);
-    // printf("on_pad_added caps_str : %s\n",caps_str);
 
     /* We can now link this pad with the rtsp-decoder sink pad */
     sinkpad = gst_element_get_static_pad (decoder, "sink");
@@ -343,11 +193,45 @@ on_decoder_pad_added (GstElement *element, GstPad *new_pad, gpointer data){
 
     if (GST_PAD_LINK_FAILED (ret)) {
         C_ERROR("failed to link dynamically '%s' to '%s'",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(decoder));
-    } else {
-        C_TRACE("on_decoder_pad_added linked '%s' to '%s'",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(decoder));
     }
 
     gst_object_unref (sinkpad);
+}
+
+void GstRtspPlayerPrivate__apply_view_mode(GstRtspPlayerPrivate * priv){
+    switch(priv->view_mode){
+        case GST_RTSP_PLAYER_VIEW_MODE_FIT_WINDOW:
+            gtk_widget_set_vexpand(GTK_WIDGET(priv->canvas),FALSE);
+            gtk_widget_set_hexpand(GTK_WIDGET(priv->canvas),FALSE);
+            gtk_widget_set_vexpand(GTK_WIDGET(priv->canvas_handle),FALSE);
+            gtk_widget_set_hexpand(GTK_WIDGET(priv->canvas_handle),FALSE);
+            gtk_widget_set_size_request(GTK_WIDGET(priv->canvas),-1,-1);
+            break;
+        case GST_RTSP_PLAYER_VIEW_MODE_FILL_WINDOW:
+            gtk_widget_set_vexpand(GTK_WIDGET(priv->canvas),TRUE);
+            gtk_widget_set_hexpand(GTK_WIDGET(priv->canvas),TRUE);
+            gtk_widget_set_vexpand(GTK_WIDGET(priv->canvas_handle),TRUE);
+            gtk_widget_set_hexpand(GTK_WIDGET(priv->canvas_handle),TRUE);
+            gtk_widget_set_size_request(GTK_WIDGET(priv->canvas),-1,-1);
+            break;
+        case GST_RTSP_PLAYER_VIEW_MODE_NATIVE:
+            gtk_widget_set_vexpand(GTK_WIDGET(priv->canvas),TRUE);
+            gtk_widget_set_hexpand(GTK_WIDGET(priv->canvas),TRUE);
+            gtk_widget_set_vexpand(GTK_WIDGET(priv->canvas_handle),TRUE);
+            gtk_widget_set_hexpand(GTK_WIDGET(priv->canvas_handle),TRUE);
+            if(GST_IS_CAPS(priv->sinkcaps)){
+                GstStructure * caps_struct = gst_caps_get_structure (priv->sinkcaps, 0);
+                gint width,height;
+                gst_structure_get_int(caps_struct,"width",&width);
+                gst_structure_get_int(caps_struct,"height",&height);
+                gtk_widget_set_size_request(GTK_WIDGET(priv->canvas),width,height);
+            }
+
+            break;
+        default:
+            C_WARN("%s Unsupported setting",priv->session->location);
+            break;
+    }
 }
 
 void GstRtspPlayer__caps_changed_cb (GstElement * overlay, GstCaps * caps, gint window_width, gint window_height, GstRtspPlayerPrivate * priv){
@@ -502,7 +386,7 @@ GstRtspPlayerPrivate__create_audio_pad(){
 }
 
 struct create_video_data{
-    GstRtspPlayerPrivate * priv;
+    GstRtspPlayerSession * session;
     GstPad *new_pad;
     GstElement *element;
     P_COND_TYPE cond;
@@ -510,34 +394,34 @@ struct create_video_data{
     int done;
 };
 
-gboolean GstRtspPlayerPrivate__idle_attach_video_pad(void * user_data){
+gboolean GstRtspPlayerSession__idle_attach_video_pad(void * user_data){
     struct create_video_data * data = (struct create_video_data *) user_data;
     GstPad *sink_pad;
+    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (data->session->player);
+    gst_bin_add_many (GST_BIN (data->session->pipeline), priv->video_bin, NULL);
 
-    gst_bin_add_many (GST_BIN (data->priv->pipeline), data->priv->video_bin, NULL);
-
-    C_TRACE("GstRtspPlayerPrivate__idle_attach_video_pad");
-    sink_pad = gst_element_get_static_pad (data->priv->video_bin, "bin_sink");
+    C_TRACE("%s GstRtspPlayerSession__idle_attach_video_pad", data->session->location);
+    sink_pad = gst_element_get_static_pad (priv->video_bin, "bin_sink");
 
     GstPadLinkReturn pad_ret = gst_pad_link (data->new_pad, sink_pad);
     if (GST_PAD_LINK_FAILED (pad_ret)) {
-        C_ERROR ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(data->element),GST_ELEMENT_NAME(data->priv->video_bin));
+        C_ERROR ("%s failed to link dynamically '%s' to '%s'", data->session->location,GST_ELEMENT_NAME(data->element),GST_ELEMENT_NAME(priv->video_bin));
         //TODO Show error on canvas
         goto exit;
     }
-    data->priv->dynamic_elements = g_list_append(data->priv->dynamic_elements, data->priv->video_bin);
-    gst_element_sync_state_with_parent(data->priv->video_bin);
+    data->session->dynamic_elements = g_list_append(data->session->dynamic_elements, priv->video_bin);
+    gst_element_sync_state_with_parent(priv->video_bin);
 
 exit:
     data->done = 1;
-    C_TRACE("GstRtspPlayerPrivate__idle_attach_video_pad - done");
+    C_TRACE("%s GstRtspPlayerSession__idle_attach_video_pad - done", data->session->location);
     P_COND_BROADCAST(data->cond);
     return FALSE;
 }
 
 static void
-GstRtspPlayerPrivate__on_rtsp_pad_added (GstElement *element, GstPad *new_pad, GstRtspPlayerPrivate * priv){
-    C_DEBUG ("Received new pad '%s' from '%s':\n", GST_PAD_NAME (new_pad), GST_ELEMENT_NAME (element));
+GstRtspPlayerSession__on_rtsp_pad_added (GstElement *element, GstPad *new_pad, GstRtspPlayerSession * session){
+    C_DEBUG ("%s Received new pad '%s' from '%s'", session->location, GST_PAD_NAME (new_pad), GST_ELEMENT_NAME (element));
     
     GstPadLinkReturn pad_ret;
     GstPad *sink_pad = NULL;
@@ -560,41 +444,41 @@ GstRtspPlayerPrivate__on_rtsp_pad_added (GstElement *element, GstPad *new_pad, G
             pad_added is called by the streaming thread, so we sync with the main thread to attach it
         */
         struct create_video_data data;
-        data.priv = priv;
+        data.session = session;
         data.new_pad = new_pad;
         data.element = element;
         data.done = 0;
         P_COND_SETUP(data.cond);
         P_MUTEX_SETUP(data.lock);
 
-        C_TRACE("dispatch idle_attach_video_pad");
-        gdk_threads_add_idle(G_SOURCE_FUNC(GstRtspPlayerPrivate__idle_attach_video_pad),&data);
+        C_TRACE("%s dispatch idle_attach_video_pad", session->location);
+        g_idle_add(G_SOURCE_FUNC(GstRtspPlayerSession__idle_attach_video_pad),&data);
         
-        if(!data.done) { C_TRACE("wait idle_attach_video_pad"); P_COND_WAIT(data.cond, data.lock); }
+        if(!data.done) { C_TRACE("%s wait idle_attach_video_pad", session->location); P_COND_WAIT(data.cond, data.lock); }
         P_COND_CLEANUP(data.cond);
         P_MUTEX_CLEANUP(data.lock);
 
     } else if (g_strrstr(capsName,"audio")){
-
-        gst_bin_add_many (GST_BIN (priv->pipeline), priv->audio_bin, NULL);
+        GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (session->player);
+        gst_bin_add_many (GST_BIN (session->pipeline), priv->audio_bin, NULL);
 
         sink_pad = gst_element_get_static_pad (priv->audio_bin, "bin_sink");
         pad_ret = gst_pad_link (new_pad, sink_pad);
         if (GST_PAD_LINK_FAILED (pad_ret)) {
-            C_ERROR ("failed to link dynamically '%s' to '%s'\n",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(priv->audio_bin));
+            C_ERROR ("%s failed to link dynamically '%s' to '%s'", session->location,GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(priv->audio_bin));
             goto exit;
         }
-        priv->dynamic_elements = g_list_append(priv->dynamic_elements, priv->audio_bin);
+        session->dynamic_elements = g_list_append(session->dynamic_elements, priv->audio_bin);
         gst_element_sync_state_with_parent(priv->audio_bin);
     } else {
         new_pad_struct = gst_caps_get_structure (new_pad_caps, 0);
         gint payload_v;
         gst_structure_get_int(new_pad_struct,"payload", &payload_v);
-        C_ERROR("Support other payload formats %i\n",payload_v);
+        C_ERROR("%s Support other payload formats %i", session->location,payload_v);
     }
 
 exit:
-    C_DEBUG ("Received new pad attached");
+    C_DEBUG ("%s Received new pad attached", session->location);
     free(capsName);
     /* Unreference the new pad's caps, if we got them */
     if (new_pad_caps)
@@ -603,57 +487,65 @@ exit:
         gst_object_unref (sink_pad);
 }
 
-static void
-GstRtspPlayerPrivate__setup_pipeline (GstRtspPlayerPrivate * priv)
+static GstRtspPlayerSession *
+GstRtspPlayerSession__setup_pipeline (GstRtspPlayerSession * session)
 {
 
     /* Create the empty pipeline */
-    priv->pipeline = gst_pipeline_new ("onvif-pipeline");
+    session->pipeline = gst_pipeline_new ("onvif-pipeline");
 
     /* Create the elements */
-    priv->src = gst_element_factory_make ("rtspsrc", "rtspsrc");
+    session->src = gst_element_factory_make ("rtspsrc", "rtspsrc");
 
-    if (!priv->pipeline){
-        C_FATAL("Failed to created pipeline. Check your gstreamer installation...\n");
-        return;
+    if (!session->pipeline){
+        C_FATAL("%s Failed to created pipeline. Check your gstreamer installation...", session->location);
+        return NULL;
     }
-    if (!priv->src){
-        C_FATAL ("Failed to created rtspsrc. Check your gstreamer installation...\n");
-        return;
+    if (!session->src){
+        C_FATAL ("%s Failed to created rtspsrc. Check your gstreamer installation...", session->location);
+        return NULL;
     }
 
     // Add Elements to the Bin
-    gst_bin_add_many (GST_BIN (priv->pipeline), priv->src, NULL);
+    gst_bin_add_many (GST_BIN (session->pipeline), session->src, NULL);
 
     // Dynamic Pad Creation
-    if(! g_signal_connect (priv->src, "pad-added", G_CALLBACK (GstRtspPlayerPrivate__on_rtsp_pad_added),priv)){
-        C_ERROR ("Linking part (1) with part (A)-1 Fail...");
+    if(! g_signal_connect (session->src, "pad-added", G_CALLBACK (GstRtspPlayerSession__on_rtsp_pad_added),session)){
+        C_ERROR ("%s Linking part (1) with part (A)-1 Fail...", session->location);
     }
 
-    if(!g_signal_connect (priv->src, "select-stream", G_CALLBACK (RtspBackchannel__find),priv->backchannel)){
-        C_ERROR ("Fail to connect select-stream signal...");
+    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (session->player);
+    if(!g_signal_connect (session->src, "select-stream", G_CALLBACK (RtspBackchannel__find),priv->backchannel)){
+        C_ERROR ("%s Fail to connect select-stream signal...", session->location);
     }
 
     // g_object_set (G_OBJECT (priv->src), "buffer-mode", 3, NULL);
-    g_object_set (G_OBJECT (priv->src), "latency", 0, NULL);
-    g_object_set (G_OBJECT (priv->src), "teardown-timeout", 0, NULL); 
-    g_object_set (G_OBJECT (priv->src), "backchannel", priv->enable_backchannel, NULL);
-    g_object_set (G_OBJECT (priv->src), "user-agent", "OnvifDeviceManager-Linux-0.0", NULL);
-    g_object_set (G_OBJECT (priv->src), "do-retransmission", TRUE, NULL);
-    g_object_set (G_OBJECT (priv->src), "onvif-mode", FALSE, NULL); //It seems onvif mode can cause segmentation fault with libva
-    g_object_set (G_OBJECT (priv->src), "is-live", TRUE, NULL);
-    g_object_set (G_OBJECT (priv->src), "tcp-timeout", 1000000, NULL);
-    g_object_set (G_OBJECT (priv->src), "protocols", GST_RTSP_LOWER_TRANS_TCP, NULL); //TODO Allow changing this via settings
+    g_object_set (G_OBJECT (session->src), "latency", 0, NULL);
+    g_object_set (G_OBJECT (session->src), "teardown-timeout", 0, NULL); 
+    g_object_set (G_OBJECT (session->src), "backchannel", session->enable_backchannel, NULL);
+    g_object_set (G_OBJECT (session->src), "user-agent", "OnvifDeviceManager-Linux-0.0", NULL);
+    g_object_set (G_OBJECT (session->src), "do-retransmission", TRUE, NULL);
+    g_object_set (G_OBJECT (session->src), "onvif-mode", FALSE, NULL); //It seems onvif mode can cause segmentation fault with libva
+    g_object_set (G_OBJECT (session->src), "is-live", TRUE, NULL);
+    g_object_set (G_OBJECT (session->src), "tcp-timeout", 1000000, NULL);
+    g_object_set (G_OBJECT (session->src), "protocols", GST_RTSP_LOWER_TRANS_TCP, NULL); //TODO Allow changing this via settings
 
     /* set up bus */
-    GstBus *bus = gst_element_get_bus (priv->pipeline);
+    GstBus *bus = gst_element_get_bus (session->pipeline);
     gst_bus_add_signal_watch (bus);
-    g_signal_connect (bus, "message", G_CALLBACK (GstRtspPlayerPrivate__message_handler), priv);
+    g_signal_connect (bus, "message", G_CALLBACK (GstRtspPlayerSession__message_handler), session);
     gst_object_unref (bus);
+
+    return session;
 }
 
-void GstRtspPlayerPrivate__inner_stop(GstRtspPlayerPrivate * priv){
+void GstRtspPlayerPrivate__stop_unlocked(GstRtspPlayerPrivate * priv){
     GstStateChangeReturn ret;
+
+    if(!priv->session){
+        C_TRACE("Nothing to stop.");
+        return;
+    }
 
     //Pause backchannel
     if(!RtspBackchannel__pause(priv->backchannel)){
@@ -661,25 +553,22 @@ void GstRtspPlayerPrivate__inner_stop(GstRtspPlayerPrivate * priv){
     }
 
     //Set NULL state to clear buffers
-    if(GST_IS_ELEMENT(priv->pipeline)){
-        ret = gst_element_set_state (priv->pipeline, GST_STATE_NULL);
+    if(GST_IS_ELEMENT(priv->session->pipeline)){
+        ret = gst_element_set_state (priv->session->pipeline, GST_STATE_NULL);
         if (ret == GST_STATE_CHANGE_FAILURE) {
-            C_ERROR ("Unable to set the pipeline to the ready state.\n");
+            C_ERROR ("%s Unable to set the pipeline to the ready state.",priv->session->location);
             return;
         }
     }
 
-    g_list_free(priv->dynamic_elements);
-    priv->dynamic_elements = NULL;
+    g_list_free(priv->session->dynamic_elements);
+    priv->session->dynamic_elements = NULL;
 
     //Destroy old pipeline
-    if(GST_IS_ELEMENT(priv->pipeline)){
-        gst_object_unref (priv->pipeline);
-        priv->pipeline = NULL;
+    if(GST_IS_ELEMENT(priv->session->pipeline)){
+        gst_object_unref (priv->session->pipeline);
+        priv->session->pipeline = NULL;
     }
-
-    // Create new pipeline
-    GstRtspPlayerPrivate__setup_pipeline(priv);
 
     //New pipeline causes previous pipe to stop dispatching state change.
     //Force hide the previous stream
@@ -690,70 +579,124 @@ void GstRtspPlayerPrivate__inner_stop(GstRtspPlayerPrivate * priv){
 
 void GstRtspPlayerPrivate__stop(GstRtspPlayerPrivate * priv){
     C_DEBUG("GstRtspPlayer__stop\n");
-    
     P_MUTEX_LOCK(priv->player_lock);
-
     priv->playing = 0;
 
-    GstRtspPlayerPrivate__inner_stop(priv);
-
+    GstRtspPlayerPrivate__stop_unlocked(priv);
+    
     g_signal_emit (priv->owner, signals[STOPPED], 0 /* details */);
     P_MUTEX_UNLOCK(priv->player_lock);
 }
 
+
+void GstRtspPlayer__stop(GstRtspPlayer* self){
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (GST_IS_RTSPPLAYER (self));
+    
+    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
+    GstRtspPlayerPrivate__stop(priv);
+}
+
+void GstRtspPlayerSession__play(GstRtspPlayerSession * session){
+    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (session->player);
+    P_MUTEX_LOCK(priv->player_lock);
+    GstRtspPlayerPrivate__stop_unlocked(priv);
+    if(priv->session != session){
+        GstRtspPlayerSession__destroy(priv->session);
+        priv->session = session;
+    }
+    GstRtspPlayerSession__setup_pipeline(session);
+
+    if(session->user)
+        g_object_set (G_OBJECT (session->src), "user-id", session->user, NULL);
+    if(session->pass)
+        g_object_set (G_OBJECT (session->src), "user-pw", session->pass, NULL);
+    if(session->location)
+        g_object_set (G_OBJECT (session->src), "location", session->location, NULL);
+
+    C_DEBUG("%s RtspPlayer__play retry[%i] - playing[%i]",session->location,session->retry,priv->playing);
+    priv->playing = 1;
+
+    GstStateChangeReturn ret;
+    ret = gst_element_set_state (session->pipeline, GST_STATE_PLAYING);
+    if (ret == GST_STATE_CHANGE_FAILURE) {
+        C_ERROR ("%s Unable to set the pipeline to the playing state.",session->location);
+        gst_object_unref (session->pipeline);
+        session->pipeline = NULL;
+    }
+    P_MUTEX_UNLOCK(priv->player_lock);
+}
+
+void GstRtspPlayer__play(GstRtspPlayer* self, char *url, char * user, char * pass, char * fallback_host, char * fallback_port, void * user_data){
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (GST_IS_RTSPPLAYER (self));
+
+    GstRtspPlayerSession * session = GstRtspPlayerSession__create(self, url, user, pass, fallback_host, fallback_port, user_data);
+    GstRtspPlayerSession__play(session);
+}
+
+/*
+Compared to play, retry is design to work after a stream failure.
+Stopping will essentially break the retry method and stop the loop.
+*/
+void GstRtspPlayerSession__retry(GstRtspPlayerSession * session){
+    //TODO Typecheck
+    GstRtspPlayerSession__play(session);
+}
+
 static void 
-GstRtspPlayerPrivate__warning_msg (GstBus *bus, GstMessage *msg) {
+GstRtspPlayerSession__warning_msg (GstRtspPlayerSession * session, GstBus *bus, GstMessage *msg) {
     GError *err;
     gchar *debug_info;
     gst_message_parse_warning (msg, &err, &debug_info);
     if(strcmp(err->message,"Empty Payload.")){ //Ignoring rtp empty payload warnings
-        C_WARN ("Warning received from element %s: %s", GST_OBJECT_NAME (msg->src), err->message);
-        C_WARN ("Debugging information: %s", debug_info ? debug_info : "none");
+        C_WARN ("%s Warning received from element %s: %s",session->location, GST_OBJECT_NAME (msg->src), err->message);
+        C_WARN ("%s Debugging information: %s",session->location, debug_info ? debug_info : "none");
     }
     g_clear_error (&err);
     g_free (debug_info);
 }
 
-static int GstRtspPlayerPrivate__process_fallback(GstRtspPlayerPrivate * priv){
-    switch(priv->fallback){
+static int GstRtspPlayerSession__process_fallback(GstRtspPlayerSession * session){
+    switch(session->fallback){
         case RTSP_FALLBACK_NONE:
-            priv->fallback = RTSP_FALLBACK_HOST;
+            session->fallback = RTSP_FALLBACK_HOST;
             char * host_fallback = NULL;
-            if(priv->host_fallback) host_fallback = URL__set_host(priv->location_set, priv->host_fallback);
-            if(host_fallback && strcmp(host_fallback,priv->location_set) != 0 && strcmp(host_fallback,priv->location) != 0){
-                C_WARN("Attempting URL host correction : [%s] --> [%s]",priv->location_set, host_fallback);
-                free(priv->location);
-                priv->location = host_fallback;
+            if(session->host_fallback) host_fallback = URL__set_host(session->location_set, session->host_fallback);
+            if(host_fallback && strcmp(host_fallback,session->location_set) != 0 && strcmp(host_fallback,session->location) != 0){
+                C_WARN("%s Attempting URL host correction to [%s]",session->location_set, host_fallback);
+                free(session->location);
+                session->location = host_fallback;
                 break;
             } else {
                 free(host_fallback);
             }
             __attribute__ ((fallthrough));
         case RTSP_FALLBACK_HOST:
-            priv->fallback = RTSP_FALLBACK_PORT;
+            session->fallback = RTSP_FALLBACK_PORT;
             char * port_fallback = NULL;
-            if(priv->port_fallback) port_fallback = URL__set_port(priv->location_set, priv->port_fallback);
-            if(port_fallback && strcmp(port_fallback,priv->location_set) != 0 && strcmp(port_fallback,priv->location) != 0){
-                C_WARN("Attempting URL port correction : [%s] --> [%s]",priv->location_set, port_fallback);
-                free(priv->location);
-                priv->location = port_fallback;
+            if(session->port_fallback) port_fallback = URL__set_port(session->location_set, session->port_fallback);
+            if(port_fallback && strcmp(port_fallback,session->location_set) != 0 && strcmp(port_fallback,session->location) != 0){
+                C_WARN("%s Attempting URL port correction to [%s]",session->location_set, port_fallback);
+                free(session->location);
+                session->location = port_fallback;
                 break;
             } else {
                 free(port_fallback);
             }
             __attribute__ ((fallthrough));
         case RTSP_FALLBACK_PORT:
-            priv->fallback = RTSP_FALLBACK_URL;
+            session->fallback = RTSP_FALLBACK_URL;
             char * tmp_fallback = NULL;
             char * url_fallback = NULL;
-            if(priv->host_fallback && priv->port_fallback){
-                tmp_fallback = URL__set_port(priv->location_set, priv->port_fallback);
-                url_fallback = URL__set_host(tmp_fallback, priv->host_fallback);
+            if(session->host_fallback && session->port_fallback){
+                tmp_fallback = URL__set_port(session->location_set, session->port_fallback);
+                url_fallback = URL__set_host(tmp_fallback, session->host_fallback);
             }
-            if(url_fallback && strcmp(url_fallback,priv->location_set) != 0 && strcmp(url_fallback,priv->location) != 0){
-                C_WARN("Attempting root URL correction : [%s] --> [%s]",priv->location_set, url_fallback);
-                free(priv->location);
-                priv->location = url_fallback;
+            if(url_fallback && strcmp(url_fallback,session->location_set) != 0 && strcmp(url_fallback,session->location) != 0){
+                C_WARN("%s Attempting root URL correction to [%s]",session->location_set, url_fallback);
+                free(session->location);
+                session->location = url_fallback;
                 free(tmp_fallback);
                 break;
             } else {
@@ -774,41 +717,43 @@ static int GstRtspPlayerPrivate__process_fallback(GstRtspPlayerPrivate * priv){
 
 /* This function is called when an error message is posted on the bus */
 static void 
-GstRtspPlayerPrivate__error_msg (GstBus *bus, GstMessage *msg, GstRtspPlayerPrivate * priv) {
+GstRtspPlayerSession__error_msg (GstRtspPlayerSession * session, GstBus *bus, GstMessage *msg) {
     GError *err;
     gchar *debug_info;
     
     int fallback = 0;
-
-    P_MUTEX_LOCK(priv->player_lock);
-
+    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (session->player);
+    if(priv->session != session){
+        C_DEBUG("%s State was most likely destroyed because a new stream started.", session->location);
+        return;
+    }
     gst_message_parse_error (msg, &err, &debug_info);
 
     switch(err->code){
         case GST_RESOURCE_ERROR_SETTINGS:
-            C_WARN ("Backchannel unsupported. Downgrading...");
-            if(priv->enable_backchannel){
-                priv->enable_backchannel = 0;
-                priv->retry--; //This doesn't count as a try. Finding out device capabilities count has handshake
+            C_WARN ("%s Backchannel unsupported. Downgrading...", session->location);
+            if(session->enable_backchannel){
+                session->enable_backchannel = 0;
+                session->retry--; //This doesn't count as a try. Finding out device capabilities count has handshake
             } else {
-                C_ERROR ("Error received from element %s: %s", GST_OBJECT_NAME (msg->src), err->message);
-                C_ERROR ("Debugging information: %s", debug_info ? debug_info : "none");
-                C_ERROR ("Error code : %d",err->code);
+                C_ERROR ("%s Error received from element %s: %s", session->location, GST_OBJECT_NAME (msg->src), err->message);
+                C_ERROR ("%s Debugging information: %s", session->location, debug_info ? debug_info : "none");
+                C_ERROR ("%s Error code : %d", session->location,err->code);
             }
             break;
         case GST_RESOURCE_ERROR_READ:
-            if(!priv->valid_location && !strcmp(err->message,"Unhandled error")){
+            if(!session->valid_location && !strcmp(err->message,"Unhandled error")){
                 //Most likely invalid handshake response, like HTTP 400 - allow fallthrough into fallback logic
                 // __attribute__ ((fallthrough));
             } else if(!strcmp(err->message,"Could not read from resource.")){
                 // We allow these errors to retry without fallback with less debug
                 // This may happen with unreliable network route
-                C_ERROR ("Error received from element [%d] %s: %s", err->code, GST_OBJECT_NAME (msg->src), err->message);
+                C_ERROR ("%s Error received from element [%d] %s: %s", session->location, err->code, GST_OBJECT_NAME (msg->src), err->message);
                 break;
             } else {
                 // We allow other errors to retry without fallback with added debug
-                C_ERROR ("Error received from element [%d] %s: %s", err->code, GST_OBJECT_NAME (msg->src), err->message);
-                C_ERROR ("Debugging information: %s", debug_info ? debug_info : "none");
+                C_ERROR ("%s Error received from element [%d] %s: %s", session->location, err->code, GST_OBJECT_NAME (msg->src), err->message);
+                C_ERROR ("%s Debugging information: %s", session->location, debug_info ? debug_info : "none");
                 break;
             }
         case GST_RESOURCE_ERROR_OPEN_READ:
@@ -818,64 +763,62 @@ GstRtspPlayerPrivate__error_msg (GstBus *bus, GstMessage *msg, GstRtspPlayerPriv
                 Fallback may be necessary when the camera is behind a load balancer changin the front facing IP/Port of the device
                 The camera will return its own address unaware of the loadbalancer.
             */ 
-            C_ERROR ("Failed to connect to %s", priv->location);
-            if(priv->retry >=3 && !priv->valid_location && (priv->port_fallback || priv->host_fallback)){
-                fallback = GstRtspPlayerPrivate__process_fallback(priv);
+            C_ERROR ("%s Failed to connect", session->location);
+            if(session->retry >=3 && !session->valid_location && (session->port_fallback || session->host_fallback)){
+                fallback = GstRtspPlayerSession__process_fallback(session);
                 if(fallback){
-                    priv->retry = 0;
+                    session->retry = 0;
                 }
             }
             break;
         case GST_RESOURCE_ERROR_NOT_AUTHORIZED:
         case GST_RESOURCE_ERROR_NOT_FOUND:
-            C_ERROR("Non-recoverable error encountered. [%s]", priv->location);
+            C_ERROR("%s Non-recoverable error encountered.", session->location);
             priv->playing = 0;
             __attribute__ ((fallthrough));
         default:
-            C_ERROR ("Error received from element [%d] %s: %s",err->code, GST_OBJECT_NAME (msg->src), err->message);
-            C_ERROR ("Debugging information: %s", debug_info ? debug_info : "none");
+            C_ERROR ("%s Error received from element [%d] %s: %s",session->location,err->code, GST_OBJECT_NAME (msg->src), err->message);
+            C_ERROR ("%s Debugging information: %s",session->location, debug_info ? debug_info : "none");
     }
 
     g_clear_error (&err);
     g_free (debug_info);
 
-    if((fallback && priv->playing) || (priv->retry < 3 && priv->playing)){ //TODO Check if any retry callback exists
+    if((fallback && priv->playing) || (session->retry < 3 && priv->playing)){ //TODO Check if any retry callback exists
         //Stopping player after if condition because "playing" gets reset
-        GstRtspPlayerPrivate__inner_stop(priv);
+        GstRtspPlayerPrivate__stop(priv);
         C_WARN("****************************************************");
-        if(fallback) C_WARN("* URI fallback attempt %s", priv->location); else C_WARN("* Retry attempt #%i - %s",priv->retry, priv->location);
+        if(fallback) C_WARN("* URI fallback attempt %s", session->location); else C_WARN("* Retry attempt #%i - %s",session->retry, session->location);
         C_WARN("****************************************************");
-        P_MUTEX_UNLOCK(priv->player_lock);
         //Retry signal - The player doesn't invoke retry on its own to allow the invoker to dispatch it asynchroniously
         if(!fallback)
-            priv->retry++;
-        g_signal_emit (priv->owner, signals[RETRY], 0 /* details */);
+            session->retry++;
+        g_signal_emit (priv->owner, signals[RETRY], 0, session);
     } else if(priv->playing == 1) {
-        C_TRACE("Player giving up. Too many retries...");
+        C_TRACE("%s Player giving up. Too many retries...", session->location);
         priv->playing = 0;
-        GstRtspPlayerPrivate__inner_stop(priv);
-        P_MUTEX_UNLOCK(priv->player_lock);
+        GstRtspPlayerPrivate__stop(priv);
         //Error signal
-        g_signal_emit (priv->owner, signals[ERROR], 0 /* details */);
+        g_signal_emit (priv->owner, signals[ERROR], 0, session);
     } else { //Ignoring error after the player requested to stop (gst_rtspsrc_try_send)
-        C_TRACE("Player no longer playing...");
-        P_MUTEX_UNLOCK(priv->player_lock);
+        C_TRACE("%s Player no longer playing...");
     }
 }
 
 /* This function is called when an End-Of-Stream message is posted on the bus.
  * We just set the pipeline to READY (which stops playback) */
 static void 
-GstRtspPlayerPrivate__eos_msg (GstBus *bus, GstMessage *msg, GstRtspPlayerPrivate * priv) {
-    C_ERROR ("End-Of-Stream reached.\n");
+GstRtspPlayerSession__eos_msg (GstRtspPlayerSession * session, GstBus *bus, GstMessage *msg) {
+    C_ERROR ("%s End-Of-Stream reached.\n", session->location);
+    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (session->player);
     GstRtspPlayerPrivate__stop(priv);
 }
 
-int GstRtspPlayerPrivate__is_dynamic_pad(GstRtspPlayerPrivate * priv, GstElement * element){
-    if(g_list_length(priv->dynamic_elements) == 0){
+int GstRtspPlayerSession__is_dynamic_pad(GstRtspPlayerSession * session, GstElement * element){
+    if(g_list_length(session->dynamic_elements) == 0){
         return FALSE;
     }
-    GList *node_itr = priv->dynamic_elements;
+    GList *node_itr = session->dynamic_elements;
     while (node_itr != NULL)
     {
         GstElement * bin = (GstElement *) node_itr->data;
@@ -888,7 +831,7 @@ int GstRtspPlayerPrivate__is_dynamic_pad(GstRtspPlayerPrivate * priv, GstElement
 }
 
 static int 
-GstRtspPlayerPrivate__is_video_bin(GstRtspPlayerPrivate * priv, GstElement * element){
+GstRtspPlayerSession__is_video_bin(GstElement * element){
     if(GST_IS_OBJECT(element) && strcmp(GST_OBJECT_NAME(element),"video_bin") == 0){
         return TRUE;
     }
@@ -899,22 +842,23 @@ GstRtspPlayerPrivate__is_video_bin(GstRtspPlayerPrivate * priv, GstElement * ele
 /* This function is called when the pipeline changes states. We use it to
  * keep track of the current state. */
 static void
-GstRtspPlayerPrivate__state_changed_msg (GstBus * bus, GstMessage * msg, GstRtspPlayerPrivate * priv)
+GstRtspPlayerSession__state_changed_msg (GstRtspPlayerSession * session, GstBus * bus, GstMessage * msg)
 {
     GstState old_state, new_state, pending_state;
+    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (session->player);
 
     gst_message_parse_state_changed (msg, &old_state, &new_state, &pending_state);
     /* Using video_bin for state change since the pipeline is PLAYING before the videosink */
     
     GstElement * element = GST_ELEMENT(GST_MESSAGE_SRC (msg));
 
-    if(GstRtspPlayerPrivate__is_dynamic_pad(priv,element)){
-        C_TRACE ("State set to %s for %s\n", gst_element_state_get_name (new_state), GST_OBJECT_NAME (msg->src));
+    if(GstRtspPlayerSession__is_dynamic_pad(session,element)){
+        C_TRACE ("%s State set to %s for %s\n", session->location, gst_element_state_get_name (new_state), GST_OBJECT_NAME (msg->src));
     }
 
-    if(GstRtspPlayerPrivate__is_video_bin(priv,element) && new_state != GST_STATE_PLAYING && GTK_IS_WIDGET (priv->canvas)){
+    if(GstRtspPlayerSession__is_video_bin(element) && new_state != GST_STATE_PLAYING && GTK_IS_WIDGET (priv->canvas)){
         gtk_widget_set_visible(priv->canvas, FALSE);
-    } else if(GstRtspPlayerPrivate__is_video_bin(priv,element) && new_state == GST_STATE_PLAYING && GTK_IS_WIDGET (priv->canvas)){
+    } else if(GstRtspPlayerSession__is_video_bin(element) && new_state == GST_STATE_PLAYING && GTK_IS_WIDGET (priv->canvas)){
         gtk_widget_set_visible(priv->canvas, TRUE);
 
         /*
@@ -925,65 +869,67 @@ GstRtspPlayerPrivate__state_changed_msg (GstBus * bus, GstMessage * msg, GstRtsp
         * 
         * "select-stream" might be an alternative, although I don't know if the first stream could play before the last one is shown
         */
-        priv->retry = 0;
-        priv->valid_location = 1;
-        priv->fallback = RTSP_FALLBACK_NONE;
-        g_signal_emit (priv->owner, signals[STARTED], 0 /* details */);
+        session->retry = 0;
+        session->valid_location = 1;
+        session->fallback = RTSP_FALLBACK_NONE;
+        
+        g_signal_emit (priv->owner, signals[STARTED], 0, session);
     }
 }
 
 
 static void 
-GstRtspPlayerPrivate__message_handler (GstBus * bus, GstMessage * message, GstRtspPlayerPrivate * priv)
+GstRtspPlayerSession__message_handler (GstBus * bus, GstMessage * message, GstRtspPlayerSession * session)
 { 
+    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (session->player);
     const GstStructure *s;
     const gchar *name;
     switch(GST_MESSAGE_TYPE(message)){
         case GST_MESSAGE_UNKNOWN:
-            C_TRACE("msg : GST_MESSAGE_UNKNOWN\n");
+            C_TRACE("%s msg : GST_MESSAGE_UNKNOWN\n", session->location);
             break;
         case GST_MESSAGE_EOS:
-            GstRtspPlayerPrivate__eos_msg(bus,message,priv);
+            GstRtspPlayerSession__eos_msg(session,bus,message);
             break;
         case GST_MESSAGE_ERROR:
-            GstRtspPlayerPrivate__error_msg(bus,message,priv);
+            GstRtspPlayerSession__error_msg(session,bus,message);
             break;
         case GST_MESSAGE_WARNING:
-            GstRtspPlayerPrivate__warning_msg(bus,message);
+            GstRtspPlayerSession__warning_msg(session,bus,message);
             break;
         case GST_MESSAGE_INFO:
-            C_TRACE("msg : GST_MESSAGE_INFO\n");
+            C_TRACE("%s msg : GST_MESSAGE_INFO", session->location);
             break;
         case GST_MESSAGE_TAG:
             // tag_cb(bus,message,player);
             break;
         case GST_MESSAGE_BUFFERING:
-            C_TRACE("msg : GST_MESSAGE_BUFFERING\n");
+            C_TRACE("%s msg : GST_MESSAGE_BUFFERING", session->location);
             break;
         case GST_MESSAGE_STATE_CHANGED:
-            GstRtspPlayerPrivate__state_changed_msg(bus,message,priv);
+            GstRtspPlayerSession__state_changed_msg(session, bus,message);
             break;
         case GST_MESSAGE_STATE_DIRTY:
-            C_TRACE("msg : GST_MESSAGE_STATE_DIRTY\n");
+            C_TRACE("%s msg : GST_MESSAGE_STATE_DIRTY", session->location);
             break;
         case GST_MESSAGE_STEP_DONE:
-            C_TRACE("msg : GST_MESSAGE_STEP_DONE\n");
+            C_TRACE("%s msg : GST_MESSAGE_STEP_DONE", session->location);
             break;
         case GST_MESSAGE_CLOCK_PROVIDE:
-            C_TRACE("msg : GST_MESSAGE_CLOCK_PROVIDE\n");
+            C_TRACE("%s msg : GST_MESSAGE_CLOCK_PROVIDE", session->location);
             break;
         case GST_MESSAGE_CLOCK_LOST:
-            C_TRACE("msg : GST_MESSAGE_CLOCK_LOST\n");
+            C_TRACE("%s msg : GST_MESSAGE_CLOCK_LOST", session->location);
             break;
         case GST_MESSAGE_NEW_CLOCK:
             break;
         case GST_MESSAGE_STRUCTURE_CHANGE:
-            C_TRACE("msg : GST_MESSAGE_STRUCTURE_CHANGE\n");
+            C_TRACE("%s msg : GST_MESSAGE_STRUCTURE_CHANGE", session->location);
             break;
         case GST_MESSAGE_STREAM_STATUS:
             break;
         case GST_MESSAGE_APPLICATION:
-            C_TRACE("msg : GST_MESSAGE_APPLICATION\n");
+            C_TRACE("%s msg : GST_MESSAGE_APPLICATION", session->location);
             break;
         case GST_MESSAGE_ELEMENT:
             s = gst_message_get_structure (message);
@@ -994,41 +940,41 @@ GstRtspPlayerPrivate__message_handler (GstBus * bus, GstMessage * message, GstRt
                         strcmp (name, "application/x-rtp-source-sdes") == 0){
                 //Ignore intentionally left unhandled for now
             } else {
-                C_ERROR("Unhandled element msg name : %s//%d\n",name,message->type);
+                C_ERROR("%s Unhandled element msg name : %s//%d", session->location,name,message->type);
             }
             break;
         case GST_MESSAGE_SEGMENT_START:
-            C_TRACE("msg : GST_MESSAGE_SEGMENT_START\n");
+            C_TRACE("%s msg : GST_MESSAGE_SEGMENT_START", session->location);
             break;
         case GST_MESSAGE_SEGMENT_DONE:
-            C_TRACE("msg : GST_MESSAGE_SEGMENT_DONE\n");
+            C_TRACE("%s msg : GST_MESSAGE_SEGMENT_DONE", session->location);
             break;
         case GST_MESSAGE_DURATION_CHANGED:
-            C_TRACE("msg : GST_MESSAGE_DURATION_CHANGED\n");
+            C_TRACE("%s msg : GST_MESSAGE_DURATION_CHANGED", session->location);
             break;
         case GST_MESSAGE_LATENCY:
             break;
         case GST_MESSAGE_ASYNC_START:
-            C_TRACE("msg : GST_MESSAGE_ASYNC_START\n");
+            C_TRACE("%s msg : GST_MESSAGE_ASYNC_START", session->location);
             break;
         case GST_MESSAGE_ASYNC_DONE:
-            // printf("msg : GST_MESSAGE_ASYNC_DONE\n");
+            // printf("msg : GST_MESSAGE_ASYNC_DONE");
             break;
         case GST_MESSAGE_REQUEST_STATE:
-            C_TRACE("msg : GST_MESSAGE_REQUEST_STATE\n");
+            C_TRACE("%s msg : GST_MESSAGE_REQUEST_STATE", session->location);
             break;
         case GST_MESSAGE_STEP_START:
-            C_TRACE("msg : GST_MESSAGE_STEP_START\n");
+            C_TRACE("%s msg : GST_MESSAGE_STEP_START", session->location);
             break;
         case GST_MESSAGE_QOS:
             break;
         case GST_MESSAGE_PROGRESS:
             break;
         case GST_MESSAGE_TOC:
-            C_TRACE("msg : GST_MESSAGE_TOC\n");
+            C_TRACE("%s msg : GST_MESSAGE_TOC", session->location);
             break;
         case GST_MESSAGE_RESET_TIME:
-            C_TRACE("msg : GST_MESSAGE_RESET_TIME\n");
+            C_TRACE("%s msg : GST_MESSAGE_RESET_TIME", session->location);
             break;
         case GST_MESSAGE_STREAM_START:
             break;
@@ -1037,25 +983,25 @@ GstRtspPlayerPrivate__message_handler (GstBus * bus, GstMessage * message, GstRt
         case GST_MESSAGE_HAVE_CONTEXT:
             break;
         case GST_MESSAGE_EXTENDED:
-            C_TRACE("msg : GST_MESSAGE_EXTENDED\n");
+            C_TRACE("%s msg : GST_MESSAGE_EXTENDED", session->location);
             break;
         case GST_MESSAGE_DEVICE_ADDED:
-            C_TRACE("msg : GST_MESSAGE_DEVICE_ADDED\n");
+            C_TRACE("%s msg : GST_MESSAGE_DEVICE_ADDED", session->location);
             break;
         case GST_MESSAGE_DEVICE_REMOVED:
-            C_TRACE("msg : GST_MESSAGE_DEVICE_REMOVED\n");
+            C_TRACE("%s msg : GST_MESSAGE_DEVICE_REMOVED", session->location);
             break;
         case GST_MESSAGE_PROPERTY_NOTIFY:
-            C_TRACE("msg : GST_MESSAGE_PROPERTY_NOTIFY\n");
+            C_TRACE("%s msg : GST_MESSAGE_PROPERTY_NOTIFY", session->location);
             break;
         case GST_MESSAGE_STREAM_COLLECTION:
-            C_TRACE("msg : GST_MESSAGE_STREAM_COLLECTION\n");
+            C_TRACE("%s msg : GST_MESSAGE_STREAM_COLLECTION", session->location);
             break;
         case GST_MESSAGE_STREAMS_SELECTED:
-            C_TRACE("msg : GST_MESSAGE_STREAMS_SELECTED\n");
+            C_TRACE("%s msg : GST_MESSAGE_STREAMS_SELECTED", session->location);
             break;
         case GST_MESSAGE_REDIRECT:
-            C_TRACE("msg : GST_MESSAGE_REDIRECT\n");
+            C_TRACE("%s msg : GST_MESSAGE_REDIRECT", session->location);
             break;
         //Doesnt exists in gstreamer 1.16
         // case GST_MESSAGE_DEVICE_CHANGED:
@@ -1065,10 +1011,10 @@ GstRtspPlayerPrivate__message_handler (GstBus * bus, GstMessage * message, GstRt
         //  printf("msg : GST_MESSAGE_INSTANT_RATE_REQUEST\n");
         //  break;
         case GST_MESSAGE_ANY:
-            C_WARN("msg : GST_MESSAGE_ANY\n");
+            C_WARN("%s msg : GST_MESSAGE_ANY", session->location);
             break;
         default:
-            C_WARN("msg : default....");
+            C_WARN("%s msg : default....", session->location);
     }
 }
 
@@ -1077,38 +1023,21 @@ GstRtspPlayer__init (GstRtspPlayer * self)
 {
     GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
     priv->owner = self;
-    priv->port_fallback = NULL;
-    priv->host_fallback = NULL;
-    priv->user = NULL;
-    priv->pass = NULL;
-    priv->location = NULL;
-    priv->location_set = NULL;
-    priv->enable_backchannel = 1;
-    priv->retry = 0;
-    priv->valid_location = 0;
+    
     priv->view_mode = GST_RTSP_PLAYER_VIEW_MODE_FIT_WINDOW;
     priv->overlay_state = OverlayState__create();
     priv->canvas_handle = gtk_grid_new ();
     priv->canvas = NULL;
-    priv->dynamic_elements = NULL;
     priv->sink = NULL;
     priv->snapsink = NULL;
-    priv->fallback = RTSP_FALLBACK_NONE;
     priv->playing = 0;
     priv->sinkcaps = NULL;
     priv->video_bin = GstRtspPlayerPrivate__create_video_pad(priv);
     g_object_ref(priv->video_bin);
     priv->audio_bin = GstRtspPlayerPrivate__create_audio_pad();
     g_object_ref(priv->audio_bin);
-    P_MUTEX_SETUP(priv->player_lock);
 
     priv->backchannel = RtspBackchannel__create();
-
-    GstRtspPlayerPrivate__setup_pipeline(priv);
-    if (!priv->pipeline){
-        C_ERROR ("Failed to parse pipeline");
-        return;
-    }
 }
 
 GstRtspPlayer*  GstRtspPlayer__new (){
@@ -1143,42 +1072,6 @@ void GstRtspPlayer__mic_mute(GstRtspPlayer* self, gboolean mute) {
     RtspBackchannel__mute(priv->backchannel, mute);
 }
 
-void GstRtspPlayerPrivate__apply_view_mode(GstRtspPlayerPrivate * priv){
-    switch(priv->view_mode){
-        case GST_RTSP_PLAYER_VIEW_MODE_FIT_WINDOW:
-            gtk_widget_set_vexpand(GTK_WIDGET(priv->canvas),FALSE);
-            gtk_widget_set_hexpand(GTK_WIDGET(priv->canvas),FALSE);
-            gtk_widget_set_vexpand(GTK_WIDGET(priv->canvas_handle),FALSE);
-            gtk_widget_set_hexpand(GTK_WIDGET(priv->canvas_handle),FALSE);
-            gtk_widget_set_size_request(GTK_WIDGET(priv->canvas),-1,-1);
-            break;
-        case GST_RTSP_PLAYER_VIEW_MODE_FILL_WINDOW:
-            gtk_widget_set_vexpand(GTK_WIDGET(priv->canvas),TRUE);
-            gtk_widget_set_hexpand(GTK_WIDGET(priv->canvas),TRUE);
-            gtk_widget_set_vexpand(GTK_WIDGET(priv->canvas_handle),TRUE);
-            gtk_widget_set_hexpand(GTK_WIDGET(priv->canvas_handle),TRUE);
-            gtk_widget_set_size_request(GTK_WIDGET(priv->canvas),-1,-1);
-            break;
-        case GST_RTSP_PLAYER_VIEW_MODE_NATIVE:
-            gtk_widget_set_vexpand(GTK_WIDGET(priv->canvas),TRUE);
-            gtk_widget_set_hexpand(GTK_WIDGET(priv->canvas),TRUE);
-            gtk_widget_set_vexpand(GTK_WIDGET(priv->canvas_handle),TRUE);
-            gtk_widget_set_hexpand(GTK_WIDGET(priv->canvas_handle),TRUE);
-            if(GST_IS_CAPS(priv->sinkcaps)){
-                GstStructure * caps_struct = gst_caps_get_structure (priv->sinkcaps, 0);
-                gint width,height;
-                gst_structure_get_int(caps_struct,"width",&width);
-                gst_structure_get_int(caps_struct,"height",&height);
-                gtk_widget_set_size_request(GTK_WIDGET(priv->canvas),width,height);
-            }
-
-            break;
-        default:
-            C_WARN("Unsupported setting");
-            break;
-    }
-}
-
 void GstRtspPlayer__set_view_mode(GstRtspPlayer * self, GstRtspViewMode mode){
     g_return_if_fail (self != NULL);
     g_return_if_fail (GST_IS_RTSPPLAYER (self));
@@ -1197,8 +1090,12 @@ GstSnapshot * GstRtspPlayer__get_snapshot(GstRtspPlayer* self){
 
     GstSnapshot * snap = NULL;
     GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
-    C_TRACE("[%s] GstRtspPlayer__get_snapshot",priv->location);
 
+    if(!priv->session){
+        C_TRACE("Nothing to snapshot");
+        goto exit;
+    }
+    C_TRACE("%s GstRtspPlayer__get_snapshot",priv->session->location);
     P_MUTEX_LOCK(priv->player_lock);
     GstState state = GST_STATE_NULL;
     GstStateChangeReturn ret_1 = gst_element_get_state (priv->sink,&state, NULL, GST_CLOCK_TIME_NONE);
@@ -1208,15 +1105,15 @@ GstSnapshot * GstRtspPlayer__get_snapshot(GstRtspPlayer* self){
         GstSample * png_sample = NULL;
 
         if(last_sample){
-            C_WARN("Extracted sample.");
+            C_WARN("%s Extracted sample.",priv->session->location);
             GError * error = NULL;
             GstCaps * out_caps = gst_caps_from_string ("image/jpeg,width=640,height=480");
             png_sample = gst_video_convert_sample(last_sample, out_caps, GST_CLOCK_TIME_NONE, &error);
             if(error){
                 if(error->message){
-                    C_ERROR("[%s] GstRtspPlayer encountered an error extracting snapshot. [%d] %s",priv->location , error->code, error->message);
+                    C_ERROR("%s GstRtspPlayer encountered an error extracting snapshot. [%d] %s",priv->session->location , error->code, error->message);
                 } else {
-                    C_ERROR("[%s] GstRtspPlayer encountered an error extracting snapshot. [%d]",priv->location , error->code);
+                    C_ERROR("%s GstRtspPlayer encountered an error extracting snapshot. [%d]",priv->session->location , error->code);
                 }
             }
         }
@@ -1232,7 +1129,7 @@ GstSnapshot * GstRtspPlayer__get_snapshot(GstRtspPlayer* self){
                 snap->data = malloc(snap->size);
                 memcpy (snap->data, map_info.data, snap->size);
             } else {
-                C_ERROR("[%s] GstRtspPlayer Failed to extract snapshot sample data",priv->location);
+                C_ERROR("%s GstRtspPlayer Failed to extract snapshot sample data",priv->session->location);
             }
         }
 
@@ -1241,11 +1138,10 @@ GstSnapshot * GstRtspPlayer__get_snapshot(GstRtspPlayer* self){
         if(png_sample)
             gst_sample_unref(png_sample);
     } else {
-        C_ERROR("[%s] GstRtspPlayer not playing. No snapshot extracted %d - %d",priv->location,ret_1,state);
+        C_ERROR("%s GstRtspPlayer not playing. No snapshot extracted %d - %d",priv->session->location,ret_1,state);
     }
-
     P_MUTEX_UNLOCK(priv->player_lock);
-
+exit:
     return snap;
 }
 
@@ -1254,4 +1150,92 @@ void GstSnapshot__destroy(GstSnapshot * snapshot){
 
     free(snapshot->data);
     free(snapshot);   
+}
+
+static void
+GstRtspPlayer__dispose (GObject *gobject)
+{
+    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (GST_RTSPPLAYER (gobject));
+
+    //Making sure stream is stopped
+    GstRtspPlayerPrivate__stop(priv);
+
+    if(priv->session){
+        GstRtspPlayerSession__destroy(priv->session);
+    }
+    OverlayState__destroy(priv->overlay_state);
+    RtspBackchannel__destroy(priv->backchannel);
+    
+    P_MUTEX_CLEANUP(priv->player_lock);
+    if(priv->video_bin){
+        g_object_unref(priv->video_bin);
+        priv->video_bin = NULL;
+    }
+
+    if(priv->audio_bin){
+        g_object_unref(priv->audio_bin);
+        priv->audio_bin = NULL;
+    }
+
+    G_OBJECT_CLASS (GstRtspPlayer__parent_class)->dispose (gobject);
+}
+
+static void
+GstRtspPlayer__class_init (GstRtspPlayerClass * klass)
+{
+
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+    object_class->dispose = GstRtspPlayer__dispose;
+    
+    signals[STOPPED] =
+        g_signal_newv ("stopped",
+                G_TYPE_FROM_CLASS (klass),
+                G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
+                NULL /* closure */,
+                NULL /* accumulator */,
+                NULL /* accumulator data */,
+                NULL /* C marshaller */,
+                G_TYPE_NONE /* return_type */,
+                0     /* n_params */,
+                NULL  /* param_types */);
+
+    GType params[1];
+    params[0] = G_TYPE_POINTER | G_SIGNAL_TYPE_STATIC_SCOPE;
+    signals[STARTED] =
+        g_signal_newv ("started",
+                G_TYPE_FROM_CLASS (klass),
+                G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
+                NULL /* closure */,
+                NULL /* accumulator */,
+                NULL /* accumulator data */,
+                NULL /* C marshaller */,
+                G_TYPE_NONE /* return_type */,
+                1     /* n_params */,
+                params  /* param_types */);
+
+    signals[RETRY] =
+        g_signal_newv ("retry",
+                G_TYPE_FROM_CLASS (klass),
+                G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
+                NULL /* closure */,
+                NULL /* accumulator */,
+                NULL /* accumulator data */,
+                NULL /* C marshaller */,
+                G_TYPE_NONE /* return_type */,
+                1     /* n_params */,
+                params  /* param_types */);
+
+    signals[ERROR] =
+        g_signal_newv ("error",
+                G_TYPE_FROM_CLASS (klass),
+                G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
+                NULL /* closure */,
+                NULL /* accumulator */,
+                NULL /* accumulator data */,
+                NULL /* C marshaller */,
+                G_TYPE_NONE /* return_type */,
+                1     /* n_params */,
+                params  /* param_types */);
+
 }

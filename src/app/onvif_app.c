@@ -45,6 +45,22 @@ typedef struct {
     GstRtspPlayer * player;
 } OnvifAppPrivate;
 
+struct IdleRetryData {
+    GstRtspPlayer * player;
+    GstRtspPlayerSession * session;
+    OnvifMgrDeviceRow * device;
+};
+
+struct IdlePlayData {
+    GstRtspPlayer * player;
+    char * uri;
+    char * user;
+    char * pass;
+    char * host;
+    char * port;
+    OnvifMgrDeviceRow * device;
+};
+
 static guint signals[LAST_SIGNAL] = { 0 };
 
 static void OnvifApp__ownable_interface_init (COwnableObjectInterface *iface);
@@ -98,20 +114,30 @@ gboolean idle_add_device(void * user_data){
     return FALSE;
 }
 
-void _player_retry_stream(QueueEvent * qevt, void * user_data){
-    C_TRACE("_player_retry_stream");
-    OnvifMgrDeviceRow * device = ONVIFMGR_DEVICEROW(user_data);
-    OnvifApp * self = OnvifMgrDeviceRow__get_app(device);
-    OnvifAppPrivate *priv = OnvifApp__get_instance_private (self);
+gboolean idle_player_retry_stream(void * user_data){
+    struct IdleRetryData * data = (struct IdleRetryData *) user_data;
+    //Check that the session to retry is still the one active
+    if(GstRtspPlayer__get_session(data->player) == data->session){
+        ONVIFMGR_DEVICEROW_TRACE("%s idle_player_retry_stream",data->device);
+        GstRtspPlayerSession__retry(data->session);
+    }
+    g_object_unref(data->device);
+    free(user_data);
+    return FALSE;
+}
 
-    //Check if the device is valid and selected
-    if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) && OnvifMgrDeviceRow__is_selected(device) && !QueueEvent__is_cancelled(qevt)){
+void _wait_before_retry_stream(QueueEvent * qevt, void * user_data){
+    struct IdleRetryData * data = (struct IdleRetryData *) user_data;
+    if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(data->device) && OnvifMgrDeviceRow__is_selected(data->device) && !QueueEvent__is_cancelled(qevt)){
+        ONVIFMGR_DEVICEROW_TRACE("%s _wait_before_retry_stream",data->device);
         sleep(2);//Wait to avoid spamming the camera
-        //Check again if the device is valid and selected after waiting
-        if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) && OnvifMgrDeviceRow__is_selected(device) && !QueueEvent__is_cancelled(qevt)){
-            GstRtspPlayer__retry(priv->player);
+        if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(data->device) && OnvifMgrDeviceRow__is_selected(data->device) && !QueueEvent__is_cancelled(qevt)){
+            g_object_ref(data->device);
+            g_idle_add(G_SOURCE_FUNC(idle_player_retry_stream), data);
+            return;
         }
     }
+    free(user_data);
 }
 
 void _dicovery_found_server_cb (DiscoveryEvent * event) {
@@ -201,6 +227,25 @@ void _profile_callback (QueueEvent * qevt, void * user_data){
     OnvifApp__reload_device(qevt, device);
 }
 
+gboolean idle_play_stream(void * user_data){
+    struct IdlePlayData * data = (struct IdlePlayData*) user_data;
+    ONVIFMGR_DEVICEROW_TRACE("%s idle_play_stream",data->device);
+    OnvifDevice * odev = OnvifMgrDeviceRow__get_device(data->device);
+    if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(data->device) && OnvifDevice__is_authenticated(odev) && OnvifMgrDeviceRow__is_selected(data->device)) {
+        GstRtspPlayer__play(data->player,data->uri,data->user,data->pass,data->host,data->port, data->device);
+    }
+    
+    g_object_unref(data->device);
+    free(data->uri);
+    free(data->port);
+    free(data->host);
+    free(data->user);
+    free(data->pass);
+    free(data);
+    
+    return FALSE;
+}
+
 void _play_onvif_stream(QueueEvent * qevt, void * user_data){
     ONVIFMGR_DEVICEROW_TRACE("_play_onvif_stream %s",user_data);
     OnvifMgrDeviceRow * device = ONVIFMGR_DEVICEROW(user_data);
@@ -226,20 +271,23 @@ void _play_onvif_stream(QueueEvent * qevt, void * user_data){
     SoapFault * fault = SoapObject__get_fault(SOAP_OBJECT(media_uri));
     
     if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) && *fault == SOAP_FAULT_NONE && !(qevt != NULL && QueueEvent__is_cancelled(qevt))){
-        char * uri = OnvifMediaUri__get_uri(media_uri);
-        char * port = OnvifDevice__get_port(OnvifMgrDeviceRow__get_device(device));
-        char * host = OnvifDevice__get_host(OnvifMgrDeviceRow__get_device(device));
+        struct IdlePlayData * data = malloc(sizeof(struct IdlePlayData));
+        data->player = priv->player;
+        data->device = device;
+
+        data->port = OnvifDevice__get_port(OnvifMgrDeviceRow__get_device(device));
+        data->host = OnvifDevice__get_host(OnvifMgrDeviceRow__get_device(device));
         
         OnvifCredentials * ocreds = OnvifDevice__get_credentials(odev);
-        char * user = OnvifCredentials__get_username(ocreds);
-        char * pass = OnvifCredentials__get_password(ocreds);
+        data->user = OnvifCredentials__get_username(ocreds);
+        data->pass = OnvifCredentials__get_password(ocreds);
+        
+        char * uri = OnvifMediaUri__get_uri(media_uri);
+        data->uri = malloc(strlen(uri)+1);
+        strcpy(data->uri,uri);
 
-        GstRtspPlayer__play(priv->player,uri,user,pass,host,port);
-
-        free(port);
-        free(host);
-        free(user);
-        free(pass);
+        g_object_ref(device);
+        g_idle_add(G_SOURCE_FUNC(idle_play_stream),data);
     } else if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device)) {
         C_TRAIL("_play_onvif_stream - invalid device.");
     }
@@ -429,19 +477,27 @@ void OnvifApp__cred_dialog_login_cb(AppDialogEvent * event){
 }
 
 void OnvifApp__cred_dialog_cancel_cb(AppDialogEvent * event){
-    C_INFO("OnvifAuthentication cancelled...\n");
+    C_INFO("OnvifAuthentication cancelled...");
     g_object_unref(event->user_data);
 }
 
-void OnvifApp__player_retry_cb(GstRtspPlayer * player, void * user_data){
+void OnvifApp__player_retry_cb(GstRtspPlayer * player, GstRtspPlayerSession * session, void * user_data){
     C_TRACE("OnvifApp__player_retry_cb");
-    OnvifApp * self = (OnvifApp *) user_data;
+    OnvifApp * self = ONVIFMGR_APP(user_data);
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (self);
-    EventQueue__insert(priv->queue, priv->device, _player_retry_stream,priv->device, NULL);
+    OnvifMgrDeviceRow * device = ONVIFMGR_DEVICEROW(GstRtspPlayerSession__get_user_data(session));
+    //Check if the device is valid and selected
+    if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) && OnvifMgrDeviceRow__is_selected(device)){
+        struct IdleRetryData * data = malloc(sizeof(struct IdleRetryData));
+        data->player = player;
+        data->session = session;
+        data->device = device;
+        EventQueue__insert_plain(priv->queue, device, _wait_before_retry_stream,data, NULL);
+    }
 }
 
-void OnvifApp__player_error_cb(GstRtspPlayer * player, void * user_data){
-    C_ERROR("Stream encountered an error\n");
+void OnvifApp__player_error_cb(GstRtspPlayer * player, GstRtspPlayerSession * session, void * user_data){
+    C_ERROR("Stream encountered an error");
     OnvifApp * self = (OnvifApp *) user_data;
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (self);
     //On shutdown, the player may dispatch this event after the window is destroyed
@@ -451,12 +507,12 @@ void OnvifApp__player_error_cb(GstRtspPlayer * player, void * user_data){
 }
 
 void OnvifApp__player_stopped_cb(GstRtspPlayer * player, void * user_data){
-    C_INFO("Stream stopped\n");
+    C_INFO("Stream stopped");
     //TODO Show placeholder on canvas
 }
 
-void OnvifApp__player_started_cb(GstRtspPlayer * player, void * user_data){
-    C_INFO("Stream playing\n");
+void OnvifApp__player_started_cb(GstRtspPlayer * player, GstRtspPlayerSession * session, void * user_data){
+    C_INFO("Stream playing");
     OnvifApp * self = (OnvifApp *) user_data;
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (self);
     if(GTK_IS_SPINNER(priv->player_loading_handle)){

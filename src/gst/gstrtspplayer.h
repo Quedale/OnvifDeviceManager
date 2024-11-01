@@ -6,6 +6,7 @@
 
 G_BEGIN_DECLS
 
+typedef struct _GstRtspPlayerSession GstRtspPlayerSession;
 typedef struct _GstRtspPlayer GstRtspPlayer;
 
 #define GST_TYPE_RTSPPLAYER GstRtspPlayer__get_type()
@@ -36,14 +37,18 @@ struct _GstRtspPlayerClass
 };
 
 GstRtspPlayer * GstRtspPlayer__new ();
-void GstRtspPlayer__play(GstRtspPlayer* self, char *url, char * user, char * pass, char * fallback_host, char * fallback_port);
-void GstRtspPlayer__retry(GstRtspPlayer* self);
+void GstRtspPlayer__play(GstRtspPlayer* self, char *url, char * user, char * pass, char * fallback_host, char * fallback_port, void * user_data);
 void GstRtspPlayer__stop(GstRtspPlayer* self);
 GtkWidget * GstRtspPlayer__createCanvas(GstRtspPlayer *self);
 gboolean GstRtspPlayer__is_mic_mute(GstRtspPlayer* self);
 void GstRtspPlayer__mic_mute(GstRtspPlayer* self, gboolean mute);
 void GstRtspPlayer__set_view_mode(GstRtspPlayer * self, GstRtspViewMode mode);
 GstSnapshot * GstRtspPlayer__get_snapshot(GstRtspPlayer* self);
+GstRtspPlayerSession * GstRtspPlayer__get_session (GstRtspPlayer * self);
+
+void GstRtspPlayerSession__retry(GstRtspPlayerSession* state);
+void * GstRtspPlayerSession__get_user_data(GstRtspPlayerSession * state);
+char * GstRtspPlayerSession__get_uri(GstRtspPlayerSession * state);
 
 G_END_DECLS
 
