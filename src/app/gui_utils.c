@@ -76,9 +76,10 @@ void gui_update_widget_image(GtkWidget * image, GtkWidget * handle){
 
 gboolean gui_set_label_text_priv (void * user_data){
     GUILabelUpdate * update = (GUILabelUpdate *) user_data;
-    if(!GTK_IS_LABEL(update->label)) return FALSE; //This may happen if the element was destroyed before the idle is dispatched
+    if(!update->label || !GTK_IS_LABEL(update->label)) goto exit; //This may happen if the element was destroyed before the idle is dispatched
     gtk_label_set_text(GTK_LABEL(update->label),update->text);
 
+exit:
     free(update->text);
     free(update);
 
@@ -86,6 +87,7 @@ gboolean gui_set_label_text_priv (void * user_data){
 }
 
 void gui_set_label_text (GtkWidget * widget, char * value){
+    g_return_if_fail(widget != NULL);
     g_return_if_fail(GTK_IS_LABEL(widget));
     GUILabelUpdate * iguiu = malloc(sizeof(GUILabelUpdate));
     iguiu->text = malloc(strlen(value)+1);

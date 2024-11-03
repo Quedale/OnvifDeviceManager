@@ -144,21 +144,27 @@ static void GstRtspPlayerSession__destroy(GstRtspPlayerSession * session){
         }
         if(session->port_fallback){
             free(session->port_fallback);
+            session->port_fallback = NULL;
         }
         if(session->host_fallback){
             free(session->host_fallback);
+            session->host_fallback = NULL;
         }
         if(session->user){
             free(session->user);
+            session->user = NULL;
         }
         if(session->pass){
             free(session->pass);
+            session->pass = NULL;
         }
         if(session->location){
             free(session->location);
+            session->location = NULL;
         }
         if(session->location_set){
             free(session->location_set);
+            session->location_set = NULL;
         }
         free(session);
     }
@@ -270,7 +276,7 @@ GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
         gst_base_sink_set_sync(GST_BASE_SINK_CAST(priv->sink),FALSE);
         gst_base_sink_set_qos_enabled(GST_BASE_SINK_CAST(priv->sink),FALSE);
     }
-
+    gtk_widget_set_no_show_all(priv->canvas, TRUE);
     gtk_container_add (GTK_CONTAINER (priv->canvas_handle), GTK_WIDGET(priv->canvas));
 
     if (!video_bin ||
@@ -539,6 +545,11 @@ GstRtspPlayerSession__setup_pipeline (GstRtspPlayerSession * session)
     return session;
 }
 
+gboolean GstRtspPlayerPrivate__idle_hide(GtkWidget * widget){
+    gtk_widget_hide(widget);
+    return FALSE;
+}
+
 void GstRtspPlayerPrivate__stop_unlocked(GstRtspPlayerPrivate * priv){
     GstStateChangeReturn ret;
 
@@ -549,7 +560,7 @@ void GstRtspPlayerPrivate__stop_unlocked(GstRtspPlayerPrivate * priv){
 
     //Pause backchannel
     if(!RtspBackchannel__pause(priv->backchannel)){
-        return;
+        C_WARN("Failed to pause backchannel.");
     }
 
     //Set NULL state to clear buffers
@@ -557,12 +568,8 @@ void GstRtspPlayerPrivate__stop_unlocked(GstRtspPlayerPrivate * priv){
         ret = gst_element_set_state (priv->session->pipeline, GST_STATE_NULL);
         if (ret == GST_STATE_CHANGE_FAILURE) {
             C_ERROR ("%s Unable to set the pipeline to the ready state.",priv->session->location);
-            return;
         }
     }
-
-    g_list_free(priv->session->dynamic_elements);
-    priv->session->dynamic_elements = NULL;
 
     //Destroy old pipeline
     if(GST_IS_ELEMENT(priv->session->pipeline)){
@@ -570,11 +577,13 @@ void GstRtspPlayerPrivate__stop_unlocked(GstRtspPlayerPrivate * priv){
         priv->session->pipeline = NULL;
     }
 
+    if(priv->session->dynamic_elements){
+        g_list_free(priv->session->dynamic_elements);
+        priv->session->dynamic_elements = NULL;
+    }
     //New pipeline causes previous pipe to stop dispatching state change.
     //Force hide the previous stream
-    if(GTK_IS_WIDGET (priv->canvas))
-        gtk_widget_set_visible(priv->canvas, FALSE);
-
+    g_idle_add(G_SOURCE_FUNC(GstRtspPlayerPrivate__idle_hide),priv->canvas);
 }
 
 void GstRtspPlayerPrivate__stop(GstRtspPlayerPrivate * priv){
