@@ -6,7 +6,7 @@
 
 typedef struct _OnvifApp OnvifApp;
 
-#include "dialog/msg_dialog.h"
+#include "dialog/omgr_msg_dialog.h"
 #include "omgr_device_row.h"
 #include "../queue/event_queue.h"
 
@@ -29,7 +29,7 @@ struct _OnvifAppClass
 
 OnvifApp * OnvifApp__new (void);
 void OnvifApp__destroy(OnvifApp* self);
-MsgDialog * OnvifApp__get_msg_dialog(OnvifApp * self);
+void OnvifApp__show_msg_dialog(OnvifApp * self, OnvifMgrMsgDialog * msg_dialog);
 EventQueue * OnvifApp__get_EventQueue(OnvifApp * self);
 
 G_END_DECLS

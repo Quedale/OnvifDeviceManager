@@ -20,7 +20,7 @@ void * _thread_destruction(void * event){
     pthread_exit(0);
 }
 
-void force_shutdown_cb(AppDialogEvent * event){
+void force_shutdown_cb(OnvifMgrMsgDialog * dialog){
     C_WARN("Aborting GTK main thread!!");
     gtk_main_quit();
 }
@@ -29,22 +29,20 @@ int ONVIF_APP_SHUTTING_DOWN = 0;
 
 void onvif_app_shutdown(OnvifApp * data){
     if(!ONVIF_APP_SHUTTING_DOWN){
-        C_INFO("Calling App Shutdown...\n");
+        C_INFO("Calling App Shutdown...");
         ONVIF_APP_SHUTTING_DOWN = 1;
     } else {
-        C_WARN("Application already shutting down...\n");
+        C_WARN("Application already shutting down...");
         return;
     }
-    
-    MsgDialog * dialog = OnvifApp__get_msg_dialog(data);
-    AppDialog__set_closable((AppDialog*)dialog, 0);
-    AppDialog__set_submit_label((AppDialog*)dialog, "Force Shutdown!");
-    AppDialog__set_title((AppDialog*)dialog,"Shutting down...");
-    AppDialog__set_cancellable((AppDialog*)dialog,0);
-    AppDialog__show((AppDialog *) dialog,force_shutdown_cb,NULL,data);
-    AppDialog__show_loading((AppDialog *) dialog,"Waiting for running task to finish...");
-    AppDialog__show_actions((AppDialog*)dialog);
-
+    OnvifMgrMsgDialog * dialog = OnvifMgrMsgDialog__new();
+    g_signal_connect (G_OBJECT (dialog), "submit", G_CALLBACK (force_shutdown_cb), NULL);
+    g_object_set (dialog, "closable", FALSE, NULL);
+    g_object_set (dialog, "cancellable", FALSE, NULL);
+    g_object_set (dialog, "submit-label", "Force Shutdown!", NULL);
+    g_object_set (dialog, "title-label", "Shutting down...", NULL);
+    OnvifApp__show_msg_dialog(data,dialog);
+    OnvifMgrAppDialog__show_loading(ONVIFMGR_APPDIALOG(dialog),"Waiting for running task to finish...");
     pthread_t pthread;
     pthread_create(&pthread, NULL, _thread_destruction, data);
     pthread_detach(pthread);

@@ -12,7 +12,7 @@ AUTOMAKE_OPTIONS = foreign subdir-objects
 AM_CFLAGS = $(DEBUG_FLAG) -Wall -Wextra -Wpedantic -Wno-unused-parameter $(DEBUG_FLAG) -DONVIFMGR_VERSION_MAJ=$(APP_VERSION_MAJ) -DONVIFMGR_VERSION_MIN=$(APP_VERSION_MIN) -DHAVE_CONFIG_H $(GST_STATIC_FLAG) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0 libntlm cutils onvifsoap libssl libcrypto` $(EXT_CFLAGS) -lm
 
 bin_PROGRAMS = onvifmgr 
-EXTRA_PROGRAMS = gifdemo overlaytest queuedemo csssliderdemo playerdemo cssfilesliderdemo gtksliderdemo omgrdevicedemo gtkstyledimagedemo
+EXTRA_PROGRAMS = gifdemo overlaytest queuedemo csssliderdemo playerdemo cssfilesliderdemo gtksliderdemo omgrdevicedemo gtkstyledimagedemo omgrdialogdemo
 
 playerdemo_SOURCES = $(top_srcdir)/src/demo/player-demo.c \
 					$(top_srcdir)/src/alsa/alsa_devices.c \
@@ -40,12 +40,12 @@ onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c \
 					$(top_srcdir)/src/app/details/onvif_network.c \
 					$(top_srcdir)/src/app/onvif_nvt.c \
 					$(top_srcdir)/src/app/task_manager.c \
-					$(top_srcdir)/src/app/dialog/add_device.c \
-					$(top_srcdir)/src/app/dialog/app_dialog.c \
-					$(top_srcdir)/src/app/dialog/credentials_input.c \
 					$(top_srcdir)/src/app/dialog/gtkprofilepanel.c \
-					$(top_srcdir)/src/app/dialog/msg_dialog.c \
-					$(top_srcdir)/src/app/dialog/profiles_dialog.c \
+					$(top_srcdir)/src/app/dialog/omgr_add_dialog.c \
+					$(top_srcdir)/src/app/dialog/omgr_app_dialog.c \
+					$(top_srcdir)/src/app/dialog/omgr_credentials_dialog.c \
+					$(top_srcdir)/src/app/dialog/omgr_msg_dialog.c \
+					$(top_srcdir)/src/app/dialog/omgr_profiles_dialog.c \
 					$(top_srcdir)/src/app/settings/app_settings_discovery.c \
 					$(top_srcdir)/src/app/settings/app_settings_stream.c \
 					$(top_srcdir)/src/app/settings/app_settings.c \
@@ -98,6 +98,22 @@ omgrdevicedemo_SOURCES = $(top_srcdir)/src/demo/omgr-device-demo.c \
 					 	$(top_srcdir)/src/app/omgr_device_row.c
 omgrdevicedemo_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap libntlm` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
 omgrdevicedemo_LDADD = save.o locked-icon.o warning.o
+
+omgrdialogdemo_SOURCES = $(top_srcdir)/src/demo/omgr-dialog-demo.c \
+						$(top_srcdir)/src/app/gui_utils.c \
+						$(top_srcdir)/src/app/c_ownable_interface.c \
+						$(top_srcdir)/src/app/gtkstyledimage.c \
+						$(top_srcdir)/src/app/gtkbinaryimage.c \
+					 	$(top_srcdir)/src/app/omgr_device_row.c \
+						$(top_srcdir)/src/app/dialog/omgr_credentials_dialog.c \
+						$(top_srcdir)/src/app/dialog/omgr_add_dialog.c \
+						$(top_srcdir)/src/app/dialog/omgr_app_dialog.c \
+						$(top_srcdir)/src/animations/gtk/gtk_dotted_slider_widget.c \
+						$(top_srcdir)/src/animations/gtk/custom_gtk_revealer.c \
+						$(top_srcdir)/src/animations/gtk/custom_gtk_progress_tracker.c
+omgrdialogdemo_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap libntlm` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
+omgrdialogdemo_LDADD = save.o locked-icon.o warning.o
+
 
 gtksliderdemo_SOURCES = $(top_srcdir)/src/demo/widget-demo.c \
 					$(top_srcdir)/src/animations/gtk/gtk_dotted_slider_widget.c \
