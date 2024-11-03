@@ -23,7 +23,8 @@ enum
   PROP_TITLELABEL = 5,
   PROP_SUBMITLABEL = 6,
   PROP_USERDATA = 7,
-  PROP_ERROR = 8,
+  PROP_SELFDESTROY = 8,
+  PROP_ERROR = 9,
   N_PROPERTIES
 };
 
@@ -38,9 +39,11 @@ struct _OnvifMgrAppDialogPrivate {
     GtkWidget * title_lbl;
     GtkWidget * action_panel;
     GtkWidget * innerFocusedWidget;
+    GtkWidget * focusedWidget;
     GtkWidget * lblerr;
     int keysignalid;
 
+    gboolean self_destroy;
     gboolean closable;
     char * title;
     gpointer user_data;
@@ -67,7 +70,11 @@ OnvifMgrAppDialog__cancel_event (GtkWidget *widget, OnvifMgrAppDialog * self) {
     if(!priv->closable){
         return;
     }
-    gtk_widget_destroy(GTK_WIDGET(self));
+    if(priv->self_destroy){
+        gtk_widget_destroy(GTK_WIDGET(self));
+    } else {
+        gtk_widget_hide(GTK_WIDGET(self));
+    }    
 }
 
 /*
@@ -211,13 +218,16 @@ OnvifMgrAppDialog__real_create_ui(OnvifMgrAppDialog * self){
     gtk_grid_attach (GTK_GRID (self), empty, 1, 1, 1, 1);
 
     g_object_unref (cssProvider);  
-    
-    gtk_widget_set_no_show_all(GTK_WIDGET(self), FALSE);
 }
 
 static void
 OnvifMgrAppDialog__dispose (GObject *object){
     OnvifMgrAppDialogPrivate *priv = OnvifMgrAppDialog__get_instance_private (ONVIFMGR_APPDIALOG(object));
+    if(priv->self_destroy && priv->focusedWidget && GTK_IS_WIDGET(priv->focusedWidget)){ //Call only if self destroys
+        gtk_widget_grab_focus(priv->focusedWidget);
+        priv->focusedWidget = NULL;
+    }
+
     if(priv->title){
         free(priv->title);
         priv->title = NULL;
@@ -292,6 +302,10 @@ OnvifMgrAppDialog__set_property (GObject      *object,
             gtk_label_set_label(GTK_LABEL(priv->lblerr),strvalue);
             gtk_widget_set_visible(priv->lblerr,strvalue && strlen(strvalue));
             break;
+        case PROP_SELFDESTROY:
+            boolvalue = g_value_get_boolean(value);
+            priv->self_destroy = boolvalue;
+            break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
             break;
@@ -329,6 +343,9 @@ OnvifMgrAppDialog__get_property (GObject    *object,
             break;
         case PROP_ERROR:
             g_value_set_string(value,gtk_label_get_label(GTK_LABEL(priv->lblerr)));
+            break;
+        case PROP_SELFDESTROY:
+            g_value_set_boolean(value,priv->self_destroy);
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -411,6 +428,17 @@ OnvifMgrAppDialog__keypress_function (GtkWidget *widget, GdkEventKey *event, Onv
 }
 
 static void
+OnvifMgrAppDialog__set_focus_child (GtkContainer * container, GtkWidget	 *child){
+    GtkWidget *window = gtk_widget_get_toplevel (GTK_WIDGET(container));
+    if (!gtk_widget_is_visible(GTK_WIDGET(container)) && gtk_widget_is_toplevel (window)){
+        OnvifMgrAppDialogPrivate *priv = OnvifMgrAppDialog__get_instance_private (ONVIFMGR_APPDIALOG(container));
+        priv->focusedWidget = gtk_window_get_focus(GTK_WINDOW(window));
+    }
+
+    GTK_CONTAINER_CLASS (OnvifMgrAppDialog__parent_class)->set_focus_child (container, child);
+}
+
+static void
 OnvifMgrAppDialog__show (GtkWidget * widget){
     OnvifMgrAppDialog *self = ONVIFMGR_APPDIALOG(widget);
     OnvifMgrAppDialogPrivate *priv = OnvifMgrAppDialog__get_instance_private (self);
@@ -434,7 +462,7 @@ OnvifMgrAppDialog__hide (GtkWidget * widget){
     
     //Disconnect keyboard handler.
     GtkWidget *window = gtk_widget_get_toplevel (GTK_WIDGET(self));
-    if (gtk_widget_is_toplevel (window)){  
+    if (priv->keysignalid && gtk_widget_is_toplevel (window)){  
         g_signal_handler_disconnect (G_OBJECT (window), priv->keysignalid);
         priv->keysignalid = 0;
     }
@@ -442,6 +470,11 @@ OnvifMgrAppDialog__hide (GtkWidget * widget){
     //Restore focus capabilities to previous widget
     GtkWidget *parent = gtk_widget_get_parent(GTK_WIDGET(self));
     gtk_container_foreach (GTK_CONTAINER (parent), (GtkCallback)OnvifMgrAppDialog__set_nofocus, self);
+
+    //Restore stolen focus
+    if(GTK_IS_WIDGET(priv->focusedWidget))
+        gtk_widget_grab_focus(priv->focusedWidget);
+
     GTK_WIDGET_CLASS (OnvifMgrAppDialog__parent_class)->hide (widget);
 }
 
@@ -452,6 +485,8 @@ OnvifMgrAppDialog__class_init (OnvifMgrAppDialogClass *klass){
     object_class->dispose = OnvifMgrAppDialog__dispose;
     object_class->set_property = OnvifMgrAppDialog__set_property;
     object_class->get_property = OnvifMgrAppDialog__get_property;
+    GtkContainerClass *container_class = GTK_CONTAINER_CLASS (klass);
+    container_class->set_focus_child = OnvifMgrAppDialog__set_focus_child;
     GtkWidgetClass * widget_class = GTK_WIDGET_CLASS(klass);
     widget_class->show = OnvifMgrAppDialog__show;
     widget_class->hide = OnvifMgrAppDialog__hide;
@@ -528,7 +563,14 @@ OnvifMgrAppDialog__class_init (OnvifMgrAppDialogClass *klass){
                             "gboolean flag that will show a cancel button in the actioRn bar",
                             TRUE,
                             G_PARAM_CONSTRUCT | G_PARAM_READWRITE);
-                            
+
+    obj_properties[PROP_SELFDESTROY] =
+        g_param_spec_boolean ("self-destroy",
+                            "Dialog will self destroy",
+                            "The dialog will destroy itself instead of simply hiding",
+                            TRUE,
+                            G_PARAM_CONSTRUCT | G_PARAM_READWRITE);
+
     obj_properties[PROP_ERROR] =
         g_param_spec_string ("error",
                             "Dialog error string",
@@ -554,7 +596,7 @@ OnvifMgrAppDialog__init (OnvifMgrAppDialog *self){
     priv->title_lbl = NULL;
     priv->action_panel = NULL;
     priv->innerFocusedWidget = NULL;
-    
+
     OnvifMgrAppDialog__real_create_ui(self);
 }
 

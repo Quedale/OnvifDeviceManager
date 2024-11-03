@@ -915,9 +915,14 @@ else
   printlines project="onvifmgr" task="check" msg="Skipping pip install. NO_DOWNLOAD is set."
 fi
 
-# pullOrClone path="https://gitlab.gnome.org/GNOME/gtk.git" tag="3.24.34"
-# buildMesonProject srcdir="gtk" prefix="$SUBPROJECT_DIR/gtk/dist" mesonargs="-Dtests=false -Dintrospection=false -Ddemos=false -Dexamples=false -Dlibepoxy:tests=false"
-# if [ $FAILED -eq 1 ]; then exit 1; fi
+# export PKG_CONFIG_PATH="$SUBPROJECT_DIR/gtk/dist/lib/pkgconfig":$PKG_CONFIG_PATH
+# echo $SUBPROJECT_DIR/gtk/dist/lib/pkgconfig
+# pkgCheck project="gtk" name=gtk+-3.0 minver=3.24.43
+# if [ ! -z "$(pkgCheck project="gtk" name=gtk+-3.0 minver=3.24.43)" ]; then
+#   #https://download.gnome.org/sources/gtk+/3.24/gtk%2B-3.24.42.tar.xz
+#   pullOrClone project="gtk" path="https://gitlab.gnome.org/GNOME/gtk.git" tag="3.24.43"
+#   buildMesonProject project="gtk" srcdir="gtk" prefix="$SUBPROJECT_DIR/gtk/dist" mesonargs="-Dtests=false -Dintrospection=false -Ddemos=false -Dexamples=false -Dlibepoxy:tests=false"
+# fi
 
 ################################################################
 # 
