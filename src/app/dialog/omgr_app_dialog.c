@@ -221,11 +221,33 @@ OnvifMgrAppDialog__real_create_ui(OnvifMgrAppDialog * self){
 }
 
 static void
+OnvifMgrAppDialog__set_nofocus(GtkWidget *widget, GtkWidget * dialog_root){
+    if(widget != dialog_root){
+        gtk_widget_set_can_focus(widget,FALSE);
+    } else {
+        gtk_widget_set_can_focus(widget,TRUE);
+    }
+}
+
+static void
+OnvifMgrAppDialog__set_onlyfocus (GtkWidget *widget, GtkWidget * dialog_root){
+    if(widget == dialog_root){
+        gtk_widget_set_can_focus(widget,FALSE);
+    } else {
+        gtk_widget_set_can_focus(widget,TRUE);
+    }
+}
+
+static void
 OnvifMgrAppDialog__dispose (GObject *object){
     OnvifMgrAppDialogPrivate *priv = OnvifMgrAppDialog__get_instance_private (ONVIFMGR_APPDIALOG(object));
-    if(priv->self_destroy && priv->focusedWidget && GTK_IS_WIDGET(priv->focusedWidget)){ //Call only if self destroys
+    if(priv->focusedWidget && GTK_IS_WIDGET(priv->focusedWidget)){ //Call only if self destroys
         gtk_widget_grab_focus(priv->focusedWidget);
         priv->focusedWidget = NULL;
+    }
+    GtkWidget *parent = gtk_widget_get_parent(GTK_WIDGET(object));
+    if(parent && GTK_IS_CONTAINER(parent)){
+        gtk_container_foreach (GTK_CONTAINER (parent), (GtkCallback)OnvifMgrAppDialog__set_nofocus, object);
     }
 
     if(priv->title){
@@ -363,24 +385,6 @@ OnvifMgrAppDialog__constructed (GObject *object){
     g_return_if_fail (priv->panel != NULL);
     gtk_grid_attach (GTK_GRID (priv->panel_decor), priv->panel, 0, 2, 1, 1);
     G_OBJECT_CLASS (OnvifMgrAppDialog__parent_class)->constructed (object);
-}    
-
-static void
-OnvifMgrAppDialog__set_nofocus(GtkWidget *widget, GtkWidget * dialog_root){
-    if(widget != dialog_root){
-        gtk_widget_set_can_focus(widget,FALSE);
-    } else {
-        gtk_widget_set_can_focus(widget,TRUE);
-    }
-}
-
-static void
-OnvifMgrAppDialog__set_onlyfocus (GtkWidget *widget, GtkWidget * dialog_root){
-    if(widget == dialog_root){
-        gtk_widget_set_can_focus(widget,FALSE);
-    } else {
-        gtk_widget_set_can_focus(widget,TRUE);
-    }
 }
 
 // static int 
@@ -472,8 +476,10 @@ OnvifMgrAppDialog__hide (GtkWidget * widget){
     gtk_container_foreach (GTK_CONTAINER (parent), (GtkCallback)OnvifMgrAppDialog__set_nofocus, self);
 
     //Restore stolen focus
-    if(GTK_IS_WIDGET(priv->focusedWidget))
+    if(GTK_IS_WIDGET(priv->focusedWidget)){
         gtk_widget_grab_focus(priv->focusedWidget);
+        priv->focusedWidget = NULL;
+    }
 
     GTK_WIDGET_CLASS (OnvifMgrAppDialog__parent_class)->hide (widget);
 }
