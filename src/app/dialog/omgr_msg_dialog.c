@@ -37,12 +37,16 @@ OnvifMgrMsgDialog__create_ui(OnvifMgrAppDialog * app_dialog){
     gtk_grid_attach (GTK_GRID (grid), empty, 0, 0, 1, 1);
 
     priv->image_handle = gtk_event_box_new ();
-    g_object_set (priv->image_handle, "margin-top", 20, NULL);
+    gtk_widget_set_margin_top(priv->image_handle,20);
     gtk_grid_attach (GTK_GRID (grid), priv->image_handle, 1, 0, 1, 1);
 
     empty = gtk_label_new("");
     gtk_widget_set_hexpand (empty, TRUE);
     gtk_grid_attach (GTK_GRID (grid), empty, 2, 0, 1, 1);
+
+    g_object_set (app_dialog,
+            "submit-label", MSG_DIALOG_SUBMIT_LABEL,
+            NULL);
 
     return grid;
 }
@@ -131,9 +135,7 @@ OnvifMgrMsgDialog__class_init (OnvifMgrMsgDialogClass *klass){
 
 static void
 OnvifMgrMsgDialog__init (OnvifMgrMsgDialog *self){
-    g_object_set (self,
-            "submit-label", MSG_DIALOG_SUBMIT_LABEL,
-            NULL);
+ 
 }
 
 OnvifMgrMsgDialog * 

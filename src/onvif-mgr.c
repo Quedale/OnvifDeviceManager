@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
   sigaction(SIGSEGV, &sa, NULL);
   signal(SIGSEGV, handler_signal);  
   
-  c_log_set_level(C_ALL_E);
+  c_log_set_level(C_TRACE_E);
   c_log_set_thread_color(ANSI_COLOR_DRK_GREEN, P_THREAD_ID);
 
   /* Initialize GTK */

@@ -86,7 +86,7 @@ OnvifMgrAppDialog__attach_cancel_button(OnvifMgrAppDialog *self){
     priv->cancel_btn = gtk_button_new ();
     GtkWidget * label = gtk_label_new("Cancel");
     gtk_container_add (GTK_CONTAINER (priv->cancel_btn), label);
-    gtk_grid_attach (GTK_GRID (priv->action_panel), priv->cancel_btn, 2, 0, 1, 1);
+    gtk_grid_attach (GTK_GRID (priv->action_panel), priv->cancel_btn, 4, 0, 1, 1);
     g_signal_connect (priv->cancel_btn, "clicked", G_CALLBACK (OnvifMgrAppDialog__cancel_event), self);
 }
 
@@ -95,9 +95,8 @@ OnvifMgrAppDialog__attach_submit_button(OnvifMgrAppDialog *self){
     OnvifMgrAppDialogPrivate *priv = OnvifMgrAppDialog__get_instance_private (self);
     priv->submit_btn = gtk_button_new ();
     GtkWidget * label = gtk_label_new("");
-    g_object_set (priv->submit_btn, "margin-end", 10, NULL);
     gtk_container_add (GTK_CONTAINER (priv->submit_btn), label);
-    gtk_grid_attach (GTK_GRID (priv->action_panel), priv->submit_btn, 1, 0, 1, 1);
+    gtk_grid_attach (GTK_GRID (priv->action_panel), priv->submit_btn, 2, 0, 1, 1);
     g_signal_connect (priv->submit_btn, "clicked", G_CALLBACK (OnvifMgrAppDialog__submit_event), self);
 }
 
@@ -106,7 +105,8 @@ OnvifMgrAppDialog__create_buttons(OnvifMgrAppDialog * self){
     GtkWidget * label;
     OnvifMgrAppDialogPrivate *priv = OnvifMgrAppDialog__get_instance_private (self);
     priv->action_panel = gtk_grid_new ();
-    g_object_set (priv->action_panel, "margin", 5, NULL);
+    gtk_grid_set_column_spacing(GTK_GRID (priv->action_panel),5);
+    gtk_widget_set_margin_top(priv->action_panel,10);
 
     label = gtk_label_new("");
     gtk_widget_set_hexpand (label, TRUE);
@@ -114,7 +114,7 @@ OnvifMgrAppDialog__create_buttons(OnvifMgrAppDialog * self){
 
     label = gtk_label_new("");
     gtk_widget_set_hexpand (label, TRUE);
-    gtk_grid_attach (GTK_GRID (priv->action_panel), label, 3, 0, 1, 1);
+    gtk_grid_attach (GTK_GRID (priv->action_panel), label, 6, 0, 1, 1);
 }
 
 static GtkWidget * 
@@ -129,16 +129,15 @@ OnvifMgrAppDialog__create_panel(OnvifMgrAppDialog * self){
     GtkStyleContext * context;
     OnvifMgrAppDialogPrivate *priv = OnvifMgrAppDialog__get_instance_private (self);
     priv->panel_decor = gtk_grid_new ();
-
     //Add title strip
     priv->title_lbl = gtk_label_new("");
-    g_object_set (priv->title_lbl, "margin", 10, NULL);
+    gtk_widget_set_margin_bottom(priv->title_lbl,10);
     gtk_widget_set_hexpand (priv->title_lbl, TRUE);
     gtk_grid_attach (GTK_GRID (priv->panel_decor), priv->title_lbl, 0, 0, 1, 1);
 
     //Lightgrey background for the title strip
     cssProvider = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(cssProvider, "* { background-image:none; border-radius: 10px; background: linear-gradient(to top, @theme_bg_color, @theme_bg_color);}",-1,NULL); 
+    gtk_css_provider_load_from_data(cssProvider, "* { background-image:none; border-radius: 10px; padding: 10px; background: linear-gradient(to top, @theme_bg_color, @theme_bg_color);}",-1,NULL); 
     context = gtk_widget_get_style_context(priv->panel_decor);
     gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
 
@@ -608,6 +607,8 @@ OnvifMgrAppDialog__init (OnvifMgrAppDialog *self){
 
 void 
 OnvifMgrAppDialog__show_loading(OnvifMgrAppDialog * self, char * message){
+    g_return_if_fail(self != NULL);
+    g_return_if_fail(ONVIFMGR_IS_APPDIALOG(self));
     OnvifMgrAppDialogPrivate *priv = OnvifMgrAppDialog__get_instance_private (self);
     //Save previous focused element
     GtkWidget *window = gtk_widget_get_toplevel (GTK_WIDGET(self));
@@ -668,6 +669,8 @@ OnvifMgrAppDialog__show_loading(OnvifMgrAppDialog * self, char * message){
 
 void 
 OnvifMgrAppDialog__hide_loading(OnvifMgrAppDialog * self){
+    g_return_if_fail(self != NULL);
+    g_return_if_fail(ONVIFMGR_IS_APPDIALOG(self));
     OnvifMgrAppDialogPrivate *priv = OnvifMgrAppDialog__get_instance_private (self);
 
     //Destroy loading panel
@@ -693,6 +696,17 @@ OnvifMgrAppDialog__hide_loading(OnvifMgrAppDialog * self){
         gtk_widget_grab_focus(priv->innerFocusedWidget);
         priv->innerFocusedWidget = NULL;
     }
+}
+
+void OnvifMgrAppDialog__add_action_widget(OnvifMgrAppDialog * self, GtkWidget * widget, OnvifMgrAppDialogButtonPosition position){
+    g_return_if_fail(self != NULL);
+    g_return_if_fail(ONVIFMGR_IS_APPDIALOG(self));
+    g_return_if_fail(widget != NULL);
+    g_return_if_fail(GTK_IS_WIDGET(widget));
+    g_return_if_fail(position >= ONVIFMGR_APPDIALOG_BUTTON_BEFORE && position <= ONVIFMGR_APPDIALOG_BUTTON_AFTER);
+    OnvifMgrAppDialogPrivate *priv = OnvifMgrAppDialog__get_instance_private (self);
+    gtk_grid_attach (GTK_GRID (priv->action_panel), widget, position, 0, 1, 1);
+
 }
 
 OnvifMgrAppDialog * 

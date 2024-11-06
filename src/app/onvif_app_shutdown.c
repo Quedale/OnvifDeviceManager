@@ -43,6 +43,7 @@ void onvif_app_shutdown(OnvifApp * data){
     g_object_set (dialog, "title-label", "Shutting down...", NULL);
     OnvifApp__show_msg_dialog(data,dialog);
     OnvifMgrAppDialog__show_loading(ONVIFMGR_APPDIALOG(dialog),"Waiting for running task to finish...");
+    g_object_set (dialog, "action-visible", TRUE, NULL); //Setting this attribute after loading, because it hies the actionpanel
     pthread_t pthread;
     pthread_create(&pthread, NULL, _thread_destruction, data);
     pthread_detach(pthread);

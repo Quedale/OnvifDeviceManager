@@ -34,6 +34,11 @@ OnvifMgrProfilesDialog__create_ui(OnvifMgrAppDialog * app_dialog){
   OnvifMgrProfilesDialogPrivate *priv = OnvifMgrProfilesDialog__get_instance_private (ONVIFMGR_PROFILESDIALOG(app_dialog));
   priv->primary_pane = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 
+  g_object_set (app_dialog,
+          "title-label", "Profile Selector",
+          "submittable", FALSE,
+          NULL);
+
   return priv->primary_pane;
 }
 
@@ -189,10 +194,7 @@ OnvifMgrProfilesDialog__class_init (OnvifMgrProfilesDialogClass *klass){
 
 static void
 OnvifMgrProfilesDialog__init (OnvifMgrProfilesDialog *self){
-  g_object_set (self,
-          "title-label", "Profile Selector",
-          "submittable", FALSE,
-          NULL);
+
 }
 
 OnvifMgrProfilesDialog * 

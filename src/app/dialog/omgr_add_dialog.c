@@ -123,7 +123,7 @@ OnvifMgrAddDialog__create_ui(OnvifMgrAppDialog * app_dialog){
     gtk_widget_set_halign (widget, GTK_ALIGN_END);
     
     priv->txthost = gtk_entry_new();
-    g_object_set (priv->txthost, "margin-right", 10, NULL);
+    gtk_widget_set_margin_end(priv->txthost,10);
     gtk_widget_set_hexpand (priv->txthost, TRUE);
     gtk_grid_attach (GTK_GRID (grid), priv->txthost, 1, 1, 1, 1);
     g_signal_connect(G_OBJECT(priv->txthost), "insert-text", G_CALLBACK(OnvifMgrAddDialog__host_text_validate), NULL);
@@ -134,19 +134,23 @@ OnvifMgrAddDialog__create_ui(OnvifMgrAppDialog * app_dialog){
     gtk_widget_set_halign (widget, GTK_ALIGN_END);
 
     priv->txtport = gtk_entry_new();
-    g_object_set (priv->txtport, "margin-right", 10, NULL);
-    gtk_widget_set_hexpand (priv->txtport, TRUE);
-    gtk_grid_attach (GTK_GRID (grid), priv->txtport, 1, 3, 1, 1);
+    gtk_widget_set_margin_end(priv->txtport,10);
+    gtk_entry_set_width_chars(GTK_ENTRY(priv->txtport),5);
+    gtk_widget_set_hexpand (priv->txtport, FALSE);
     g_signal_connect(G_OBJECT(priv->txtport), "insert-text", G_CALLBACK(OnvifMgrAddDialog__port_text_validate), NULL);
     gtk_entry_set_placeholder_text(GTK_ENTRY(priv->txtport),"80");
 
+    GtkWidget* vbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_box_pack_start(GTK_BOX(vbox), priv->txtport, FALSE, FALSE, 0);
+    gtk_grid_attach (GTK_GRID (grid), vbox, 1, 3, 1, 1);
+    
     widget = gtk_label_new("HTTPS :");
     gtk_widget_set_hexpand (widget, TRUE);
     gtk_grid_attach (GTK_GRID (grid), widget, 0, 2, 1, 1);
     gtk_widget_set_halign (widget, GTK_ALIGN_END);
 
     priv->chkhttps = gtk_check_button_new();
-    g_object_set (priv->chkhttps, "margin-right", 10, NULL);
+    gtk_widget_set_margin_end(priv->chkhttps,10);
     gtk_widget_set_hexpand (priv->chkhttps, TRUE);
     gtk_grid_attach (GTK_GRID (grid), priv->chkhttps, 1, 2, 1, 1);
     g_signal_connect (priv->chkhttps, "toggled",
@@ -159,7 +163,7 @@ OnvifMgrAddDialog__create_ui(OnvifMgrAppDialog * app_dialog){
     gtk_widget_set_halign (widget, GTK_ALIGN_END);
 
     priv->txtuser = gtk_entry_new();
-    g_object_set (priv->txtuser, "margin-right", 10, NULL);
+    gtk_widget_set_margin_end(priv->txtuser,10);
     gtk_widget_set_hexpand (priv->txtuser, TRUE);
     gtk_grid_attach (GTK_GRID (grid), priv->txtuser, 1, 4, 1, 1);
 
@@ -169,10 +173,15 @@ OnvifMgrAddDialog__create_ui(OnvifMgrAppDialog * app_dialog){
     gtk_widget_set_halign (widget, GTK_ALIGN_END);
 
     priv->txtpass = gtk_entry_new();
-    g_object_set (priv->txtpass, "margin-right", 10, NULL);
+    gtk_widget_set_margin_end(priv->txtpass,10);
     gtk_entry_set_visibility(GTK_ENTRY(priv->txtpass),FALSE);
     gtk_widget_set_hexpand (priv->txtpass, TRUE);
     gtk_grid_attach (GTK_GRID (grid), priv->txtpass, 1, 5, 1, 1);
+
+    g_object_set (app_dialog, 
+            "title-label", ONVIFMGR_ADDDIALOG_TITLE,
+            "submit-label", ONVIFMGR_ADDDIALOG_SUBMIT_LABEL,
+            NULL);
 
     return grid;
 }
@@ -206,10 +215,6 @@ OnvifMgrAddDialog__class_init (OnvifMgrAddDialogClass *klass){
 static void
 OnvifMgrAddDialog__init (OnvifMgrAddDialog *self){
 
-    g_object_set (self, 
-            "title-label", ONVIFMGR_ADDDIALOG_TITLE,
-            "submit-label", ONVIFMGR_ADDDIALOG_SUBMIT_LABEL,
-            NULL);
 }
 
 OnvifMgrAddDialog * 

@@ -2,6 +2,7 @@
 #include "portable_thread.h"
 #include "../src/app/dialog/omgr_credentials_dialog.h"
 #include "../src/app/dialog/omgr_add_dialog.h"
+#include "../src/app/dialog/omgr_truststore_dialog.h"
 #include "../src/app/omgr_device_row.h"
 
 static void delete_event_cb (GtkWidget *widget, GdkEvent *event, gpointer data) {
@@ -49,7 +50,8 @@ int main(int argc, char *argv[])
     gtk_overlay_add_overlay(GTK_OVERLAY(overlay),GTK_WIDGET(hbox));
 
     // OnvifMgrCredentialsDialog * dialog = OnvifMgrCredentialsDialog__new();
-    OnvifMgrAddDialog * dialog = OnvifMgrAddDialog__new();
+    // OnvifMgrAddDialog * dialog = OnvifMgrAddDialog__new();
+    OnvifMgrTrustStoreDialog * dialog = OnvifMgrTrustStoreDialog__new();
     g_object_set (dialog,   "userdata", omgr_device, 
                             "self-destroy", FALSE, //Setting self-destroy to false so that we can re-use the dialog after its closed
                         NULL);

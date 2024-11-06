@@ -34,24 +34,33 @@ OnvifMgrCredentialsDialog__create_ui(OnvifMgrAppDialog * app_dialog){
     GtkWidget * grid = gtk_grid_new ();
     
     widget = gtk_label_new("Username :");
+    gtk_widget_set_margin_end(widget,10);
+    gtk_widget_set_halign (widget, GTK_ALIGN_END);
     gtk_widget_set_hexpand (widget, TRUE);
     gtk_grid_attach (GTK_GRID (grid), widget, 0, 0, 1, 1);
 
     priv->txtuser = gtk_entry_new();
-    g_object_set (priv->txtuser, "margin-right", 10, NULL);
+    gtk_widget_set_margin_end(priv->txtuser, 20);
     gtk_widget_set_hexpand (priv->txtuser, TRUE);
     gtk_grid_attach (GTK_GRID (grid), priv->txtuser, 1, 0, 1, 1);
     
     widget = gtk_label_new("Password :");
+    gtk_widget_set_margin_end(widget,10);
+    gtk_widget_set_halign (widget, GTK_ALIGN_END);
     gtk_widget_set_hexpand (widget, TRUE);
     gtk_grid_attach (GTK_GRID (grid), widget, 0, 1, 1, 1);
 
     priv->txtpassword = gtk_entry_new();
-    g_object_set (priv->txtpassword, "margin-right", 10, NULL);
+    gtk_widget_set_margin_end(priv->txtpassword,20);
     gtk_entry_set_visibility(GTK_ENTRY(priv->txtpassword),FALSE);
     gtk_widget_set_hexpand (priv->txtpassword, TRUE);
     gtk_grid_attach (GTK_GRID (grid), priv->txtpassword, 1, 1, 1, 1);
 
+    g_object_set (app_dialog, 
+            "title-label", CREDENTIALS_DIALOG_TITLE,
+            "submit-label", CREDENTIALS_DIALOG_LABEL,
+            NULL);
+            
     return grid;
 }
 
@@ -80,10 +89,6 @@ OnvifMgrCredentialsDialog__class_init (OnvifMgrCredentialsDialogClass *klass){
 static void
 OnvifMgrCredentialsDialog__init (OnvifMgrCredentialsDialog *self){
 
-    g_object_set (self, 
-            "title-label", CREDENTIALS_DIALOG_TITLE,
-            "submit-label", CREDENTIALS_DIALOG_LABEL,
-            NULL);
 }
 
 OnvifMgrCredentialsDialog * 
