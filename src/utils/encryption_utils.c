@@ -78,7 +78,7 @@ EncryptionUtils__encrypt(unsigned char * pass,
 
     printHex("Encrypted Chunk", encrypted_data, encrypted_data_length);
 
-    EVP_CIPHER_CTX_cleanup(context);
+    EVP_CIPHER_CTX_free(context);
 
     return encrypted_data_length + tmp_len;
 }
@@ -102,7 +102,7 @@ EncryptionUtils__decrypt(unsigned char * pass,
     EVP_DecryptUpdate(context, decrypted_data, &decrypted_data_len, encrypted_data, encrypted_data_length);
     EVP_DecryptFinal_ex(context, decrypted_data+decrypted_data_len, &tmp_len);
 
-    EVP_CIPHER_CTX_cleanup(context);
+    EVP_CIPHER_CTX_free(context);
 
     return decrypted_data_len + tmp_len;
 }

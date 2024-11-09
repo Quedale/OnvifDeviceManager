@@ -93,9 +93,10 @@ static gboolean
 OnvifMgrProfilesDialog__show_profiles(void * user_data){
   OnvifMgrProfilesDialog * profile_dialog = ONVIFMGR_PROFILESDIALOG(user_data);
   OnvifMgrProfilesDialogPrivate *priv = OnvifMgrProfilesDialog__get_instance_private (profile_dialog);
-
+  OnvifMgrAppDialog__hide_loading(ONVIFMGR_APPDIALOG(profile_dialog));
   //TODO Check fault
-  gtk_widget_destroy(priv->content_pane);
+  if(priv->content_pane && GTK_IS_WIDGET(priv->content_pane)) gtk_widget_destroy(priv->content_pane);
+
   priv->content_pane = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
   for(int i=0;i<OnvifMediaProfiles__get_size(priv->profiles);i++){
       OnvifProfile * profile = OnvifMediaProfiles__get_profile(priv->profiles,i);
@@ -127,26 +128,8 @@ static void
 OnvifMgrProfilesDialog__show (GtkWidget *widget){
   OnvifMgrProfilesDialog * self = ONVIFMGR_PROFILESDIALOG(widget);
   OnvifMgrProfilesDialogPrivate *priv = OnvifMgrProfilesDialog__get_instance_private (self);
-
-  //Clear previous content
-  if(GTK_IS_WIDGET(priv->content_pane)) gtk_widget_destroy(priv->content_pane);
-
-  //Show global loading
-  priv->content_pane = gtk_grid_new();
-  GtkWidget * empty = gtk_label_new("Loading device profiles...");
-  gtk_widget_set_hexpand (empty, TRUE);
-  gtk_grid_attach (GTK_GRID (priv->content_pane), empty, 0, 0, 1, 1);
-
-
-  GtkWidget * slider = gtk_dotted_slider_new(GTK_ORIENTATION_HORIZONTAL, 5,10,1);
-  gtk_widget_set_halign(slider, GTK_ALIGN_CENTER);
-  gtk_widget_set_valign(slider, GTK_ALIGN_CENTER);
-  gtk_grid_attach (GTK_GRID (priv->content_pane), slider, 0, 1, 1, 1);
-
-  gtk_box_pack_start(GTK_BOX(priv->primary_pane), priv->content_pane,     TRUE, FALSE, 0);
-
+  OnvifMgrAppDialog__show_loading(ONVIFMGR_APPDIALOG(self),"Loading device profiles...");
   EventQueue__insert_plain(priv->queue, priv->device, OnvifMgrProfilesDialog__load_profiles,self, NULL);
-  GTK_WIDGET_CLASS (OnvifMgrProfilesDialog__parent_class)->show (widget);
 }
 
 static void
@@ -156,8 +139,7 @@ OnvifMgrProfilesDialog__class_init (OnvifMgrProfilesDialogClass *klass){
   object_class->get_property = OnvifMgrProfilesDialog__get_property;
   OnvifMgrAppDialogClass * app_class = ONVIFMGR_APPDIALOG_CLASS (klass);
   app_class->create_ui = OnvifMgrProfilesDialog__create_ui;
-  GtkWidgetClass * widget_class = GTK_WIDGET_CLASS(klass);
-  widget_class->show = OnvifMgrProfilesDialog__show;
+  app_class->show = OnvifMgrProfilesDialog__show;
 
   GType params[1];
   params[0] = G_TYPE_POINTER;
@@ -177,14 +159,14 @@ OnvifMgrProfilesDialog__class_init (OnvifMgrProfilesDialogClass *klass){
       g_param_spec_object ("queue",
                           "EventQueue",
                           "Pointer to EventQueue parent.",
-                          QUEUE_TYPE_EVENTQUEUE  /* default value */,
+                          QUEUE_TYPE_EVENTQUEUE,
                           G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE);
 
   obj_properties[PROP_DEVICE] =
       g_param_spec_object ("device",
                           "OnvifMgrDeviceRow",
                           "Device to display profiles.",
-                          ONVIFMGR_TYPE_DEVICEROW  /* default value */,
+                          ONVIFMGR_TYPE_DEVICEROW,
                           G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE);
 
   g_object_class_install_properties (object_class,

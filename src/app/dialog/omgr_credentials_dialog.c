@@ -74,15 +74,12 @@ OnvifMgrCredentialsDialog__show (GtkWidget *widget){
     //Clear previous credentials
     gtk_entry_set_text(GTK_ENTRY(priv->txtuser),"");
     gtk_entry_set_text(GTK_ENTRY(priv->txtpassword),"");
-
-    GTK_WIDGET_CLASS (OnvifMgrCredentialsDialog__parent_class)->show (widget);
 }
 
 static void
 OnvifMgrCredentialsDialog__class_init (OnvifMgrCredentialsDialogClass *klass){
     OnvifMgrAppDialogClass * app_class = ONVIFMGR_APPDIALOG_CLASS (klass);
-    GtkWidgetClass * widget_class = GTK_WIDGET_CLASS(klass);
-    widget_class->show = OnvifMgrCredentialsDialog__show;
+    app_class->show = OnvifMgrCredentialsDialog__show;
     app_class->create_ui = OnvifMgrCredentialsDialog__create_ui;
 }
 

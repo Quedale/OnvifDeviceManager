@@ -15,7 +15,7 @@ bin_PROGRAMS = onvifmgr
 EXTRA_PROGRAMS = gifdemo overlaytest queuedemo csssliderdemo playerdemo cssfilesliderdemo gtksliderdemo omgrdevicedemo gtkstyledimagedemo omgrdialogdemo encryptiondemo test
 
 encryptiondemo_SOURCES = $(top_srcdir)/src/demo/encryptiondemo.c \
-					$(top_srcdir)/src/app/encryption_utils.c
+					$(top_srcdir)/src/utils/encryption_utils.c
 encryptiondemo_LDFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs  cutils` -lcrypto
 
 playerdemo_SOURCES = $(top_srcdir)/src/demo/player-demo.c \
@@ -53,7 +53,8 @@ onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c \
 					$(top_srcdir)/src/app/settings/app_settings_discovery.c \
 					$(top_srcdir)/src/app/settings/app_settings_stream.c \
 					$(top_srcdir)/src/app/settings/app_settings.c \
-					$(top_srcdir)/src/app/c_ownable_interface.c \
+					$(top_srcdir)/src/utils/c_ownable_interface.c \
+					$(top_srcdir)/src/utils/omgr_serializable_interface.c \
 					$(top_srcdir)/src/app/gtkbinaryimage.c \
 					$(top_srcdir)/src/app/gtkstyledimage.c \
 					$(top_srcdir)/src/gst/gst_plugin_utils.c \
@@ -96,7 +97,8 @@ csssliderdemo_LDFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs gtk+
 
 omgrdevicedemo_SOURCES = $(top_srcdir)/src/demo/omgr-device-demo.c \
 						$(top_srcdir)/src/app/gui_utils.c \
-						$(top_srcdir)/src/app/c_ownable_interface.c \
+						$(top_srcdir)/src/utils/c_ownable_interface.c \
+						$(top_srcdir)/src/utils/omgr_serializable_interface.c \
 						$(top_srcdir)/src/app/gtkstyledimage.c \
 						$(top_srcdir)/src/app/gtkbinaryimage.c \
 					 	$(top_srcdir)/src/app/omgr_device_row.c
@@ -105,7 +107,8 @@ omgrdevicedemo_LDADD = save.o locked-icon.o warning.o
 
 omgrdialogdemo_SOURCES = $(top_srcdir)/src/demo/omgr-dialog-demo.c \
 						$(top_srcdir)/src/app/gui_utils.c \
-						$(top_srcdir)/src/app/c_ownable_interface.c \
+						$(top_srcdir)/src/utils/c_ownable_interface.c \
+						$(top_srcdir)/src/utils/omgr_serializable_interface.c \
 						$(top_srcdir)/src/app/gtkstyledimage.c \
 						$(top_srcdir)/src/app/gtkbinaryimage.c \
 					 	$(top_srcdir)/src/app/omgr_device_row.c \
@@ -115,7 +118,11 @@ omgrdialogdemo_SOURCES = $(top_srcdir)/src/demo/omgr-dialog-demo.c \
 						$(top_srcdir)/src/app/dialog/omgr_truststore_dialog.c \
 						$(top_srcdir)/src/animations/gtk/gtk_dotted_slider_widget.c \
 						$(top_srcdir)/src/animations/gtk/custom_gtk_revealer.c \
-						$(top_srcdir)/src/animations/gtk/custom_gtk_progress_tracker.c
+						$(top_srcdir)/src/animations/gtk/custom_gtk_progress_tracker.c \
+						$(top_srcdir)/src/queue/event_queue.c \
+						$(top_srcdir)/src/queue/queue_event.c \
+						$(top_srcdir)/src/queue/queue_thread.c
+
 omgrdialogdemo_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0 cutils onvifsoap libntlm` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
 omgrdialogdemo_LDADD = save.o locked-icon.o warning.o
 

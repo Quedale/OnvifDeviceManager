@@ -6,7 +6,7 @@ typedef struct _OnvifMgrDeviceRow OnvifMgrDeviceRow;
 #include <gtk/gtk.h>
 #include "onvif_device.h"
 #include "onvif_app.h"
-#include "c_ownable_interface.h"
+#include "../utils/c_ownable_interface.h"
 
 G_BEGIN_DECLS
 

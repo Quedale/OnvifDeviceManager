@@ -3,6 +3,7 @@
 #include "clogger.h"
 #include "gui_utils.h"
 #include "gtkstyledimage.h"
+#include "../utils/omgr_serializable_interface.h"
 
 #define OMGR_DEVICE_PARAM_READWRITE G_PARAM_READWRITE|G_PARAM_STATIC_NAME|G_PARAM_STATIC_NICK|G_PARAM_STATIC_BLURB
 
@@ -44,9 +45,12 @@ typedef struct {
 static guint signals[LAST_SIGNAL] = { 0 };
 
 static void OnvifMgrDeviceRow__ownable_interface_init (COwnableObjectInterface *iface);
+static void OnvifMgrDeviceRow__serializable_interface_init (OnvifMgrSerializableInterface *iface);
 
-G_DEFINE_TYPE_WITH_CODE(OnvifMgrDeviceRow, OnvifMgrDeviceRow_, GTK_TYPE_LIST_BOX_ROW, G_ADD_PRIVATE (OnvifMgrDeviceRow)
-                                    G_IMPLEMENT_INTERFACE (COWNABLE_TYPE_OBJECT,OnvifMgrDeviceRow__ownable_interface_init))
+G_DEFINE_TYPE_WITH_CODE(OnvifMgrDeviceRow, OnvifMgrDeviceRow_, GTK_TYPE_LIST_BOX_ROW, 
+                                    G_ADD_PRIVATE (OnvifMgrDeviceRow)
+                                    G_IMPLEMENT_INTERFACE (COWNABLE_TYPE_OBJECT,OnvifMgrDeviceRow__ownable_interface_init)
+                                    G_IMPLEMENT_INTERFACE (OMGR_TYPE_SERIALIZABLE,OnvifMgrDeviceRow__serializable_interface_init))
 
 static void OnvifMgrDeviceRow_change_parent (OnvifMgrDeviceRow * self){
     OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
@@ -81,6 +85,32 @@ OnvifMgrDeviceRow__ownable_interface_init (COwnableObjectInterface *iface)
   iface->disown = OnvifMgrDeviceRow_disown;
 }
 
+static int 
+OnvifMgrDeviceRow__serialize (OnvifMgrSerializable  *self, unsigned char * output){
+    //TODO Convert to binary
+    //sizeof(int) url length (max 2,048)
+    //URL are max characters
+    //sizeof(int) user length
+    //User are theoretically unlimited length
+    //another sizeof(int) passlength
+    //Pass are theoretically unlimited length
+    C_FATAL("Serialize");
+    return 0;
+}
+
+static OnvifMgrSerializable * 
+OnvifMgrDeviceRow__unserialize (unsigned char * data, int length){
+    //TODO Convert binary to OnvifMgrDeviceRow
+    C_FATAL("unserialize");
+    return NULL;
+}
+
+static void
+OnvifMgrDeviceRow__serializable_interface_init (OnvifMgrSerializableInterface *iface)
+{
+    iface->serialize = OnvifMgrDeviceRow__serialize;
+    iface->unserialize = OnvifMgrDeviceRow__unserialize;
+}
 
 static GtkWidget * 
 OnvifMgrDeviceRow__create_save_btn(OnvifMgrDeviceRow * self){

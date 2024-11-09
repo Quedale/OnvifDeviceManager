@@ -443,19 +443,25 @@ OnvifMgrAppDialog__set_focus_child (GtkContainer * container, GtkWidget	 *child)
 
 static void
 OnvifMgrAppDialog__show (GtkWidget * widget){
-    OnvifMgrAppDialog *self = ONVIFMGR_APPDIALOG(widget);
-    OnvifMgrAppDialogPrivate *priv = OnvifMgrAppDialog__get_instance_private (self);
-    //Conncet keyboard handler. ESC = Cancel, Enter/Return = Login
-    GtkWidget *window = gtk_widget_get_toplevel (GTK_WIDGET(self));
-    if (gtk_widget_is_toplevel (window)){  
-        gtk_widget_add_events(window, GDK_KEY_PRESS_MASK);
-        priv->keysignalid = g_signal_connect (G_OBJECT (window), "key_press_event", G_CALLBACK (OnvifMgrAppDialog__keypress_function), self);
-    }
-
-    //Prevent overlayed widget from getting focus
-    GtkWidget *parent = gtk_widget_get_parent(GTK_WIDGET(self));
-    gtk_container_foreach (GTK_CONTAINER (parent), (GtkCallback)OnvifMgrAppDialog__set_onlyfocus, self);
+    int visible_before = gtk_widget_is_visible(widget);
     GTK_WIDGET_CLASS (OnvifMgrAppDialog__parent_class)->show (widget);
+    if(visible_before != gtk_widget_is_visible(widget)){
+        OnvifMgrAppDialog *self = ONVIFMGR_APPDIALOG(widget);
+        OnvifMgrAppDialogPrivate *priv = OnvifMgrAppDialog__get_instance_private (self);
+        //Conncet keyboard handler. ESC = Cancel, Enter/Return = Login
+        GtkWidget *window = gtk_widget_get_toplevel (GTK_WIDGET(self));
+        if (gtk_widget_is_toplevel (window)){  
+            gtk_widget_add_events(window, GDK_KEY_PRESS_MASK);
+            priv->keysignalid = g_signal_connect (G_OBJECT (window), "key_press_event", G_CALLBACK (OnvifMgrAppDialog__keypress_function), self);
+        }
+
+        //Prevent overlayed widget from getting focus
+        GtkWidget *parent = gtk_widget_get_parent(GTK_WIDGET(self));
+        gtk_container_foreach (GTK_CONTAINER (parent), (GtkCallback)OnvifMgrAppDialog__set_onlyfocus, self);
+
+        OnvifMgrAppDialogClass *klass = ONVIFMGR_APPDIALOG_GET_CLASS (self);
+        if(klass->show) klass->show(widget);
+    }
 }
 
 static void

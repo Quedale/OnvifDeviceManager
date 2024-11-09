@@ -3,6 +3,7 @@
 
 #include <gtk/gtk.h>
 #include "omgr_app_dialog.h"
+#include "../../queue/event_queue.h"
 
 G_BEGIN_DECLS
 
@@ -19,7 +20,7 @@ struct _OnvifMgrTrustStoreDialogClass
     OnvifMgrAppDialogClass parent;
 };
 
-OnvifMgrTrustStoreDialog * OnvifMgrTrustStoreDialog__new();
+OnvifMgrTrustStoreDialog * OnvifMgrTrustStoreDialog__new(EventQueue * queue);
 
 G_END_DECLS
 

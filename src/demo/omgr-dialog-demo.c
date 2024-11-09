@@ -51,7 +51,10 @@ int main(int argc, char *argv[])
 
     // OnvifMgrCredentialsDialog * dialog = OnvifMgrCredentialsDialog__new();
     // OnvifMgrAddDialog * dialog = OnvifMgrAddDialog__new();
-    OnvifMgrTrustStoreDialog * dialog = OnvifMgrTrustStoreDialog__new();
+
+    EventQueue * queue = EventQueue__new();
+    EventQueue__start(queue);
+    OnvifMgrTrustStoreDialog * dialog = OnvifMgrTrustStoreDialog__new(queue);
     g_object_set (dialog,   "userdata", omgr_device, 
                             "self-destroy", FALSE, //Setting self-destroy to false so that we can re-use the dialog after its closed
                         NULL);

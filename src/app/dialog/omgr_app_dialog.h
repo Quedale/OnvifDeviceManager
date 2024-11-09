@@ -19,6 +19,7 @@ struct _OnvifMgrAppDialogClass
 {
     GtkGridClass parent;
     GtkWidget * (*create_ui)(OnvifMgrAppDialog *);
+    void (* show) (GtkWidget *widget);
 };
 
 OnvifMgrAppDialog * OnvifMgrAppDialog__new();

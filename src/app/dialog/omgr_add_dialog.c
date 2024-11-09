@@ -143,7 +143,7 @@ OnvifMgrAddDialog__create_ui(OnvifMgrAppDialog * app_dialog){
     GtkWidget* vbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_box_pack_start(GTK_BOX(vbox), priv->txtport, FALSE, FALSE, 0);
     gtk_grid_attach (GTK_GRID (grid), vbox, 1, 3, 1, 1);
-    
+
     widget = gtk_label_new("HTTPS :");
     gtk_widget_set_hexpand (widget, TRUE);
     gtk_grid_attach (GTK_GRID (grid), widget, 0, 2, 1, 1);
@@ -200,16 +200,13 @@ OnvifMgrAddDialog__show (GtkWidget *widget){
     gtk_entry_set_text(GTK_ENTRY(priv->txtpass),"");
     g_object_set(self,"error",NULL,NULL);
     gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON(priv->chkhttps),FALSE);
-
-    GTK_WIDGET_CLASS (OnvifMgrAddDialog__parent_class)->show (widget);
 }
 
 static void
 OnvifMgrAddDialog__class_init (OnvifMgrAddDialogClass *klass){
     OnvifMgrAppDialogClass * app_class = ONVIFMGR_APPDIALOG_CLASS (klass);
     app_class->create_ui = OnvifMgrAddDialog__create_ui;
-    GtkWidgetClass * widget_class = GTK_WIDGET_CLASS(klass);
-    widget_class->show = OnvifMgrAddDialog__show;
+    app_class->show = OnvifMgrAddDialog__show;
 }
 
 static void
