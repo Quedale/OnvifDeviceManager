@@ -456,47 +456,33 @@ gboolean OnvifMgrDeviceRow__is_selected(OnvifMgrDeviceRow * self){
     return gtk_list_box_row_is_selected(GTK_LIST_BOX_ROW(self));
 }
 
-void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
-    g_return_if_fail (self != NULL);
-    g_return_if_fail (ONVIFMGR_IS_DEVICEROW (self));
-    ONVIFMGR_DEVICEROW_TRACE("%s OnvifMgrDeviceRow__load_thumbnail",self);
-    GtkWidget *image = NULL;
-    GError * error = NULL;
-    OnvifSnapshot * snapshot = NULL;
-
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
-        C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
-        return;
-    }
-    
+static gboolean
+OnvifMgrDeviceRow__display_snapshot(void * user_data){
+    void ** arr = (void**)user_data;
+    OnvifMgrDeviceRow * self = ONVIFMGR_DEVICEROW(arr[0]);
+    OnvifSnapshot * snapshot = arr[1];
     OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
+    GError * error = NULL;
 
-    if(OnvifDevice__is_authenticated(priv->device)){
-        OnvifMediaService * media_service = OnvifDevice__get_media_service(priv->device);
-        snapshot = OnvifMediaService__getSnapshot(media_service,OnvifProfile__get_index(priv->profile));
-        SoapFault * fault = SoapObject__get_fault(SOAP_OBJECT(snapshot));
-        switch(*fault){
-            case SOAP_FAULT_NONE:
-                image = GtkBinaryImage__new((unsigned char *)OnvifSnapshot__get_buffer(snapshot),OnvifSnapshot__get_size(snapshot), -1, 40, error);
-                break;
-            case SOAP_FAULT_ACTION_NOT_SUPPORTED:
-                goto unsupported;
-            case SOAP_FAULT_CONNECTION_ERROR:
-            case SOAP_FAULT_NOT_VALID:
-            case SOAP_FAULT_UNAUTHORIZED:
-            case SOAP_FAULT_UNEXPECTED:
-            default:
-                goto warning;
-        }
-    } else {
-        image = GtkStyledImage__new((unsigned char *)_binary_locked_icon_png_start,_binary_locked_icon_png_end - _binary_locked_icon_png_start, 40, 40, error);
-    }
-    ONVIFMGR_DEVICEROW_TRACE("%s OnvifMgrDeviceRow__load_thumbnail - img created",self);
-
-    //Check is device is still valid. (User performed scan before snapshot finished)
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
-        C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
+        C_TRAIL("OnvifMgrDeviceRow__display_snapshot - invalid device");
         goto exit;
+    }
+
+    GtkWidget *image = NULL;
+    SoapFault * fault = SoapObject__get_fault(SOAP_OBJECT(snapshot));
+    switch(*fault){
+        case SOAP_FAULT_NONE:
+            image = GtkBinaryImage__new((unsigned char *)OnvifSnapshot__get_buffer(snapshot),OnvifSnapshot__get_size(snapshot), -1, 40, error);
+            break;
+        case SOAP_FAULT_ACTION_NOT_SUPPORTED:
+            goto unsupported;
+        case SOAP_FAULT_CONNECTION_ERROR:
+        case SOAP_FAULT_NOT_VALID:
+        case SOAP_FAULT_UNAUTHORIZED:
+        case SOAP_FAULT_UNEXPECTED:
+        default:
+            goto warning;
     }
 
     //Attempt to get downloaded pixbuf or locked icon
@@ -515,7 +501,7 @@ void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
 warning:
     //Check is device is still valid. (User performed scan before snapshot finished)
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
-        C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
+        C_TRAIL("OnvifMgrDeviceRow__display_snapshot - invalid device");
         goto exit;
     }
 
@@ -540,7 +526,7 @@ warning:
     if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
         gui_update_widget_image(image,priv->image_handle);
     } else {
-        ONVIFMGR_DEVICEROW_TRAIL("%s OnvifMgrDeviceRow__load_thumbnail invalid device",self);
+        ONVIFMGR_DEVICEROW_TRAIL("%s OnvifMgrDeviceRow__display_snapshot invalid device",self);
     }
     goto exit;
 
@@ -551,9 +537,60 @@ unsupported:
         priv->image_handle = NULL;
     }
 exit:
+    free(user_data);
     if(snapshot)
         g_object_unref(snapshot);
 
+    ONVIFMGR_DEVICEROW_TRACE("%s OnvifMgrDeviceRow__display_snapshot done",self);
+    return FALSE;
+}
+
+static gboolean
+OnvifMgrDeviceRow__display_locked(void * user_data){
+    OnvifMgrDeviceRow * self = ONVIFMGR_DEVICEROW(user_data);
+    OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
+    GError * error = NULL;
+
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
+        C_TRAIL("OnvifMgrDeviceRow__display_locked - invalid device");
+        return FALSE;
+    }
+    
+    GtkWidget *image = GtkStyledImage__new((unsigned char *)_binary_locked_icon_png_start,_binary_locked_icon_png_end - _binary_locked_icon_png_start, 40, 40, error);
+    gtk_container_foreach (GTK_CONTAINER (priv->image_handle), (GtkCallback)gui_widget_destroy, NULL);
+    gtk_container_add (GTK_CONTAINER (priv->image_handle), image);
+    gtk_widget_show (image);
+
+    ONVIFMGR_DEVICEROW_TRACE("%s OnvifMgrDeviceRow__display_locked",self);
+    return FALSE;
+}
+
+void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (ONVIFMGR_IS_DEVICEROW (self));
+    ONVIFMGR_DEVICEROW_TRACE("%s OnvifMgrDeviceRow__load_thumbnail",self);
+
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
+        C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
+        return;
+    }
+    
+    OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
+
+    if(OnvifDevice__is_authenticated(priv->device)){
+        OnvifMediaService * media_service = OnvifDevice__get_media_service(priv->device);
+        OnvifSnapshot * snapshot = OnvifMediaService__getSnapshot(media_service,OnvifProfile__get_index(priv->profile));
+        if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
+            C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
+            return;
+        }
+        void ** data = malloc(sizeof(void*)*2);
+        data[0] = self;
+        data[1] = snapshot;
+        g_idle_add(OnvifMgrDeviceRow__display_snapshot,data);
+    } else {
+        g_idle_add(OnvifMgrDeviceRow__display_locked,self);
+    }
     ONVIFMGR_DEVICEROW_TRACE("%s OnvifMgrDeviceRow__load_thumbnail done",self);
 } 
 
