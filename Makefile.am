@@ -119,6 +119,7 @@ omgrdialogdemo_SOURCES = $(top_srcdir)/src/demo/omgr-dialog-demo.c \
 						$(top_srcdir)/src/animations/gtk/gtk_dotted_slider_widget.c \
 						$(top_srcdir)/src/animations/gtk/custom_gtk_revealer.c \
 						$(top_srcdir)/src/animations/gtk/custom_gtk_progress_tracker.c \
+						$(top_srcdir)/src/utils/encryption_utils.c \
 						$(top_srcdir)/src/queue/event_queue.c \
 						$(top_srcdir)/src/queue/queue_event.c \
 						$(top_srcdir)/src/queue/queue_thread.c
