@@ -46,14 +46,18 @@ int main(int argc, char *argv[]){
     unsigned char * pass = (unsigned char *) "SomeSuperSecretKey(Can be non-printable characters)";
     int pass_len = strlen((char*)pass);
 
+
+    //Below 16char length works with extra padding added
+    // char * plain_data = "0123456789ab";
+    //Extra long buffer end up getting chunked
     char * plain_data = "0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz";
 
     int plain_data_len = strlen(plain_data)+1;
-    EncryptionUtils__write_encrypted(pass, pass_len, (unsigned char *) plain_data, plain_data_len,file_path);
+    int encrypted_data_len = EncryptionUtils__write_encrypted(pass, pass_len, (unsigned char *) plain_data, plain_data_len,file_path);
+    C_DEBUG("encrypted_data_len %d",encrypted_data_len);
 
-    int decrypted_data_len = 0;
-    EncryptionUtils__read_encrypted(pass,pass_len,&decrypted_data_len,file_path,encrypted_chunk_callback, NULL);
-
+    int decrypted_data_len = EncryptionUtils__read_encrypted(pass,pass_len,file_path,encrypted_chunk_callback, NULL);
+    C_DEBUG("decrypted_data_len %d",decrypted_data_len);
     // RAND_poll(); //Create new seed
     // unsigned char salt[ENCRYPTION_UTILS_SALT_MAX_LENGTH];
     // RAND_bytes(salt, ENCRYPTION_UTILS_SALT_MAX_LENGTH);

@@ -30,9 +30,8 @@ int EncryptionUtils__write_encrypted(unsigned char * pass,
                                         int data_len, 
                                         char * path);
 
-void EncryptionUtils__read_encrypted(unsigned char * pass, 
+int EncryptionUtils__read_encrypted(unsigned char * pass, 
                                         int pass_len, 
-                                        int * decripted_data_len,
                                         char * path,
                                         int (*callback) (unsigned char * buffer, int buffer_length, void * user_data),
                                         void * user_data);

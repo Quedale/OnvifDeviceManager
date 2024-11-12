@@ -70,11 +70,9 @@ OnvifMgrAppDialog__cancel_event (GtkWidget *widget, OnvifMgrAppDialog * self) {
     if(!priv->closable){
         return;
     }
-    if(priv->self_destroy){
-        gtk_widget_destroy(GTK_WIDGET(self));
-    } else {
-        gtk_widget_hide(GTK_WIDGET(self));
-    }    
+
+    
+    OnvifMgrAppDialog__close(self);
 }
 
 /*
@@ -622,6 +620,8 @@ OnvifMgrAppDialog__show_loading(OnvifMgrAppDialog * self, char * message){
         priv->innerFocusedWidget = gtk_window_get_focus(GTK_WINDOW(window));
     }
 
+    if(GTK_IS_WIDGET(priv->loading_panel)) gtk_widget_destroy(priv->loading_panel);
+
     //Create loading panel
     GtkWidget * widget;
     priv->loading_panel = gtk_grid_new ();
@@ -702,6 +702,19 @@ OnvifMgrAppDialog__hide_loading(OnvifMgrAppDialog * self){
         gtk_widget_grab_focus(priv->innerFocusedWidget);
         priv->innerFocusedWidget = NULL;
     }
+}
+
+gboolean OnvifMgrAppDialog__close(OnvifMgrAppDialog * self){
+    g_return_val_if_fail(self != NULL, FALSE);
+    g_return_val_if_fail(ONVIFMGR_IS_APPDIALOG(self), FALSE);
+    OnvifMgrAppDialogPrivate *priv = OnvifMgrAppDialog__get_instance_private (self);
+    if(priv->self_destroy){
+        gtk_widget_destroy(GTK_WIDGET(self));
+    } else {
+        gtk_widget_hide(GTK_WIDGET(self));
+    }
+
+    return FALSE;
 }
 
 void OnvifMgrAppDialog__add_action_widget(OnvifMgrAppDialog * self, GtkWidget * widget, OnvifMgrAppDialogButtonPosition position){

@@ -25,6 +25,7 @@ struct _OnvifMgrAppDialogClass
 OnvifMgrAppDialog * OnvifMgrAppDialog__new();
 void OnvifMgrAppDialog__show_loading(OnvifMgrAppDialog * self, char * message);
 void OnvifMgrAppDialog__hide_loading(OnvifMgrAppDialog * self);
+gboolean OnvifMgrAppDialog__close(OnvifMgrAppDialog * self);
 void OnvifMgrAppDialog__add_action_widget(OnvifMgrAppDialog * self, GtkWidget * widget, OnvifMgrAppDialogButtonPosition position);
 
 G_END_DECLS

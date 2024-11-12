@@ -10,13 +10,7 @@ static void delete_event_cb (GtkWidget *widget, GdkEvent *event, gpointer data) 
 }
 
 void dialog_login_cb(OnvifMgrAppDialog * app_dialog){
-    char * error = NULL;
-    g_object_get (G_OBJECT (app_dialog), "error", &error, NULL);
-    if(!error || !strlen(error)){
-        g_object_set (app_dialog, "error", "TEST", NULL);
-    } else {
-        g_object_set (app_dialog, "error", NULL, NULL);
-    }
+    C_DEBUG("Submit button clicked");
 }
 
 void demo_clicked (GtkButton* widget, OnvifMgrAppDialog * dialog){
