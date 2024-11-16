@@ -62,10 +62,16 @@ void QueueThread__dispose(GObject * obj){
     G_OBJECT_CLASS (QueueThread__parent_class)->dispose (obj);
 }
 
-static _Thread_local QueueEvent * event_queue;
+static _Thread_local QueueEvent * queue_event;
 static _Thread_local QueueThread * queue_thread;
+
+EventQueue * EventQueue__get_current(){
+    QueueThreadPrivate *priv = QueueThread__get_instance_private (queue_thread);
+    return priv->queue;
+}
+
 QueueEvent * QueueEvent__get_current(){
-    return event_queue;
+    return queue_event;
 }
 
 QueueThread * QueueThread__get_current(){
@@ -74,7 +80,7 @@ QueueThread * QueueThread__get_current(){
 
 void * priv_QueueThread_call(void * data){
     queue_thread = (QueueThread*) data;
-    event_queue = NULL;
+    queue_event = NULL;
     QueueThreadPrivate *priv = QueueThread__get_instance_private (queue_thread);
 
     g_signal_emit (queue_thread, signals[STATE_CHANGED], 0, EVENTQUEUE_STARTED /* details */);
@@ -95,26 +101,26 @@ void * priv_QueueThread_call(void * data){
             goto exit;
         }
 
-        event_queue = EventQueue__pop(priv->queue);
-        if(!event_queue){
+        queue_event = EventQueue__pop(priv->queue);
+        if(!queue_event){
             continue;
         }
         g_signal_emit (queue_thread, signals[STATE_CHANGED], 0, EVENTQUEUE_DISPATCHING /* details */);
         
-        QueueEvent__invoke(event_queue);
-        if(QueueEvent__is_cancelled(event_queue)){
+        QueueEvent__invoke(queue_event);
+        if(QueueEvent__is_cancelled(queue_event)){
             g_signal_emit (queue_thread, signals[STATE_CHANGED], 0, EVENTQUEUE_CANCELLED /* details */);
         } else {
-            QueueEvent__finish(event_queue);
+            QueueEvent__finish(queue_event);
             g_signal_emit (queue_thread, signals[STATE_CHANGED], 0, EVENTQUEUE_DISPATCHED /* details */);
         }
-        QueueEvent__cleanup(event_queue);
-        g_object_unref(event_queue);
-        event_queue = NULL;
+        QueueEvent__cleanup(queue_event);
+        g_object_unref(queue_event);
+        queue_event = NULL;
     }
 
 exit:
-    event_queue = NULL;
+    queue_event = NULL;
     g_signal_emit (queue_thread, signals[STATE_CHANGED], 0, EVENTQUEUE_FINISHED /* details */);
     g_object_unref(queue_thread);
     P_THREAD_EXIT;

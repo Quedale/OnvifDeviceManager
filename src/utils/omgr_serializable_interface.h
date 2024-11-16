@@ -23,7 +23,7 @@ G_DECLARE_INTERFACE (OnvifMgrSerializable, OnvifMgrSerializable_, OMGR, SERIALIZ
 struct _OnvifMgrSerializableInterface
 {
   GTypeInterface parent_iface;
-  int (*serialize) (OnvifMgrSerializable  *self, unsigned char * output);
+  unsigned char * (*serialize) (OnvifMgrSerializable  *self, int * serialized_length);
   OnvifMgrSerializable * (*unserialize) (unsigned char * data, int length);
 };
 
@@ -33,7 +33,7 @@ struct _OnvifMgrSerializableInterfaceClass
   GObjectClass parent_class;
 };
 
-int OnvifMgrSerializable__serialize(OnvifMgrSerializable * self, unsigned char * output);
+unsigned char * OnvifMgrSerializable__serialize(OnvifMgrSerializable * self, int * serialized_length);
 OnvifMgrSerializable * OnvifMgrSerializable__unserialize(GType type, unsigned char * data, int length);
 
 G_END_DECLS

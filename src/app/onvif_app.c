@@ -3,6 +3,7 @@
 #include "dialog/omgr_add_dialog.h"
 #include "dialog/omgr_credentials_dialog.h"
 #include "dialog/omgr_profiles_dialog.h"
+#include "dialog/omgr_encrypted_store.h"
 #include "details/onvif_details.h"
 #include "onvif_nvt.h"
 #include "settings/app_settings.h"
@@ -38,6 +39,7 @@ typedef struct {
     AppSettings * settings;
 
     EventQueue * queue;
+    OnvifMgrEncryptedStore * store;
     GstRtspPlayer * player;
 } OnvifAppPrivate;
 
@@ -172,7 +174,6 @@ void _display_onvif_device(QueueEvent * qevt, void * user_data){
 
     /* Authentication check */
     OnvifDevice__authenticate(odev);
-        
 
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(omgr_device) || QueueEvent__is_cancelled(qevt)){
         return;
@@ -376,11 +377,6 @@ void _onvif_device_add(QueueEvent * qevt, void * user_data){
     OnvifDevice__set_credentials(onvif_dev,OnvifMgrAddDialog__get_user(dialog),OnvifMgrAddDialog__get_pass(dialog));
    
     /* Authentication check */
-    OnvifDeviceService * devserv;
-    OnvifScopes * scopes;
-    char * name;
-    char * hardware;
-    char * location;
     GtkWidget * omgr_device;
 
     SoapFault fault = OnvifDevice__authenticate(onvif_dev);
@@ -395,36 +391,9 @@ void _onvif_device_add(QueueEvent * qevt, void * user_data){
     switch(fault){
         case SOAP_FAULT_NONE:
             //Extract scope
-            devserv = OnvifDevice__get_device_service(onvif_dev);
-            scopes = OnvifDeviceService__getScopes(devserv);
-            fault = *SoapObject__get_fault(SOAP_OBJECT(scopes));
-            switch(fault){
-                case SOAP_FAULT_NONE:
-                    name = OnvifScopes__extract_scope(scopes,"name");
-                    hardware = OnvifScopes__extract_scope(scopes,"hardware");
-                    location = OnvifScopes__extract_scope(scopes,"location");
-
-                    omgr_device = OnvifMgrDeviceRow__new(app, onvif_dev,name,hardware,location);
-                    
-                    gdk_threads_add_idle(G_SOURCE_FUNC(idle_add_device),omgr_device);
-
-                    free(name);
-                    free(hardware);
-                    free(location);
-                    break;
-                case SOAP_FAULT_ACTION_NOT_SUPPORTED:
-                case SOAP_FAULT_CONNECTION_ERROR:
-                case SOAP_FAULT_NOT_VALID:
-                case SOAP_FAULT_UNAUTHORIZED:
-                case SOAP_FAULT_UNEXPECTED:
-                default:
-                    //TODO Invoke from GUI thread
-                    g_object_set (dialog, "error", "Failed to retrieve Device Scopes...", NULL);
-                    g_object_unref(scopes);
-                    goto exit;
-            }
-            //TODO Save manually added camera to settings
-            g_object_unref(scopes);
+            omgr_device = OnvifMgrDeviceRow__new(app, onvif_dev, NULL, NULL, NULL);
+            OnvifMgrDeviceRow__load_scopedata(ONVIFMGR_DEVICEROW(omgr_device));
+            gdk_threads_add_idle(G_SOURCE_FUNC(idle_add_device),omgr_device);
             break;
         case SOAP_FAULT_CONNECTION_ERROR:
             g_object_set (dialog, "error", "Failed to connect...", NULL);
@@ -615,7 +584,7 @@ void OnvifApp__btn_scan_cb (GtkWidget *widget, OnvifApp * app) {
     free(scopes);
 
     //Clearing the list
-    gtk_container_foreach (GTK_CONTAINER (priv->listbox), (GtkCallback)gui_container_remove, priv->listbox);
+    // gtk_container_foreach (GTK_CONTAINER (priv->listbox), (GtkCallback)gui_container_remove, priv->listbox);
 
     //Multiple dispatch in case of packet dropped
     EventQueue__insert(priv->queue, app, _start_onvif_discovery,app, NULL);
@@ -991,7 +960,6 @@ void OnvifApp__create_ui (OnvifApp * app) {
 
     priv->window = main_window;
     gtk_widget_show_all (main_window);
-
 }
 
 void OnvifApp__dispose(GObject * obj){
@@ -1073,6 +1041,25 @@ OnvifApp__ownable_interface_init (COwnableObjectInterface *iface)
 }
 
 static void
+OnvifApp__cancelled_store (OnvifMgrEncryptedStore * store, OnvifApp *self){
+    //TODO Support for no credentials storage file
+    C_WARN("Credentials Store dialog cancelled.");
+    onvif_app_shutdown(self);
+}
+
+static void
+OnvifApp__new_object_store(OnvifMgrEncryptedStore * store, OnvifMgrSerializable * serializable, OnvifApp * app){
+    if(ONVIFMGR_IS_DEVICEROW(serializable)){
+        OnvifMgrDeviceRow * device = ONVIFMGR_DEVICEROW(serializable);
+        ONVIFMGR_DEVICEROW_DEBUG("[%s] Found device from stoage.", device);
+        g_object_set(device, "app", app, NULL);
+        OnvifApp__add_device(app,ONVIFMGR_DEVICEROW(device));
+    } else {
+        C_ERROR("Unknown object type found in store file.");
+    }
+}
+
+static void
 OnvifApp__init (OnvifApp *self)
 {
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (self);
@@ -1098,6 +1085,10 @@ OnvifApp__init (OnvifApp *self)
     g_signal_connect (G_OBJECT(priv->player), "started", G_CALLBACK (OnvifApp__player_started_cb), self);
     
     OnvifApp__create_ui (self);
+    priv->store = OnvifMgrEncryptedStore__new(priv->queue,priv->overlay);
+    g_signal_connect (G_OBJECT (priv->store), "cancel", G_CALLBACK (OnvifApp__cancelled_store), self);
+    g_signal_connect (G_OBJECT (priv->store), "new-object", G_CALLBACK (OnvifApp__new_object_store), self);
+    OnvifMgrEncryptedStore__capture_passphrase(priv->store);
 
     //Defaults 8 paralell event threads.
     //TODO support configuration to modify this
@@ -1120,6 +1111,18 @@ OnvifApp * OnvifApp__new(void){
 void OnvifApp__destroy(OnvifApp* self){
     g_return_if_fail (self != NULL);
     g_return_if_fail (ONVIFMGR_IS_APP (self));
+    OnvifAppPrivate *priv = OnvifApp__get_instance_private (self);
+    
+    GList * childs = gtk_container_get_children(GTK_CONTAINER(priv->listbox));
+    if(childs){
+        int data_saved = OnvifMgrEncryptedStore__save(priv->store,childs);
+        if(data_saved <= 0){
+            C_ERROR("Failed to save camera details.");
+        }
+        g_list_free(childs);
+    }
+
+
     g_object_ref(self);
     COwnableObject__disown(COWNABLE_OBJECT(self)); //Changing owned state, flagging pending events to be ignored
     while(G_IS_OBJECT(self) && G_OBJECT(self)->ref_count > 1){ //Wait for destruction to complete

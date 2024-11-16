@@ -17,11 +17,11 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Logging framework
 - HTTP authentication challenge (Basic, Digest and NTLM)
 - EventQueue for background tasks
+- Encrypted Credential Storage 
 
 # TODO
 - EventQueue GUI (TaskManager)
 - GObject rollout
-- Credential Storage 
 - Edit Onvif device identification
 - Display Onvif network information
 - Display Media information
@@ -115,9 +115,18 @@ sudo dpkg -r onvifmgr
 ```
 sudo make uninstall
 ```
+
+#
 # Note
 I have very little spare time to work on any personal project, so this might take a while.
 This is my very first C project, so I'm learning as I go. 
+
+# 
+# Attributions
+[<img width="20" height="20" src="https://www.flaticon.com/media/dist/min/img/favicon.ico">](https://www.flaticon.com/) [FlatIcon](https://www.flaticon.com/)
+<br/><br/>
+If I missed any attributions, feel free to report it so that I can add it.<br/>
+This is just a hobby project and I didn't mean to steal anything.
 
 # 
 # Feedback is more than welcome

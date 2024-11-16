@@ -10,6 +10,9 @@
     #error "ENCRYPTION_UTILS_SALT_MAX_LENGTH > 16"
 #endif
 
+void EncryptionUtils__printHex(char * title, unsigned char * data, int length);
+void EncryptionUtils__printReadable(unsigned char * data, int length, char * title);
+
 int EncryptionUtils__encrypt(unsigned char * pass, 
                                         int pass_len, 
                                         unsigned char * decrypted_data, 

@@ -4,6 +4,7 @@
 #include <openssl/rand.h>
 #include <math.h>
 #include "clogger.h"
+#include "cstring_utils.h"
 
 #ifndef ENCRYPTION_UTILS_PLAIN_BUFFER_SIZE
     #define ENCRYPTION_UTILS_PLAIN_BUFFER_SIZE 32
@@ -17,9 +18,13 @@
 
 #define ENCRYPTION_UTILS_ENC_BUFFER_SIZE ENCRYPTION_UTILS_PLAIN_BUFFER_SIZE+AES_BLOCK_SIZE
 #define DUMP_SUFIX "-----------------------------------------------"
+#define NULL_CHAR_DISPLAY " - NullChar\n"
 
-static void 
-printHex(char * title, unsigned char * data, int length){
+void 
+EncryptionUtils__printHex(char * title, unsigned char * data, int length){
+    if(c_log_get_level() < C_TRAIL_E){
+        return;
+    }
     int lines = ceil((double)length/(double)16);
     //Extra 64bytes for title buffer
     char dump[length*3 + lines + strlen(DUMP_SUFIX) + strlen(DUMP_SUFIX)+1 + 64];
@@ -32,6 +37,38 @@ printHex(char * title, unsigned char * data, int length){
         if (!(a % 16)) strcat(dump,"\n"); //Newline at every 16th hex
     }
     if (length % 16)  strcat(dump,"\n"); //Add teriminal newline if the last line isn't complete
+    strcat(dump,DUMP_SUFIX);
+    C_TRAIL("%s",dump);
+}
+
+/* ********** WARNING **********
+ *  Printing decrytpted data may 
+ *  export sensitive details like
+ *  credentials.
+ * *****************************
+ */
+void 
+EncryptionUtils__printReadable(unsigned char * data, int length, char * title){
+    if(c_log_get_level() < C_TRAIL_E){
+        return;
+    }
+    int nullcharcount = cstring_occurence_count((const char *)data,length,'\0');
+    //Extra 64bytes for title buffer
+    char dump[length + nullcharcount*strlen(NULL_CHAR_DISPLAY) + strlen(DUMP_SUFIX) + strlen(DUMP_SUFIX)+1 + 64];
+    double split = (strlen(DUMP_SUFIX) - strlen(title) - 2) / (double)2;
+    sprintf(dump,"%.*s ",(int)floor(split),DUMP_SUFIX);
+    strcat(dump,title);
+    sprintf(&dump[strlen(dump)]," %.*s\n",(int)ceil(split),DUMP_SUFIX);
+
+    for(int a = 1; a<=length;a++){
+        if(data[a-1] == '\0'){
+            sprintf(&dump[strlen(dump)],"%s", NULL_CHAR_DISPLAY); //Format hex
+        } else {
+            sprintf(&dump[strlen(dump)],"%c", data[a-1]); //Format hex
+        }
+    }
+
+    strcat(dump,"\n");
     strcat(dump,DUMP_SUFIX);
     C_TRAIL("%s",dump);
 }
@@ -72,17 +109,19 @@ EncryptionUtils__encrypt(unsigned char * pass,
         return -1;
     }
 
-    printHex("Encrypting Chunk", plain_data, plain_data_length);
+    EncryptionUtils__printHex("Encrypting Chunk", plain_data, plain_data_length);
 
     if(plain_data_length >= AES_BLOCK_SIZE){
         int encrypted_data_length = plain_data_length + AES_BLOCK_SIZE;
         int tmp_len = 0;
         if(1 != EVP_EncryptInit_ex(context, NULL, NULL, NULL, NULL)){
             C_ERROR("Failed to initialize EVP Cipher Context");
+            encrypted_data_length = -1;
             goto exit;
         }
         if(1 != EVP_EncryptUpdate(context, encrypted_data, &encrypted_data_length, plain_data, plain_data_length)){
             C_ERROR("Failed to initialize EVP Cipher Context");
+            encrypted_data_length = -1;
             goto exit;
         }
         if(1 != EVP_EncryptFinal_ex(context, encrypted_data+encrypted_data_length, &tmp_len)){
@@ -91,7 +130,7 @@ EncryptionUtils__encrypt(unsigned char * pass,
             goto exit;
         }
 
-        printHex("Encrypted Chunk", encrypted_data, encrypted_data_length);
+        EncryptionUtils__printHex("Encrypted Chunk", encrypted_data, encrypted_data_length);
 
         EVP_CIPHER_CTX_free(context);
 
@@ -116,7 +155,7 @@ EncryptionUtils__encrypt(unsigned char * pass,
             goto exit;
         }
 
-        printHex("Padded Encrypted Chunk", encrypted_data, encrypted_data_length);
+        EncryptionUtils__printHex("Padded Encrypted Chunk", encrypted_data, encrypted_data_length);
 
 exit:
         EVP_CIPHER_CTX_free(context);
@@ -141,11 +180,13 @@ EncryptionUtils__decrypt(unsigned char * pass,
     int tmp_len = 0;
     if(1 != EVP_DecryptInit_ex(context, NULL, NULL, NULL, NULL)){
         C_ERROR("Failed to initialize EVP Cipher Context");
+        decrypted_data_len = -1;
         goto exit;
     }
 
     if(1 != EVP_DecryptUpdate(context, decrypted_data, &decrypted_data_len, encrypted_data, encrypted_data_length)){
         C_ERROR("Failed to update EVP Cipher Context");
+        decrypted_data_len = -1;
         goto exit;
     }
     if(1 != EVP_DecryptFinal_ex(context, decrypted_data+decrypted_data_len, &tmp_len)){
@@ -245,7 +286,6 @@ int EncryptionUtils__read_encrypted(unsigned char * pass,
                 goto drop;
             }
 
-            printHex("Decrypted Chunk", decrypted_data, decripted_data_len);
             if(!callback(decrypted_data, decripted_data_len, user_data)){
                 C_WARN("Decryption aborted by called.");
                 decripted_data_total_len = 0;

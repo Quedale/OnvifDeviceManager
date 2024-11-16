@@ -7,6 +7,13 @@
 
 #define OMGR_DEVICE_PARAM_READWRITE G_PARAM_READWRITE|G_PARAM_STATIC_NAME|G_PARAM_STATIC_NICK|G_PARAM_STATIC_BLURB
 
+#define OMGR_DEVICE_URL_PREFIX "URL:"
+#define OMGR_DEVICE_USER_PREFIX "USER:"
+#define OMGR_DEVICE_PASS_PREFIX "PASS:"
+#define OMGR_DEVICE_NAME_PREFIX "NAME:"
+#define OMGR_DEVICE_HW_PREFIX "HW:"
+#define OMGR_DEVICE_LOC_PREFIX "LOC:"
+
 extern char _binary_locked_icon_png_size[];
 extern char _binary_locked_icon_png_start[];
 extern char _binary_locked_icon_png_end[];
@@ -15,14 +22,24 @@ extern char _binary_warning_png_size[];
 extern char _binary_warning_png_start[];
 extern char _binary_warning_png_end[];
 
-extern char _binary_save_png_size[];
-extern char _binary_save_png_start[];
-extern char _binary_save_png_end[];
+extern char _binary_trash_png_size[];
+extern char _binary_trash_png_start[];
+extern char _binary_trash_png_end[];
+
+enum
+{
+    PROP_APP = 1,
+    PROP_DEVICE = 2,
+    PROP_NAME = 3,
+    PROP_HARDWARE = 4,
+    PROP_LOCATION = 5,
+    N_PROPERTIES
+};
 
 enum {
-  PROFILE_CLICKED,
-  PROFILE_CHANGED,
-  LAST_SIGNAL
+    PROFILE_CLICKED,
+    PROFILE_CHANGED,
+    LAST_SIGNAL
 };
 
 typedef struct {
@@ -43,6 +60,7 @@ typedef struct {
 } OnvifMgrDeviceRowPrivate;
 
 static guint signals[LAST_SIGNAL] = { 0 };
+static GParamSpec *obj_properties[N_PROPERTIES] = { NULL, };
 
 static void OnvifMgrDeviceRow__ownable_interface_init (COwnableObjectInterface *iface);
 static void OnvifMgrDeviceRow__serializable_interface_init (OnvifMgrSerializableInterface *iface);
@@ -85,24 +103,126 @@ OnvifMgrDeviceRow__ownable_interface_init (COwnableObjectInterface *iface)
   iface->disown = OnvifMgrDeviceRow_disown;
 }
 
-static int 
-OnvifMgrDeviceRow__serialize (OnvifMgrSerializable  *self, unsigned char * output){
-    //TODO Convert to binary
-    //sizeof(int) url length (max 2,048)
-    //URL are max characters
-    //sizeof(int) user length
-    //User are theoretically unlimited length
-    //another sizeof(int) passlength
-    //Pass are theoretically unlimited length
-    C_FATAL("Serialize");
-    return 0;
+static unsigned char * 
+OnvifMgrDeviceRow__serialize (OnvifMgrSerializable  *self, int * serialized_length){
+    OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (ONVIFMGR_DEVICEROW(self));
+    OnvifDeviceService * device_service = OnvifDevice__get_device_service(priv->device);
+    char * url = OnvifBaseService__get_endpoint((OnvifBaseService*)device_service);
+    OnvifCredentials * credentials = OnvifDevice__get_credentials(priv->device);
+
+    unsigned char * output = NULL;
+    if(credentials){
+        char * user = OnvifCredentials__get_username(credentials);
+        char * pass = OnvifCredentials__get_password(credentials);
+        const char * location = gtk_label_get_text(GTK_LABEL(priv->lbl_location));
+        const char * hardware = gtk_label_get_text(GTK_LABEL(priv->lbl_hardware));
+        const char * name = gtk_label_get_text(GTK_LABEL(priv->lbl_name));
+
+        int len = strlen(OMGR_DEVICE_URL_PREFIX);
+        len += strlen(url) + 1;
+        if(user && strlen(user)) {
+            len += strlen(OMGR_DEVICE_USER_PREFIX);
+            len += strlen(user) +1;
+        }
+        if(pass && strlen(pass)) {
+            len += strlen(OMGR_DEVICE_PASS_PREFIX);
+            len += strlen(pass) +1;
+        }
+
+        len += strlen(OMGR_DEVICE_NAME_PREFIX);
+        len += strlen(name) + 1;
+        len += strlen(OMGR_DEVICE_HW_PREFIX);
+        len += strlen(hardware) + 1;
+        len += strlen(OMGR_DEVICE_LOC_PREFIX);
+        len += strlen(location) + 1;
+
+        output = malloc(len);
+        *serialized_length = 0;
+
+        memcpy(output,OMGR_DEVICE_URL_PREFIX,strlen(OMGR_DEVICE_URL_PREFIX));
+        *serialized_length += strlen(OMGR_DEVICE_URL_PREFIX);
+        memcpy(&output[*serialized_length],url,strlen(url) + 1);
+        *serialized_length += strlen(url)+1;
+
+        memcpy(&output[*serialized_length],OMGR_DEVICE_NAME_PREFIX,strlen(OMGR_DEVICE_NAME_PREFIX));
+        *serialized_length += strlen(OMGR_DEVICE_NAME_PREFIX);
+        memcpy(&output[*serialized_length],name,strlen(name)+1);
+        *serialized_length += strlen(name)+1;
+
+        memcpy(&output[*serialized_length],OMGR_DEVICE_HW_PREFIX,strlen(OMGR_DEVICE_HW_PREFIX));
+        *serialized_length += strlen(OMGR_DEVICE_HW_PREFIX);
+        memcpy(&output[*serialized_length],hardware,strlen(hardware)+1);
+        *serialized_length += strlen(hardware)+1;
+
+        memcpy(&output[*serialized_length],OMGR_DEVICE_LOC_PREFIX,strlen(OMGR_DEVICE_LOC_PREFIX));
+        *serialized_length += strlen(OMGR_DEVICE_LOC_PREFIX);
+        memcpy(&output[*serialized_length],location,strlen(location)+1);
+        *serialized_length += strlen(location)+1;
+
+        if(user){
+            memcpy(&output[*serialized_length],OMGR_DEVICE_USER_PREFIX,strlen(OMGR_DEVICE_USER_PREFIX));
+            *serialized_length += strlen(OMGR_DEVICE_USER_PREFIX);
+            memcpy(&output[*serialized_length],user,strlen(user)+1);
+            *serialized_length += strlen(user)+1;
+        }
+        if(pass){
+            memcpy(&output[*serialized_length],OMGR_DEVICE_PASS_PREFIX,strlen(OMGR_DEVICE_PASS_PREFIX));
+            *serialized_length += strlen(OMGR_DEVICE_PASS_PREFIX);
+            memcpy(&output[*serialized_length],pass,strlen(pass)+1);
+            *serialized_length += strlen(pass)+1;
+        }
+
+    } else {
+        output = malloc(strlen(url)+1);
+        *serialized_length = strlen(url)+1;
+        memcpy(output,url,*serialized_length);
+    }
+
+    return output;
 }
 
 static OnvifMgrSerializable * 
 OnvifMgrDeviceRow__unserialize (unsigned char * data, int length){
-    //TODO Convert binary to OnvifMgrDeviceRow
-    C_FATAL("unserialize");
-    return NULL;
+    int data_read = 0;
+    char * url = NULL;
+    char * user = NULL;
+    char * pass = NULL;
+    char * name = NULL;
+    char * location = NULL;
+    char * hardware = NULL;
+
+    while(data_read <= length){
+        int line_len = strlen((char*)&data[data_read])+1;
+
+        if(strncmp((char *)&data[data_read], OMGR_DEVICE_URL_PREFIX, strlen(OMGR_DEVICE_URL_PREFIX)) == 0){
+            url = (char*) &data[data_read + strlen(OMGR_DEVICE_URL_PREFIX)];
+        } else if(strncmp((char *)&data[data_read], OMGR_DEVICE_USER_PREFIX, strlen(OMGR_DEVICE_USER_PREFIX)) == 0){
+            user = (char*) &data[data_read + strlen(OMGR_DEVICE_USER_PREFIX)];
+        } else if(strncmp((char *)&data[data_read], OMGR_DEVICE_PASS_PREFIX, strlen(OMGR_DEVICE_PASS_PREFIX)) == 0){
+            pass = (char*) &data[data_read + strlen(OMGR_DEVICE_PASS_PREFIX)];
+        } else if(strncmp((char *)&data[data_read], OMGR_DEVICE_NAME_PREFIX, strlen(OMGR_DEVICE_NAME_PREFIX)) == 0){
+            name = (char*) &data[data_read + strlen(OMGR_DEVICE_NAME_PREFIX)];
+        } else if(strncmp((char *)&data[data_read], OMGR_DEVICE_HW_PREFIX, strlen(OMGR_DEVICE_HW_PREFIX)) == 0){
+            hardware = (char*) &data[data_read + strlen(OMGR_DEVICE_HW_PREFIX)];
+        } else if(strncmp((char *)&data[data_read], OMGR_DEVICE_LOC_PREFIX, strlen(OMGR_DEVICE_LOC_PREFIX)) == 0){
+            location = (char*) &data[data_read + strlen(OMGR_DEVICE_LOC_PREFIX)];
+        } 
+        data_read += line_len;
+    }
+
+    g_return_val_if_fail(url != NULL,NULL);
+
+    OnvifDevice * onvif_dev = OnvifDevice__create(url);
+    if(!OnvifDevice__is_valid(onvif_dev)){
+        C_ERROR("Invalid URL provided\n");
+        OnvifDevice__destroy(onvif_dev);
+        return NULL;
+    }
+    OnvifCredentials * credentials = OnvifDevice__get_credentials(onvif_dev);
+    if(user) OnvifCredentials__set_username(credentials,user);
+    if(pass) OnvifCredentials__set_password(credentials,pass);
+
+    return OMGR_SERIALIZABLE(OnvifMgrDeviceRow__new (NULL, onvif_dev, name, hardware, location));
 }
 
 static void
@@ -112,13 +232,18 @@ OnvifMgrDeviceRow__serializable_interface_init (OnvifMgrSerializableInterface *i
     iface->unserialize = OnvifMgrDeviceRow__unserialize;
 }
 
+static void 
+OnvifMgrDeviceRow__trash (GtkWidget * widget, OnvifMgrDeviceRow * device){
+    gtk_widget_destroy(GTK_WIDGET(device));
+}
+
 static GtkWidget * 
 OnvifMgrDeviceRow__create_save_btn(OnvifMgrDeviceRow * self){
     GError *error = NULL;
     GtkWidget *button = gtk_button_new();
-    GtkWidget * image = GtkStyledImage__new((unsigned char *)_binary_save_png_start, _binary_save_png_end - _binary_save_png_start, 20, 20, error);
+    GtkWidget * image = GtkStyledImage__new((unsigned char *)_binary_trash_png_start, _binary_trash_png_end - _binary_trash_png_start, 20, 20, error);
 
-    gtk_widget_set_sensitive(button,FALSE);
+    g_signal_connect (G_OBJECT(button), "clicked", G_CALLBACK (OnvifMgrDeviceRow__trash), self);
     gtk_button_set_always_show_image(GTK_BUTTON(button),TRUE);
 
     if(image){
@@ -156,7 +281,7 @@ OnvifMgrDeviceRow__create_buttons(OnvifMgrDeviceRow * self){
 
     priv->btn_save = OnvifMgrDeviceRow__create_save_btn(self);
     g_object_set (priv->btn_save, "margin-end", 3, NULL);
-    gtk_widget_set_sensitive (priv->btn_save, FALSE);
+
     gtk_box_pack_start(GTK_BOX(hbox), priv->btn_save,     FALSE, FALSE, 0);
 
     priv->btn_profile = gtk_button_new_with_label("");
@@ -182,6 +307,12 @@ OnvifMgrDeviceRow__create_layout(OnvifMgrDeviceRow * self){
     GtkWidget * grid = gtk_grid_new();
 
     priv->lbl_name = gtk_label_new (NULL);
+    PangoAttrList *const Attrs = pango_attr_list_new();
+    PangoAttribute *const boldAttr = pango_attr_weight_new(PANGO_WEIGHT_BOLD);
+    pango_attr_list_insert(Attrs, boldAttr);
+    gtk_label_set_attributes(GTK_LABEL(priv->lbl_name),Attrs);
+    pango_attr_list_unref(Attrs);
+
     g_object_set (priv->lbl_name, "margin-end", 5, NULL);
     gtk_widget_set_hexpand (priv->lbl_name, TRUE);
     gtk_grid_attach (GTK_GRID (grid), priv->lbl_name, 0, 0, 2, 1);
@@ -239,10 +370,12 @@ static void
 OnvifMgrDeviceRow__init (OnvifMgrDeviceRow * self)
 {
     OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
+    priv->app = NULL;
     priv->device = NULL;  
     priv->profile = NULL;
     priv->owned = TRUE;
-    
+    priv->init = FALSE;
+
     g_signal_connect (self, "notify::parent", G_CALLBACK (OnvifMgrDeviceRow_change_parent), NULL);
 
     /* initialize all public and private members to reasonable default values.
@@ -297,9 +430,78 @@ OnvifMgrDeviceRow__unrealize (GtkWidget *widget)
 }
 
 static void
+OnvifMgrDeviceRow__set_property (GObject      *object,
+                          guint         prop_id,
+                          const GValue *value,
+                          GParamSpec   *pspec){
+    OnvifMgrDeviceRow * self = ONVIFMGR_DEVICEROW (object);
+    OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
+
+    switch (prop_id){
+        case PROP_APP:
+            priv->app = ONVIFMGR_APP(g_value_get_object (value));
+            break;
+        case PROP_DEVICE:
+            if(priv->device) OnvifDevice__destroy(priv->device);
+            priv->device = g_value_get_pointer (value);
+            if(priv->device){
+                char * host = OnvifDevice__get_host(priv->device);
+                gui_set_label_text(priv->lbl_host,host);
+                free(host);
+            } else {
+                gui_set_label_text(priv->lbl_host,NULL);
+            }
+            break;
+        case PROP_NAME:
+            gui_set_label_text(priv->lbl_name,(char*)g_value_get_string(value));
+            break;
+        case PROP_HARDWARE:
+            gui_set_label_text(priv->lbl_hardware,(char*)g_value_get_string(value));
+            return;
+        case PROP_LOCATION:
+            gui_set_label_text(priv->lbl_location,(char*)g_value_get_string(value));
+            return;
+        default:
+            G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+            break;
+    }
+}
+
+static void
+OnvifMgrDeviceRow__get_property (GObject    *object,
+                          guint       prop_id,
+                          GValue     *value,
+                          GParamSpec *pspec){
+    OnvifMgrDeviceRow *thread = ONVIFMGR_DEVICEROW (object);
+    OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (thread);
+    switch (prop_id){
+        case PROP_APP:
+            g_value_set_object (value, priv->app);
+            break;
+        case PROP_DEVICE:
+            g_value_set_pointer (value, priv->device);
+            break;
+        case PROP_NAME:
+            g_value_set_string(value,gtk_label_get_text(GTK_LABEL(priv->lbl_name)));
+            break;
+        case PROP_HARDWARE:
+            g_value_set_string(value,gtk_label_get_text(GTK_LABEL(priv->lbl_hardware)));
+            return;
+        case PROP_LOCATION:
+            g_value_set_string(value,gtk_label_get_text(GTK_LABEL(priv->lbl_location)));
+            return;
+        default:
+            G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+            break;
+    }
+}
+
+static void
 OnvifMgrDeviceRow__class_init (OnvifMgrDeviceRowClass * klass)
 {
-    // GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    object_class->set_property = OnvifMgrDeviceRow__set_property;
+    object_class->get_property = OnvifMgrDeviceRow__get_property;
     GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(klass);
     widget_class->realize = OnvifMgrDeviceRow__realize;
     widget_class->unrealize = OnvifMgrDeviceRow__unrealize;
@@ -317,6 +519,7 @@ OnvifMgrDeviceRow__class_init (OnvifMgrDeviceRowClass * klass)
                         G_TYPE_NONE /* return_type */,
                         0     /* n_params */,
                         NULL  /* param_types */);
+
     signals[PROFILE_CHANGED] =
         g_signal_newv ("profile-changed",
                         G_TYPE_FROM_CLASS (klass),
@@ -329,19 +532,53 @@ OnvifMgrDeviceRow__class_init (OnvifMgrDeviceRowClass * klass)
                         0     /* n_params */,
                         NULL  /* param_types */);
 
+    obj_properties[PROP_APP] =
+        g_param_spec_object ("app",
+                            "OnvifApp",
+                            "Pointer to OnvifApp parent.",
+                            ONVIFMGR_TYPE_APP  /* default value */,
+                            G_PARAM_READWRITE);
+
+    obj_properties[PROP_DEVICE] =
+        g_param_spec_pointer ("device",
+                            "OnvifDevice",
+                            "Pointer to OnvifDevice parent.",
+                            G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE);
+
+    obj_properties[PROP_NAME] =
+        g_param_spec_string ("name",
+                            "OnvifName",
+                            "Onvif name from scopes",
+                            NULL,
+                            G_PARAM_CONSTRUCT | G_PARAM_READWRITE);
+
+    obj_properties[PROP_LOCATION] =
+        g_param_spec_string ("location",
+                            "OnvifLocation",
+                            "Onvif location from scopes",
+                            NULL,
+                            G_PARAM_CONSTRUCT | G_PARAM_READWRITE);
+
+    obj_properties[PROP_HARDWARE] =
+        g_param_spec_string ("hardware",
+                            "OnvifHardware",
+                            "Onvif hardware from scopes",
+                            NULL,
+                            G_PARAM_CONSTRUCT | G_PARAM_READWRITE);
+
+    g_object_class_install_properties (object_class,
+                                        N_PROPERTIES,
+                                        obj_properties);
 }
 
 GtkWidget* OnvifMgrDeviceRow__new(OnvifApp * app, OnvifDevice * device, char * name, char * hardware, char * location){
-    GtkWidget* ret = g_object_new (ONVIFMGR_TYPE_DEVICEROW,
+    return g_object_new (ONVIFMGR_TYPE_DEVICEROW,
+                        "app",app,
+                        "device",device,
+                        "name",name,
+                        "hardware",hardware,
+                        "location",location,
                         NULL);
-    OnvifMgrDeviceRow * odevice = ONVIFMGR_DEVICEROW(ret);
-    OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (odevice);
-    priv->app = app;
-    OnvifMgrDeviceRow__set_device(odevice,device);
-    OnvifMgrDeviceRow__set_name(odevice,name);
-    OnvifMgrDeviceRow__set_hardware(odevice,hardware);
-    OnvifMgrDeviceRow__set_location(odevice,location);
-    return ret;
 }
 
 OnvifApp * OnvifMgrDeviceRow__get_app(OnvifMgrDeviceRow * self){
@@ -351,57 +588,11 @@ OnvifApp * OnvifMgrDeviceRow__get_app(OnvifMgrDeviceRow * self){
     return priv->app;
 }
 
-void OnvifMgrDeviceRow__set_device(OnvifMgrDeviceRow * self, OnvifDevice * device){
-    g_return_if_fail (self != NULL);
-    g_return_if_fail (ONVIFMGR_IS_DEVICEROW (self));
-    OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
-    OnvifDevice__destroy(priv->device);
-    priv->device = device;
-
-    if(device){
-        char * host = OnvifDevice__get_host(device);
-        gtk_label_set_text(GTK_LABEL(priv->lbl_host),host);
-        free(host);
-    } else {
-        gtk_label_set_text(GTK_LABEL(priv->lbl_host),NULL);
-    }
-}
-
 OnvifDevice * OnvifMgrDeviceRow__get_device(OnvifMgrDeviceRow * self){
     g_return_val_if_fail (self != NULL, NULL);
     g_return_val_if_fail (ONVIFMGR_IS_DEVICEROW (self),NULL);
     OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
     return priv->device;
-}
-
-void OnvifMgrDeviceRow__set_name(OnvifMgrDeviceRow * self, char * name){
-    g_return_if_fail (self != NULL);
-    g_return_if_fail (ONVIFMGR_IS_DEVICEROW (self));
-    OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
-
-    if(name){
-        char markup_name[strlen("<b>") + strlen(name) + strlen("</b>") +1]; //= malloc(strlen("<b>") + strlen(name) + strlen("</b>") +1);
-        strcpy(markup_name, "<b>");
-        strcat(markup_name, name);
-        strcat(markup_name, "</b>");
-        gtk_label_set_markup(GTK_LABEL(priv->lbl_name),markup_name);
-    } else {
-        gtk_label_set_text(GTK_LABEL(priv->lbl_name),NULL);
-    }
-}
-
-void OnvifMgrDeviceRow__set_hardware(OnvifMgrDeviceRow * self, char * hardware){
-    g_return_if_fail (self != NULL);
-    g_return_if_fail (ONVIFMGR_IS_DEVICEROW (self));
-    OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
-    gtk_label_set_text(GTK_LABEL(priv->lbl_hardware),hardware);
-}
-
-void OnvifMgrDeviceRow__set_location(OnvifMgrDeviceRow * self, char * location){
-    g_return_if_fail (self != NULL);
-    g_return_if_fail (ONVIFMGR_IS_DEVICEROW (self));
-    OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
-    gtk_label_set_text(GTK_LABEL(priv->lbl_location),location);
 }
 
 gboolean OnvifMgrDeviceRow__update_profile_btn(void * user_data){
@@ -593,6 +784,65 @@ void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
     }
     ONVIFMGR_DEVICEROW_TRACE("%s OnvifMgrDeviceRow__load_thumbnail done",self);
 } 
+
+static gboolean 
+OnvifMgrEncryptedStore__gui_set_scopes(void * user_data){
+    void ** arr = (void*)user_data;
+    OnvifMgrDeviceRow * self = ONVIFMGR_DEVICEROW(arr[0]);
+    OnvifScopes * scopes = (OnvifScopes *) arr[1];
+    char * name = OnvifScopes__extract_scope(scopes,"name");
+    char * hardware = OnvifScopes__extract_scope(scopes,"hardware");
+    char * location = OnvifScopes__extract_scope(scopes,"location");
+
+    g_object_set(self, 
+            "name", name,
+            "hardware",hardware,
+            "location", location,
+            NULL);
+
+    free(name);
+    free(hardware);
+    free(location);
+    free(user_data);
+    g_object_unref(scopes);
+    return FALSE;
+}
+
+void OnvifMgrDeviceRow__load_scopedata(OnvifMgrDeviceRow * self){
+    g_return_if_fail (self != NULL);
+    g_return_if_fail (ONVIFMGR_IS_DEVICEROW (self));
+    ONVIFMGR_DEVICEROW_TRACE("%s OnvifMgrDeviceRow__load_scopedata",self);
+    
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
+        C_TRAIL("OnvifMgrDeviceRow__load_scopedata - invalid device");
+        return;
+    }
+
+    OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
+    if(OnvifDevice__is_authenticated(priv->device)){
+        OnvifDeviceService * devserv = OnvifDevice__get_device_service(priv->device);
+        OnvifScopes * scopes = OnvifDeviceService__getScopes(devserv);
+        SoapFault fault = *SoapObject__get_fault(SOAP_OBJECT(scopes));
+        void ** input;
+        switch(fault){
+            case SOAP_FAULT_NONE:
+                input = malloc(sizeof(void*) *2);
+                input[0] = self;
+                input[1] = scopes;
+                g_idle_add(G_SOURCE_FUNC(OnvifMgrEncryptedStore__gui_set_scopes),input);
+                break;
+            case SOAP_FAULT_ACTION_NOT_SUPPORTED:
+            case SOAP_FAULT_CONNECTION_ERROR:
+            case SOAP_FAULT_NOT_VALID:
+            case SOAP_FAULT_UNAUTHORIZED:
+            case SOAP_FAULT_UNEXPECTED:
+            default:
+                //TODO Display error labels
+                g_object_unref(scopes);
+                break;
+        }
+    }
+}
 
 void OnvifMgrDeviceRow__set_thumbnail(OnvifMgrDeviceRow * self, GtkWidget * image){
     g_return_if_fail (self != NULL);

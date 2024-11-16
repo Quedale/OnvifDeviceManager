@@ -125,7 +125,7 @@ OnvifMgrProfilesDialog__load_profiles(QueueEvent * qevt, void * user_data){
 }
 
 static void
-OnvifMgrProfilesDialog__show (GtkWidget *widget){
+OnvifMgrProfilesDialog__showing (GtkWidget *widget){
   OnvifMgrProfilesDialog * self = ONVIFMGR_PROFILESDIALOG(widget);
   OnvifMgrProfilesDialogPrivate *priv = OnvifMgrProfilesDialog__get_instance_private (self);
   OnvifMgrAppDialog__show_loading(ONVIFMGR_APPDIALOG(self),"Loading device profiles...");
@@ -139,7 +139,7 @@ OnvifMgrProfilesDialog__class_init (OnvifMgrProfilesDialogClass *klass){
   object_class->get_property = OnvifMgrProfilesDialog__get_property;
   OnvifMgrAppDialogClass * app_class = ONVIFMGR_APPDIALOG_CLASS (klass);
   app_class->create_ui = OnvifMgrProfilesDialog__create_ui;
-  app_class->show = OnvifMgrProfilesDialog__show;
+  app_class->showing = OnvifMgrProfilesDialog__showing;
 
   GType params[1];
   params[0] = G_TYPE_POINTER;

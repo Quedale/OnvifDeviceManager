@@ -810,7 +810,7 @@ GstRtspPlayerSession__error_msg (GstRtspPlayerSession * session, GstBus *bus, Gs
         //Error signal
         g_signal_emit (priv->owner, signals[ERROR], 0, session);
     } else { //Ignoring error after the player requested to stop (gst_rtspsrc_try_send)
-        C_TRACE("%s Player no longer playing...");
+        C_TRACE("Player no longer playing...");
     }
 }
 

@@ -226,7 +226,7 @@ draw_overlay (GstElement * overlay, GstSample * sample, gpointer user_data)
 
   return comp;
 }
-
+#ifdef STATIC_BUILD
 GST_PLUGIN_STATIC_DECLARE(videotestsrc);
 GST_PLUGIN_STATIC_DECLARE(coreelements);
 GST_PLUGIN_STATIC_DECLARE(overlaycomposition);
@@ -234,7 +234,7 @@ GST_PLUGIN_STATIC_DECLARE(videoconvertscale);
 GST_PLUGIN_STATIC_DECLARE(autodetect);
 GST_PLUGIN_STATIC_DECLARE(ximagesink);
 GST_PLUGIN_STATIC_DECLARE(xvimagesink);
-
+#endif
 int
 main (int argc, char **argv)
 {
@@ -264,7 +264,7 @@ main (int argc, char **argv)
     g_clear_error (&error);
     exit (1);
   }
-
+#ifdef STATIC_BUILD
   GST_PLUGIN_STATIC_REGISTER(videotestsrc);
   GST_PLUGIN_STATIC_REGISTER(coreelements);
   GST_PLUGIN_STATIC_REGISTER(overlaycomposition);
@@ -272,7 +272,7 @@ main (int argc, char **argv)
   GST_PLUGIN_STATIC_REGISTER(autodetect);
   GST_PLUGIN_STATIC_REGISTER(ximagesink);
   GST_PLUGIN_STATIC_REGISTER(xvimagesink);
-
+#endif
   pipeline = gst_pipeline_new (NULL);
   src = gst_element_factory_make ("videotestsrc", NULL);
   capsfilter = gst_element_factory_make ("capsfilter", NULL);

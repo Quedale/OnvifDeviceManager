@@ -12,7 +12,7 @@ AUTOMAKE_OPTIONS = foreign subdir-objects
 AM_CFLAGS = $(DEBUG_FLAG) -Wall -Wextra -Wpedantic -Wno-unused-parameter $(DEBUG_FLAG) -DONVIFMGR_VERSION_MAJ=$(APP_VERSION_MAJ) -DONVIFMGR_VERSION_MIN=$(APP_VERSION_MIN) -DHAVE_CONFIG_H $(GST_STATIC_FLAG) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --cflags $(GST_LIBS) $(GST_PLGS) gtk+-3.0 libntlm cutils onvifsoap libssl libcrypto` $(EXT_CFLAGS) -lm
 
 bin_PROGRAMS = onvifmgr 
-EXTRA_PROGRAMS = gifdemo overlaytest queuedemo csssliderdemo playerdemo cssfilesliderdemo gtksliderdemo omgrdevicedemo gtkstyledimagedemo omgrdialogdemo encryptiondemo test
+EXTRA_PROGRAMS = gifdemo overlaytest queuedemo csssliderdemo playerdemo cssfilesliderdemo gtksliderdemo omgrdevicedemo gtkstyledimagedemo omgrdialogdemo encryptiondemo
 
 encryptiondemo_SOURCES = $(top_srcdir)/src/demo/encryptiondemo.c \
 					$(top_srcdir)/src/utils/encryption_utils.c
@@ -48,12 +48,15 @@ onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c \
 					$(top_srcdir)/src/app/dialog/omgr_add_dialog.c \
 					$(top_srcdir)/src/app/dialog/omgr_app_dialog.c \
 					$(top_srcdir)/src/app/dialog/omgr_credentials_dialog.c \
+					$(top_srcdir)/src/app/dialog/omgr_encrypted_store.c \
 					$(top_srcdir)/src/app/dialog/omgr_msg_dialog.c \
 					$(top_srcdir)/src/app/dialog/omgr_profiles_dialog.c \
+					$(top_srcdir)/src/app/dialog/omgr_encryoted_store_dialog.c \
 					$(top_srcdir)/src/app/settings/app_settings_discovery.c \
 					$(top_srcdir)/src/app/settings/app_settings_stream.c \
 					$(top_srcdir)/src/app/settings/app_settings.c \
 					$(top_srcdir)/src/utils/c_ownable_interface.c \
+					$(top_srcdir)/src/utils/encryption_utils.c \
 					$(top_srcdir)/src/utils/omgr_serializable_interface.c \
 					$(top_srcdir)/src/app/gtkbinaryimage.c \
 					$(top_srcdir)/src/app/gtkstyledimage.c \
@@ -66,7 +69,7 @@ onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c \
 					$(top_srcdir)/src/queue/queue_event.c \
 					$(top_srcdir)/src/queue/queue_thread.c
 onvifmgr_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0 libntlm cutils onvifsoap libssl libcrypto` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
-onvifmgr_LDADD = locked-icon.o microphone.o warning.o save.o tower.o
+onvifmgr_LDADD = locked-icon.o microphone.o warning.o trash.o tower.o
 
 queuedemo_SOURCES = $(top_srcdir)/src/demo/queue-demo.c $(top_srcdir)/src/queue/event_queue.c $(top_srcdir)/src/queue/queue_event.c $(top_srcdir)/src/queue/queue_thread.c
 queuedemo_LDFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs cutils glib-2.0 gobject-2.0`
@@ -115,7 +118,7 @@ omgrdialogdemo_SOURCES = $(top_srcdir)/src/demo/omgr-dialog-demo.c \
 						$(top_srcdir)/src/app/dialog/omgr_credentials_dialog.c \
 						$(top_srcdir)/src/app/dialog/omgr_add_dialog.c \
 						$(top_srcdir)/src/app/dialog/omgr_app_dialog.c \
-						$(top_srcdir)/src/app/dialog/omgr_truststore_dialog.c \
+						$(top_srcdir)/src/app/dialog/omgr_encryoted_store_dialog.c \
 						$(top_srcdir)/src/animations/gtk/gtk_dotted_slider_widget.c \
 						$(top_srcdir)/src/animations/gtk/custom_gtk_revealer.c \
 						$(top_srcdir)/src/animations/gtk/custom_gtk_progress_tracker.c \
@@ -204,6 +207,10 @@ locked-icon.o$(EXEEXT):
 warning.o$(EXEEXT):
 	@echo "  CCLD     images/warning.o"
 	@cd $(top_srcdir)/images && ld -r -b binary -o $(abs_builddir)/warning.o warning.png && cd ..
+
+trash.o$(EXEEXT):
+	@echo "  CCLD     images/trash.o"
+	@cd $(top_srcdir)/images && ld -r -b binary -o $(abs_builddir)/trash.o trash.png && cd ..
 
 save.o$(EXEEXT):
 	@echo "  CCLD     images/save.o"

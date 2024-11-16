@@ -2,7 +2,7 @@
 #include "portable_thread.h"
 #include "../src/app/dialog/omgr_credentials_dialog.h"
 #include "../src/app/dialog/omgr_add_dialog.h"
-#include "../src/app/dialog/omgr_truststore_dialog.h"
+#include "../src/app/dialog/omgr_encryoted_store_dialog.h"
 #include "../src/app/omgr_device_row.h"
 
 static void delete_event_cb (GtkWidget *widget, GdkEvent *event, gpointer data) {

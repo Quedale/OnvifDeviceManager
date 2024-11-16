@@ -1,9 +1,13 @@
 #include "../gst/gstrtspplayer.h"
 #include "../gst/gst_plugin_utils.h"
 #include "clogger.h"
+#include "portable_thread.h"
 
 struct PlayerAndButtons {
     GstRtspPlayer * player;
+    char * url;
+    char * user;
+    char * pass;
     GtkWidget * play_btn;
     GtkWidget * stop_btn;
 };
@@ -17,16 +21,19 @@ void stopped_stream(GstRtspPlayer * player, struct PlayerAndButtons * data){
     gtk_widget_set_sensitive(GTK_WIDGET(data->play_btn),TRUE);
 }
 
-void start_stream(GstRtspPlayer * player, struct PlayerAndButtons * data){
+void start_stream(GstRtspPlayer * player, GstRtspPlayerSession * session, struct PlayerAndButtons * data){
     C_WARN("Stream started callback\n");
     gtk_widget_set_sensitive(GTK_WIDGET(data->stop_btn),TRUE);
 }
 
+void retry_stream(GstRtspPlayer * player, GstRtspPlayerSession * session, struct PlayerAndButtons * data){
+    C_WARN("Stream invoked retry signal\n");
+}
 
 static void state_btn_cb (GtkButton *button, struct PlayerAndButtons * data) {
     if(strcmp(gtk_button_get_label(button),"Play") == 0){
         gtk_widget_set_sensitive(GTK_WIDGET(data->play_btn),FALSE);
-        GstRtspPlayer__play(data->player); //Causes big hang. should be called asynchroniously
+        GstRtspPlayer__play(data->player, data->url, data->user, data->pass, NULL,NULL,NULL); //Causes big hang. should be called asynchroniously
     } else {
         gtk_widget_set_sensitive(GTK_WIDGET(data->stop_btn),FALSE);
         GstRtspPlayer__stop(data->player); //Causes minimal hang. should be called asynchroniously
@@ -35,6 +42,7 @@ static void state_btn_cb (GtkButton *button, struct PlayerAndButtons * data) {
 
 int main(int argc, char *argv[])
 {
+    c_log_set_thread_color(ANSI_COLOR_DRK_GREEN, P_THREAD_ID);
     /* Initialize GTK */
     gtk_init (&argc, &argv);
 
@@ -50,16 +58,17 @@ int main(int argc, char *argv[])
     gtk_container_add(GTK_CONTAINER(window),vbox);
 
     struct PlayerAndButtons data;
-
+    data.url = "rtsp://61.216.97.157:16887/stream1";
+    data.user = "demo";
+    data.pass = "demo";
     data.play_btn = gtk_button_new_with_label("Play");
     data.stop_btn = gtk_button_new_with_label("Stop");
     gtk_widget_set_sensitive(GTK_WIDGET(data.stop_btn),FALSE);
 
     data.player = GstRtspPlayer__new();
-    GstRtspPlayer__set_playback_url(data.player,"rtsp://61.216.97.157:16887/stream1");
-    GstRtspPlayer__set_credentials(data.player,"demo","demo");
     g_signal_connect (G_OBJECT(data.player), "stopped", G_CALLBACK (stopped_stream), &data);
     g_signal_connect (G_OBJECT(data.player), "started", G_CALLBACK (start_stream), &data);
+    g_signal_connect (G_OBJECT(data.player), "retry", G_CALLBACK (retry_stream), &data);
     gtk_box_pack_start(GTK_BOX(vbox), GstRtspPlayer__createCanvas(data.player), TRUE, FALSE, 0);
 
     GtkWidget * hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0);

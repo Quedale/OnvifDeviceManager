@@ -8,8 +8,8 @@ gboolean safely_quit_gtk_main(void * user_data){
 void * _thread_destruction(void * event){
     c_log_set_thread_color(ANSI_COLOR_RED, P_THREAD_ID);
     C_INFO("Starting clean up thread...\n");
-    OnvifApp * app = (OnvifApp *) event;
-    
+    OnvifApp * app = ONVIFMGR_APP(event);
+
     //This what may take a long time.
     //Destroying the EventQueue will hang until all threads are finished
     OnvifApp__destroy(app);

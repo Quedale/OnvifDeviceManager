@@ -7,7 +7,6 @@
 typedef struct _OnvifApp OnvifApp;
 
 #include "dialog/omgr_msg_dialog.h"
-#include "omgr_device_row.h"
 #include "../queue/event_queue.h"
 
 G_BEGIN_DECLS

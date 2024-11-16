@@ -65,7 +65,7 @@ OnvifMgrCredentialsDialog__create_ui(OnvifMgrAppDialog * app_dialog){
 }
 
 static void
-OnvifMgrCredentialsDialog__show (GtkWidget *widget){
+OnvifMgrCredentialsDialog__showing (GtkWidget *widget){
     OnvifMgrCredentialsDialogPrivate *priv = OnvifMgrCredentialsDialog__get_instance_private (ONVIFMGR_CREDENTIALSDIALOG(widget));
 
     //Steal focus
@@ -79,7 +79,7 @@ OnvifMgrCredentialsDialog__show (GtkWidget *widget){
 static void
 OnvifMgrCredentialsDialog__class_init (OnvifMgrCredentialsDialogClass *klass){
     OnvifMgrAppDialogClass * app_class = ONVIFMGR_APPDIALOG_CLASS (klass);
-    app_class->show = OnvifMgrCredentialsDialog__show;
+    app_class->showing = OnvifMgrCredentialsDialog__showing;
     app_class->create_ui = OnvifMgrCredentialsDialog__create_ui;
 }
 

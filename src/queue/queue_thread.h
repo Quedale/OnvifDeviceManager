@@ -52,6 +52,7 @@ void QueueThread__start(QueueThread * self);
 
 //Thread-local function returning the current context pointers
 //Designed to be used within background events
+EventQueue * EventQueue__get_current();
 QueueEvent * QueueEvent__get_current();
 QueueThread * QueueThread__get_current();
 

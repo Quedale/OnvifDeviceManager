@@ -80,7 +80,8 @@ gboolean gui_set_label_text_priv (void * user_data){
     gtk_label_set_text(GTK_LABEL(update->label),update->text);
 
 exit:
-    free(update->text);
+    if(update->text)
+        free(update->text);
     free(update);
 
     return FALSE;
@@ -90,8 +91,12 @@ void gui_set_label_text (GtkWidget * widget, char * value){
     g_return_if_fail(widget != NULL);
     g_return_if_fail(GTK_IS_LABEL(widget));
     GUILabelUpdate * iguiu = malloc(sizeof(GUILabelUpdate));
-    iguiu->text = malloc(strlen(value)+1);
-    strcpy(iguiu->text,value);
+    if(value){
+        iguiu->text = malloc(strlen(value)+1);
+        strcpy(iguiu->text,value);
+    } else {
+        iguiu->text = NULL;
+    }
     iguiu->label = widget;
     gdk_threads_add_idle(G_SOURCE_FUNC(gui_set_label_text_priv),iguiu);
 }

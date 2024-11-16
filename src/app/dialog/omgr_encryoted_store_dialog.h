@@ -4,6 +4,7 @@
 #include <gtk/gtk.h>
 #include "omgr_app_dialog.h"
 #include "../../queue/event_queue.h"
+#include "../../utils/omgr_serializable_interface.h"
 
 G_BEGIN_DECLS
 
@@ -20,7 +21,9 @@ struct _OnvifMgrTrustStoreDialogClass
     OnvifMgrAppDialogClass parent;
 };
 
-OnvifMgrTrustStoreDialog * OnvifMgrTrustStoreDialog__new(EventQueue * queue);
+OnvifMgrTrustStoreDialog * OnvifMgrTrustStoreDialog__new();
+const char * OnvifMgrTrustStoreDialog__get_passphrase(OnvifMgrTrustStoreDialog * self);
+int OnvifMgrTrustStoreDialog__get_passphrase_len(OnvifMgrTrustStoreDialog * self);
 
 G_END_DECLS
 

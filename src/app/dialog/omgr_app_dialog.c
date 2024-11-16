@@ -11,6 +11,7 @@ static const char * default_submit_label = "Submit";
 enum {
   SIGNAL_SUBMIT,
   SIGNAL_CANCEL,
+  SIGNAL_SHOWING,
   LAST_SIGNAL
 };
 
@@ -71,7 +72,6 @@ OnvifMgrAppDialog__cancel_event (GtkWidget *widget, OnvifMgrAppDialog * self) {
         return;
     }
 
-    
     OnvifMgrAppDialog__close(self);
 }
 
@@ -458,7 +458,8 @@ OnvifMgrAppDialog__show (GtkWidget * widget){
         gtk_container_foreach (GTK_CONTAINER (parent), (GtkCallback)OnvifMgrAppDialog__set_onlyfocus, self);
 
         OnvifMgrAppDialogClass *klass = ONVIFMGR_APPDIALOG_GET_CLASS (self);
-        if(klass->show) klass->show(widget);
+        if(klass->showing) klass->showing(widget);
+        g_signal_emit (self, signals[SIGNAL_SHOWING], 0);
     }
 }
 
@@ -515,6 +516,18 @@ OnvifMgrAppDialog__class_init (OnvifMgrAppDialogClass *klass){
 
     signals[SIGNAL_CANCEL] =
         g_signal_newv ("cancel",
+                        G_TYPE_FROM_CLASS (klass),
+                        G_SIGNAL_RUN_FIRST | G_SIGNAL_NO_HOOKS,
+                        NULL /* closure */,
+                        NULL /* accumulator */,
+                        NULL /* accumulator data */,
+                        NULL /* C marshaller */,
+                        G_TYPE_NONE /* return_type */,
+                        0     /* n_params */,
+                        NULL  /* param_types */);
+
+    signals[SIGNAL_SHOWING] =
+        g_signal_newv ("showing",
                         G_TYPE_FROM_CLASS (klass),
                         G_SIGNAL_RUN_FIRST | G_SIGNAL_NO_HOOKS,
                         NULL /* closure */,

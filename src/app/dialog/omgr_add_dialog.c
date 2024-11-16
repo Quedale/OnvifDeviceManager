@@ -187,7 +187,7 @@ OnvifMgrAddDialog__create_ui(OnvifMgrAppDialog * app_dialog){
 }
 
 static void
-OnvifMgrAddDialog__show (GtkWidget *widget){
+OnvifMgrAddDialog__showing (GtkWidget *widget){
     OnvifMgrAddDialog * self = ONVIFMGR_ADDDIALOG(widget);
     OnvifMgrAddDialogPrivate *priv = OnvifMgrAddDialog__get_instance_private (self);
 
@@ -206,7 +206,7 @@ static void
 OnvifMgrAddDialog__class_init (OnvifMgrAddDialogClass *klass){
     OnvifMgrAppDialogClass * app_class = ONVIFMGR_APPDIALOG_CLASS (klass);
     app_class->create_ui = OnvifMgrAddDialog__create_ui;
-    app_class->show = OnvifMgrAddDialog__show;
+    app_class->showing = OnvifMgrAddDialog__showing;
 }
 
 static void
