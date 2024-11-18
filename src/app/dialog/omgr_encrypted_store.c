@@ -96,6 +96,8 @@ encrypted_chunk_callback (unsigned char * buffer, int buffer_length, void * user
 
         int len_to_read = (buffer_length-data_parsed >= chunk->expected_len-chunk->len) ? chunk->expected_len-chunk->len : buffer_length-data_parsed;
 
+        if(len_to_read == 0) break; //Encryption adds extra \0 padding to chunks
+
         memcpy(&chunk->data[chunk->len],&buffer[data_parsed],len_to_read);
         data_parsed += len_to_read;
         chunk->len += len_to_read;
