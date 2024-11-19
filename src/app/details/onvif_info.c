@@ -1,6 +1,7 @@
 #include "onvif_info.h"
 #include "../gui_utils.h"
 #include "clogger.h"
+#include "cstring_utils.h"
 
 #define ONVIF_GET_HOSTNAME_ERROR "Error retrieving hostname"
 #define ONVIF_GET_SCOPES_ERROR "Error retreiving scopes"
@@ -274,29 +275,23 @@ void _update_details_page(QueueEvent * qevt, void * user_data){
     SoapFault * fault = SoapObject__get_fault(SOAP_OBJECT(hostname));
     switch(*fault){
         case SOAP_FAULT_NONE:
-            gui_update->hostname = malloc(strlen(OnvifDeviceHostnameInfo__get_name(hostname))+1);
-            strcpy(gui_update->hostname,OnvifDeviceHostnameInfo__get_name(hostname));
+            cstring_safe_copy(&gui_update->hostname, OnvifDeviceHostnameInfo__get_name(hostname), NULL);
             break;
         case SOAP_FAULT_CONNECTION_ERROR:
-            gui_update->hostname = malloc(strlen("Error: Failed to connect...")+1);
-            strcpy(gui_update->hostname,"Error: Failed to connect...");
+            cstring_safe_copy(&gui_update->hostname, "Error: Failed to connect...", NULL);
             break;
         case SOAP_FAULT_NOT_VALID:
-            gui_update->hostname = malloc(strlen("Error: Not a valid ONVIF response...")+1);
-            strcpy(gui_update->hostname,"Error: Not a valid ONVIF response...");
+            cstring_safe_copy(&gui_update->hostname, "Error: Not a valid ONVIF response...", NULL);
             break;
         case SOAP_FAULT_UNAUTHORIZED:
-            gui_update->hostname = malloc(strlen("Error: Unauthorized...")+1);
-            strcpy(gui_update->hostname,"Error: Unauthorized...");
+            cstring_safe_copy(&gui_update->hostname, "Error: Unauthorized...", NULL);
             break;
         case SOAP_FAULT_ACTION_NOT_SUPPORTED:
-            gui_update->hostname = malloc(strlen("Error: Action Not Supported...")+1);
-            strcpy(gui_update->hostname,"Error: Action Not Supported...");
+            cstring_safe_copy(&gui_update->hostname, "Error: Action Not Supported...", NULL);
             break;
         case SOAP_FAULT_UNEXPECTED:
         default:
-            gui_update->hostname = malloc(strlen(ONVIF_GET_HOSTNAME_ERROR)+1);
-            strcpy(gui_update->hostname,ONVIF_GET_HOSTNAME_ERROR);
+            cstring_safe_copy(&gui_update->hostname, ONVIF_GET_HOSTNAME_ERROR, NULL);
             break;
     }
 
@@ -313,10 +308,8 @@ void _update_details_page(QueueEvent * qevt, void * user_data){
         case SOAP_FAULT_ACTION_NOT_SUPPORTED:
         case SOAP_FAULT_UNEXPECTED:
         default:
-            gui_update->name = malloc(strlen(ONVIF_GET_SCOPES_ERROR)+1);
-            strcpy(gui_update->name,ONVIF_GET_SCOPES_ERROR);
-            gui_update->location = malloc(strlen(ONVIF_GET_SCOPES_ERROR)+1);
-            strcpy(gui_update->location,ONVIF_GET_SCOPES_ERROR);
+            cstring_safe_copy(&gui_update->name, ONVIF_GET_SCOPES_ERROR, NULL);
+            cstring_safe_copy(&gui_update->location, ONVIF_GET_SCOPES_ERROR, NULL);
             break;
     }
 
@@ -324,20 +317,11 @@ void _update_details_page(QueueEvent * qevt, void * user_data){
     fault = SoapObject__get_fault(SOAP_OBJECT(dev_info));
     switch(*fault){
         case SOAP_FAULT_NONE:
-            gui_update->manufacturer = malloc(strlen(OnvifDeviceInformation__get_manufacturer(dev_info))+1);
-            strcpy(gui_update->manufacturer,OnvifDeviceInformation__get_manufacturer(dev_info));
-
-            gui_update->model = malloc(strlen(OnvifDeviceInformation__get_model(dev_info))+1);
-            strcpy(gui_update->model,OnvifDeviceInformation__get_model(dev_info));
-
-            gui_update->hardware = malloc(strlen(OnvifDeviceInformation__get_hardwareId(dev_info))+1);
-            strcpy(gui_update->hardware,OnvifDeviceInformation__get_hardwareId(dev_info));
-
-            gui_update->firmware = malloc(strlen(OnvifDeviceInformation__get_firmwareVersion(dev_info))+1);
-            strcpy(gui_update->firmware,OnvifDeviceInformation__get_firmwareVersion(dev_info));
-
-            gui_update->serial = malloc(strlen(OnvifDeviceInformation__get_serialNumber(dev_info))+1);
-            strcpy(gui_update->serial,OnvifDeviceInformation__get_serialNumber(dev_info));
+            cstring_safe_copy(&gui_update->manufacturer, OnvifDeviceInformation__get_manufacturer(dev_info), NULL);
+            cstring_safe_copy(&gui_update->model, OnvifDeviceInformation__get_model(dev_info), NULL);
+            cstring_safe_copy(&gui_update->hardware, OnvifDeviceInformation__get_hardwareId(dev_info), NULL);
+            cstring_safe_copy(&gui_update->firmware, OnvifDeviceInformation__get_firmwareVersion(dev_info), NULL);
+            cstring_safe_copy(&gui_update->serial, OnvifDeviceInformation__get_serialNumber(dev_info), NULL);
             break;
         case SOAP_FAULT_CONNECTION_ERROR:
         case SOAP_FAULT_NOT_VALID:
@@ -345,16 +329,11 @@ void _update_details_page(QueueEvent * qevt, void * user_data){
         case SOAP_FAULT_ACTION_NOT_SUPPORTED:
         case SOAP_FAULT_UNEXPECTED:
         default:
-            gui_update->manufacturer = malloc(strlen(ONVIF_GET_INFO_ERROR)+1);
-            strcpy(gui_update->manufacturer,ONVIF_GET_INFO_ERROR);
-            gui_update->model = malloc(strlen(ONVIF_GET_INFO_ERROR)+1);
-            strcpy(gui_update->model,ONVIF_GET_INFO_ERROR);
-            gui_update->hardware = malloc(strlen(ONVIF_GET_INFO_ERROR)+1);
-            strcpy(gui_update->hardware,ONVIF_GET_INFO_ERROR);
-            gui_update->firmware = malloc(strlen(ONVIF_GET_INFO_ERROR)+1);
-            strcpy(gui_update->firmware,ONVIF_GET_INFO_ERROR);
-            gui_update->serial = malloc(strlen(ONVIF_GET_INFO_ERROR)+1);
-            strcpy(gui_update->serial,ONVIF_GET_INFO_ERROR);
+            cstring_safe_copy(&gui_update->manufacturer, ONVIF_GET_INFO_ERROR, NULL);
+            cstring_safe_copy(&gui_update->model, ONVIF_GET_INFO_ERROR, NULL);
+            cstring_safe_copy(&gui_update->hardware, ONVIF_GET_INFO_ERROR, NULL);
+            cstring_safe_copy(&gui_update->firmware, ONVIF_GET_INFO_ERROR, NULL);
+            cstring_safe_copy(&gui_update->serial, ONVIF_GET_INFO_ERROR, NULL);
             break;
     }
 
@@ -372,14 +351,8 @@ void _update_details_page(QueueEvent * qevt, void * user_data){
                 } else {
                     gui_update->macs = malloc(sizeof(char *) * gui_update->mac_count);
                 }
-                if(OnvifDeviceInterface__get_mac(interface)){
-                    gui_update->macs[gui_update->mac_count-1] = malloc(strlen(OnvifDeviceInterface__get_mac(interface))+1);
-                    strcpy(gui_update->macs[gui_update->mac_count-1],OnvifDeviceInterface__get_mac(interface));
-                } else {
-                    gui_update->macs[gui_update->mac_count-1] = malloc(strlen("MAC Address not defined.")+1);
-                    strcpy(gui_update->macs[gui_update->mac_count-1],"MAC Address not defined.");
-                }
 
+                cstring_safe_copy(&gui_update->macs[gui_update->mac_count-1], OnvifDeviceInterface__get_mac(interface), "MAC Address not defined.");
             }
             break;
         case SOAP_FAULT_CONNECTION_ERROR:
@@ -390,8 +363,7 @@ void _update_details_page(QueueEvent * qevt, void * user_data){
         default:
             gui_update->mac_count++;
             gui_update->macs = realloc(gui_update->macs,sizeof(char *) * gui_update->mac_count);
-            gui_update->macs[gui_update->mac_count-1] = malloc(strlen(ONVIF_GET_NETWORK_ERROR)+1);
-            strcpy(gui_update->macs[gui_update->mac_count-1],ONVIF_GET_NETWORK_ERROR);
+            cstring_safe_copy(&gui_update->macs[gui_update->mac_count-1], ONVIF_GET_NETWORK_ERROR, NULL);
             break;
     }
     
@@ -410,8 +382,7 @@ void _update_details_page(QueueEvent * qevt, void * user_data){
         case SOAP_FAULT_ACTION_NOT_SUPPORTED:
         case SOAP_FAULT_UNEXPECTED:
         default:
-            gui_update->version = malloc(strlen(ONVIF_GET_DEVICE_CAPS_ERROR)+1);
-            strcpy(gui_update->version,ONVIF_GET_DEVICE_CAPS_ERROR);
+            cstring_safe_copy(&gui_update->version, ONVIF_GET_DEVICE_CAPS_ERROR, NULL);
             break;
     }
 
