@@ -788,6 +788,7 @@ GstRtspPlayerSession__error_msg (GstRtspPlayerSession * session, GstBus *bus, Gs
         default:
             C_ERROR ("%s Error received from element [%d] %s: %s",session->location,err->code, GST_OBJECT_NAME (msg->src), err->message);
             C_ERROR ("%s Debugging information: %s",session->location, debug_info ? debug_info : "none");
+            g_signal_emit (priv->owner, signals[ERROR], 0, session);
     }
 
     g_clear_error (&err);

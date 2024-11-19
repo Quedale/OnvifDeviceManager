@@ -715,7 +715,9 @@ warning:
     
 
     if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
-        gui_update_widget_image(image,priv->image_handle);
+        gtk_container_foreach (GTK_CONTAINER (priv->image_handle), (GtkCallback)gui_widget_destroy, NULL);
+        gtk_container_add (GTK_CONTAINER (priv->image_handle), image);
+        gtk_widget_show (image);
     } else {
         ONVIFMGR_DEVICEROW_TRAIL("%s OnvifMgrDeviceRow__display_snapshot invalid device",self);
     }
@@ -724,7 +726,7 @@ warning:
 unsupported:
     //Snapshot unsupported by camera. No longer need image handle
     if(priv->image_handle){
-        safely_destroy_widget(priv->image_handle);
+        gtk_widget_destroy(priv->image_handle);
         priv->image_handle = NULL;
     }
 exit:

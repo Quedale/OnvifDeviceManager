@@ -145,8 +145,8 @@ OnvifMgrEncryptedStore__read_store(QueueEvent * qevt, void * user_data){
     floating_data->len = 0;
     floating_data->expected_len = 0;
     floating_data->store = self;
-    int decrypted_data_len = EncryptionUtils__read_encrypted((unsigned char *) OnvifMgrTrustStoreDialog__get_passphrase(priv->dialog),
-                                    OnvifMgrTrustStoreDialog__get_passphrase_len(priv->dialog),
+    int decrypted_data_len = EncryptionUtils__read_encrypted((unsigned char *) priv->passphrase,
+                                    priv->passphrase_len,
                                     klass->extension->store_path,
                                     encrypted_chunk_callback, 
                                     floating_data);
@@ -159,13 +159,12 @@ OnvifMgrEncryptedStore__read_store(QueueEvent * qevt, void * user_data){
         void ** input = malloc(sizeof(void*) *2);
         input[0] = priv->dialog;
         input[1] = "Failed to decrypt store file.";
+        free(priv->passphrase);
+        priv->passphrase = NULL;
+        priv->passphrase_len = 0;
         g_idle_add(G_SOURCE_FUNC(OnvifMgrEncryptedStore__show_error),input);
         return;
     } else {
-        if(priv->passphrase) free(priv->passphrase);
-        priv->passphrase_len = OnvifMgrTrustStoreDialog__get_passphrase_len(priv->dialog);
-        priv->passphrase = malloc(priv->passphrase_len);
-        memcpy(priv->passphrase,OnvifMgrTrustStoreDialog__get_passphrase(priv->dialog),priv->passphrase_len);
         g_idle_add(G_SOURCE_FUNC(OnvifMgrAppDialog__close),priv->dialog);
     }
 }
@@ -251,6 +250,13 @@ OnvifMgrEncryptedStore__login(OnvifMgrTrustStoreDialog * dialog, OnvifMgrEncrypt
         g_object_set(priv->dialog,"error",NULL,NULL);
 
         OnvifMgrAppDialog__show_loading(ONVIFMGR_APPDIALOG(priv->dialog),"Decrypting store file...");
+        
+        //Extract from GUI before starting background thread
+        if(priv->passphrase) free(priv->passphrase);
+        priv->passphrase_len = OnvifMgrTrustStoreDialog__get_passphrase_len(priv->dialog);
+        priv->passphrase = malloc(priv->passphrase_len);
+        memcpy(priv->passphrase,OnvifMgrTrustStoreDialog__get_passphrase(priv->dialog),priv->passphrase_len);
+
         EventQueue__insert(priv->queue, self, OnvifMgrEncryptedStore__read_store,self, NULL);
     } else {
         C_DEBUG("Creating new store. '%s'",klass->extension->store_path);
