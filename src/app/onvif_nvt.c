@@ -1,5 +1,6 @@
 #include "onvif_nvt.h"
 #include "gtkstyledimage.h"
+#include "gui_utils.h"
 
 extern char _binary_microphone_png_size[];
 extern char _binary_microphone_png_start[];
@@ -40,11 +41,7 @@ GtkWidget * OnvifNVT__create_ui (GstRtspPlayer * player){
 
     gtk_grid_attach (GTK_GRID (grid), widget, 0, 1, 1, 1);
 
-    GtkCssProvider * cssProvider = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(cssProvider, "* { background-image:none; background-color:black;}",-1,NULL); 
-    GtkStyleContext * context = gtk_widget_get_style_context(grid);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
-    g_object_unref (cssProvider);  
+    gui_widget_set_css(grid,"* { background-image:none; background-color:black;}");
 
     GtkWidget * overlay =gtk_overlay_new();
     gtk_container_add (GTK_CONTAINER (overlay), grid);

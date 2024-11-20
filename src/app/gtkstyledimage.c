@@ -39,17 +39,13 @@ GdkPixbuf * pixbuf_replace_color(GdkPixbuf * src, GdkRGBA * color){
     return ret;
 }
 
-GdkPixbuf * GtkStyledImage__sync_color_with_theme(GtkWidget * parent, GdkPixbuf * src){
-    GdkRGBA color;
-    GtkStyleContext * context = gtk_widget_get_style_context(parent);// gtk_style_context_new(); 
-    gtk_style_context_get_color(context,GTK_STATE_FLAG_NORMAL, &color);
-    GdkPixbuf * ret = pixbuf_replace_color(src,&color);
-    g_object_unref(src);
-    return ret;
-}
-
 GdkPixbuf * GtkStyledImage__modify_pixbuf (GtkBinaryImage * self, GdkPixbuf * pixbuf){
-    return GtkStyledImage__sync_color_with_theme(GTK_WIDGET(self),pixbuf);
+    GdkRGBA color;
+    GtkStyleContext * context = gtk_widget_get_style_context(GTK_WIDGET(self));// gtk_style_context_new(); 
+    gtk_style_context_get_color(context,GTK_STATE_FLAG_NORMAL, &color);
+    GdkPixbuf * ret = pixbuf_replace_color(pixbuf,&color);
+    g_object_unref(pixbuf);
+    return ret;
 }
 
 static void
@@ -74,7 +70,9 @@ void GtkStyledImage__style_updated (GtkWidget* self, gpointer user_data)
     }
 
     priv->current_color = color;
-
+    
+    //Create new pixbuf from raw data
+    //New colors has to be applied on a full image
     unsigned char* data = GtkBinaryImage__get_data(GTK_BINARYIMAGE(self));
     unsigned int size = GtkBinaryImage__get_size(GTK_BINARYIMAGE(self));
     GdkPixbuf * pixbuf = GtkBinaryImage__create_pixbuf(data, size,NULL);
@@ -82,9 +80,10 @@ void GtkStyledImage__style_updated (GtkWidget* self, gpointer user_data)
         gtk_image_clear (GTK_IMAGE(self));
         return;
     }
-    GdkPixbuf * newpixbuf = GtkStyledImage__sync_color_with_theme(GTK_WIDGET(self),pixbuf);
-    GtkBinaryImage__set_image(GTK_BINARYIMAGE(self),newpixbuf);
-    g_object_unref(pixbuf);
+
+    //Apply new raw pixbuf, which will be scaled by BinayImage
+    //BinaryImage will also call modify_pixbuf, which will apply style
+    GtkBinaryImage__set_image(GTK_BINARYIMAGE(self),pixbuf);
 }
 
 

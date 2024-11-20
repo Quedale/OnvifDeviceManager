@@ -70,20 +70,20 @@ exit:
     return pixbuf;
 }
 
-void GtkBinaryImage__set_image(GtkBinaryImage *  self, GdkPixbuf * pixbuf){
-    g_return_if_fail (GTK_IS_BINARYIMAGE (self));
+gboolean GtkBinaryImage__apply_data(void * user_data){
+    void ** arr = (void**) user_data;
+    GtkBinaryImage * self = GTK_BINARYIMAGE(arr[0]);
+    GdkPixbuf * old_pixbuf = GDK_PIXBUF(arr[1]);
+    GdkPixbuf * pixbuf;
+    GtkBinaryImagePrivate *priv = GtkBinaryImage__get_instance_private (self);
 
-    GtkBinaryImagePrivate *priv = GtkBinaryImage__get_instance_private (GTK_BINARYIMAGE(self));
-    if(!pixbuf){
-        C_WARN("No GdkPixbuf set on image. Not scaling...");
-        return;
-    }
-
-    double ph = gdk_pixbuf_get_height (pixbuf);
-    double pw = gdk_pixbuf_get_width (pixbuf);
+    double ph = gdk_pixbuf_get_height (old_pixbuf);
+    double pw = gdk_pixbuf_get_width (old_pixbuf);
 
     if(GTK_BINARYIMAGE_GET_CLASS (self)->modify_pixbuf){
-        pixbuf = GTK_BINARYIMAGE_GET_CLASS (self)->modify_pixbuf (self, pixbuf);
+        pixbuf = GTK_BINARYIMAGE_GET_CLASS (self)->modify_pixbuf (self, old_pixbuf);
+    } else {
+        pixbuf = old_pixbuf;
     }
 
     GdkPixbuf * newbuf;
@@ -108,6 +108,21 @@ void GtkBinaryImage__set_image(GtkBinaryImage *  self, GdkPixbuf * pixbuf){
 
     gtk_image_set_from_pixbuf(GTK_IMAGE(self),newbuf);
     g_object_unref(newbuf);
+    free(user_data);
+    return FALSE;
+}
+
+void GtkBinaryImage__set_image(GtkBinaryImage *  self, GdkPixbuf * pixbuf){
+    if(!pixbuf){
+        C_WARN("No GdkPixbuf set on image. Not scaling...");
+        return;
+    }
+    g_return_if_fail (GTK_IS_BINARYIMAGE (self));
+    void ** arr = malloc(sizeof(void*)*2);
+    arr[0] = self;
+    arr[1] = pixbuf;
+    //setting image and executing modify_pixbuf from main thread, regardless of where the image was set
+    g_idle_add(GtkBinaryImage__apply_data,arr);
 }
 
 GtkWidget* GtkBinaryImage__new(unsigned char * data_start, unsigned int data_size, int width, int height, GError *error){
@@ -139,7 +154,6 @@ void GtkBinaryImage__set_data(GtkBinaryImage *  self, unsigned char* data_start,
     priv->data_size = data_size;
 
     GtkBinaryImage__set_image(GTK_BINARYIMAGE(self), pixbuf);
-    g_object_unref(pixbuf);
 }
 
 void GtkBinaryImage__set_width(GtkBinaryImage *  self, int width){

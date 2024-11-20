@@ -125,16 +125,33 @@ void safely_start_spinner(GtkWidget * widget){
     gdk_threads_add_idle(G_SOURCE_FUNC(idle_start_spinner),widget);
 }
 
-GtkCssProvider * gui_widget_set_css(GtkWidget * widget, char * css, GtkCssProvider * cssProvider){
-    if(!cssProvider){
-        cssProvider = gtk_css_provider_new();
-        gtk_css_provider_load_from_data(cssProvider, css,-1,NULL);  //font-size: 25px; 
-    }
+void gui_widget_set_css(GtkWidget * widget, char * css){
+    GtkCssProvider * cssProvider = gtk_css_provider_new();
+    gtk_css_provider_load_from_data(cssProvider, css,-1,NULL);  //font-size: 25px; 
 
     GtkStyleContext * context = gtk_widget_get_style_context(widget);
     gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
 
-    return cssProvider;
+    g_object_unref(cssProvider);
+}
+
+gboolean idle_set_widget_css (void * user_data){
+    void ** arr = (void **) user_data;
+    g_return_val_if_fail(GTK_IS_WIDGET(arr[0]),FALSE);
+    gui_widget_set_css(GTK_WIDGET(arr[0]),(char*) arr[1]);
+    free(arr[1]);
+    free(arr);
+    return FALSE;
+}
+
+void safely_set_widget_css(GtkWidget * widget, char * css){
+    g_return_if_fail(css != NULL);
+    g_return_if_fail(GTK_IS_WIDGET(widget));
+    void ** arr = malloc(sizeof(void*)*2);
+    arr[0] = widget;
+    arr[1] = malloc(strlen(css)+1);
+    strcpy(arr[1],css);
+    gdk_threads_add_idle(G_SOURCE_FUNC(idle_set_widget_css),arr);
 }
 
 gboolean gui_realize_make_square (GtkWidget *widget, gpointer p, gpointer player){

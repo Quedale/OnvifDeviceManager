@@ -49,7 +49,8 @@ typedef struct {
 
     gboolean owned;
     gboolean init;
-    GtkWidget * btn_save;
+    GtkWidget * button_grid;
+    GtkWidget * btn_trash;
     GtkWidget * btn_profile;
     GtkWidget * lbl_name;
     GtkWidget * lbl_host;
@@ -238,7 +239,7 @@ OnvifMgrDeviceRow__trash (GtkWidget * widget, OnvifMgrDeviceRow * device){
 }
 
 static GtkWidget * 
-OnvifMgrDeviceRow__create_save_btn(OnvifMgrDeviceRow * self){
+OnvifMgrDeviceRow__create_trash_btn(OnvifMgrDeviceRow * self){
     GError *error = NULL;
     GtkWidget *button = gtk_button_new();
     GtkWidget * image = GtkStyledImage__new((unsigned char *)_binary_trash_png_start, _binary_trash_png_end - _binary_trash_png_start, 20, 20, error);
@@ -259,12 +260,7 @@ OnvifMgrDeviceRow__create_save_btn(OnvifMgrDeviceRow * self){
     gtk_widget_set_halign(button, GTK_ALIGN_CENTER);
     gtk_widget_set_valign(button, GTK_ALIGN_CENTER);
 
-    GtkCssProvider * cssProvider = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(cssProvider, "* { padding: 2px; }",-1,NULL); 
-    GtkStyleContext * context = gtk_widget_get_style_context(button);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-    g_object_unref (cssProvider);  
-
+    safely_set_widget_css(button,"* { padding: 2px; }");
     return button;
 }
 
@@ -272,39 +268,39 @@ static void OnvifMgrDeviceRow__btn_profile_clicked (GtkWidget * widget, OnvifMgr
     g_signal_emit (device, signals[PROFILE_CLICKED], 0 /* details */);
 }
 
-static GtkWidget * 
-OnvifMgrDeviceRow__create_buttons(OnvifMgrDeviceRow * self){
+static gboolean 
+OnvifMgrDeviceRow__attach_buttons(void * user_data){
+    OnvifMgrDeviceRow * self = ONVIFMGR_DEVICEROW(user_data);
     OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
 
     GtkWidget* hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     GtkWidget* vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 
-    priv->btn_save = OnvifMgrDeviceRow__create_save_btn(self);
-    g_object_set (priv->btn_save, "margin-end", 3, NULL);
+    priv->btn_trash = OnvifMgrDeviceRow__create_trash_btn(self);
+    g_object_set (priv->btn_trash, "margin-end", 3, NULL);
 
-    gtk_box_pack_start(GTK_BOX(hbox), priv->btn_save,     FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(hbox), priv->btn_trash,     FALSE, FALSE, 0);
 
     priv->btn_profile = gtk_button_new_with_label("");
     g_signal_connect (G_OBJECT(priv->btn_profile), "clicked", G_CALLBACK (OnvifMgrDeviceRow__btn_profile_clicked), self);
 
-    GtkCssProvider * cssProvider = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(cssProvider, "* { min-height: 15px; padding: 0px; padding-bottom: 2px; }",-1,NULL); 
-    GtkStyleContext * context = gtk_widget_get_style_context(priv->btn_profile);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-    g_object_unref (cssProvider);  
-
+    safely_set_widget_css(priv->btn_profile,"* { min-height: 15px; padding: 0px; padding-bottom: 2px; }");
+    
     gtk_widget_set_sensitive (priv->btn_profile, FALSE);
     gtk_box_pack_start(GTK_BOX(hbox), priv->btn_profile,     TRUE, TRUE, 0);
 
     gtk_box_pack_start(GTK_BOX(vbox), hbox,     FALSE, FALSE, 0);
-    return vbox;
+
+    gtk_grid_attach (GTK_GRID (priv->button_grid), vbox, 0, 4, 2, 1);
+
+    return FALSE;
 }
 
 static void
 OnvifMgrDeviceRow__create_layout(OnvifMgrDeviceRow * self){
     OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
 
-    GtkWidget * grid = gtk_grid_new();
+    priv->button_grid = gtk_grid_new();
 
     priv->lbl_name = gtk_label_new (NULL);
     PangoAttrList *const Attrs = pango_attr_list_new();
@@ -315,33 +311,33 @@ OnvifMgrDeviceRow__create_layout(OnvifMgrDeviceRow * self){
 
     g_object_set (priv->lbl_name, "margin-end", 5, NULL);
     gtk_widget_set_hexpand (priv->lbl_name, TRUE);
-    gtk_grid_attach (GTK_GRID (grid), priv->lbl_name, 0, 0, 2, 1);
+    gtk_grid_attach (GTK_GRID (priv->button_grid), priv->lbl_name, 0, 0, 2, 1);
 
     priv->image = gtk_spinner_new ();
     priv->image_handle = gtk_event_box_new ();
     gtk_container_add (GTK_CONTAINER (priv->image_handle), priv->image);
-    gtk_grid_attach (GTK_GRID (grid), priv->image_handle, 0, 1, 1, 3);
+    gtk_grid_attach (GTK_GRID (priv->button_grid), priv->image_handle, 0, 1, 1, 3);
 
     priv->lbl_host = gtk_label_new (NULL);
     g_object_set (priv->lbl_host, "margin-top", 0, "margin-end", 5, NULL);
     gtk_widget_set_hexpand (priv->lbl_host, TRUE);
-    gtk_grid_attach (GTK_GRID (grid), priv->lbl_host, 1, 1, 1, 1);
+    gtk_grid_attach (GTK_GRID (priv->button_grid), priv->lbl_host, 1, 1, 1, 1);
 
     priv->lbl_hardware = gtk_label_new (NULL);
     g_object_set (priv->lbl_hardware, "margin-top", 0, "margin-end", 5, NULL);
     gtk_widget_set_hexpand (priv->lbl_hardware, TRUE);
-    gtk_grid_attach (GTK_GRID (grid), priv->lbl_hardware, 1, 2, 1, 1);
+    gtk_grid_attach (GTK_GRID (priv->button_grid), priv->lbl_hardware, 1, 2, 1, 1);
 
     priv->lbl_location = gtk_label_new (NULL);
     gtk_label_set_ellipsize (GTK_LABEL(priv->lbl_location),PANGO_ELLIPSIZE_END);
     g_object_set (priv->lbl_location, "margin-top", 0, "margin-end", 5, NULL);
     gtk_widget_set_hexpand (priv->lbl_location, TRUE);
-    gtk_grid_attach (GTK_GRID (grid), priv->lbl_location, 1, 3, 1, 1);
+    gtk_grid_attach (GTK_GRID (priv->button_grid), priv->lbl_location, 1, 3, 1, 1);
 
-    GtkWidget * widget = OnvifMgrDeviceRow__create_buttons(self);
-    gtk_grid_attach (GTK_GRID (grid), widget, 0, 4, 2, 1);
+    //Dispatch image creation using GUI thread, because GtkImage construction isn't safe
+    g_idle_add(OnvifMgrDeviceRow__attach_buttons,self);
 
-    gtk_container_add (GTK_CONTAINER (self), grid);
+    gtk_container_add (GTK_CONTAINER (self), priv->button_grid);
     //For some reason, spinner has a floating ref
     //This is required to keep ability to remove the spinner later
     g_object_ref(priv->image);
@@ -596,8 +592,9 @@ OnvifDevice * OnvifMgrDeviceRow__get_device(OnvifMgrDeviceRow * self){
 }
 
 gboolean OnvifMgrDeviceRow__update_profile_btn(void * user_data){
-    OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (ONVIFMGR_DEVICEROW(user_data));
-
+    OnvifMgrDeviceRow * self = ONVIFMGR_DEVICEROW(user_data);
+    OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
+    
     if(priv->profile){
         gtk_button_set_label(GTK_BUTTON(priv->btn_profile),OnvifProfile__get_name(priv->profile));
         gtk_widget_set_sensitive (priv->btn_profile, TRUE);
@@ -626,11 +623,10 @@ void OnvifMgrDeviceRow__set_profile(OnvifMgrDeviceRow * self, OnvifProfile * pro
     }
 
     priv->profile = OnvifProfile__copy(profile);
+    g_signal_emit (self, signals[PROFILE_CHANGED], 0);
 
     g_object_ref(self);
     gdk_threads_add_idle(G_SOURCE_FUNC(OnvifMgrDeviceRow__update_profile_btn),self);
-
-    g_signal_emit (self, signals[PROFILE_CHANGED], 0 /* details */);
 }
 
 OnvifProfile * OnvifMgrDeviceRow__get_profile(OnvifMgrDeviceRow * self){
@@ -763,7 +759,7 @@ void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
     g_return_if_fail (ONVIFMGR_IS_DEVICEROW (self));
     ONVIFMGR_DEVICEROW_TRACE("%s OnvifMgrDeviceRow__load_thumbnail",self);
 
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self) || QueueEvent__is_cancelled(QueueEvent__get_current())){
         C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
         return;
     }
@@ -773,7 +769,7 @@ void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
     if(OnvifDevice__is_authenticated(priv->device)){
         OnvifMediaService * media_service = OnvifDevice__get_media_service(priv->device);
         OnvifSnapshot * snapshot = OnvifMediaService__getSnapshot(media_service,OnvifProfile__get_index(priv->profile));
-        if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self)){
+        if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self) || QueueEvent__is_cancelled(QueueEvent__get_current())){
             C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
             return;
         }

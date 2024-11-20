@@ -3,6 +3,7 @@
 #include "clogger.h"
 #include <pwd.h>
 #include <errno.h>
+#include "../gui_utils.h"
 
 #define CONFIG_FILE_PATH "onvifmgr_settings.ini"
 
@@ -196,9 +197,6 @@ void AppSettings__create_ui(AppSettings * self){
     GtkWidget * notebook;
     GtkWidget * label;
 
-    GtkCssProvider * cssProvider;
-    GtkStyleContext * context;
-
     self->widget = gtk_grid_new(); //Create root setting container
 
     notebook = gtk_notebook_new(); //Create note containing setting pages
@@ -225,18 +223,8 @@ void AppSettings__create_ui(AppSettings * self){
     gtk_label_set_justify(GTK_LABEL(widget), GTK_JUSTIFY_CENTER);
     gtk_widget_show(widget);
 
-    cssProvider = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(cssProvider, "* { background-image:none; color:#DE5E09;}",-1,NULL); 
-    context = gtk_widget_get_style_context(widget);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
-    g_object_unref (cssProvider);  
-
-    cssProvider = gtk_css_provider_new();
-    
-    gtk_css_provider_load_from_data(cssProvider, "* { background-image:none; border-color:#FAB05B; border-radius:16px}",-1,NULL); 
-    context = gtk_widget_get_style_context(self->notice);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
-    g_object_unref (cssProvider);  
+    gui_widget_set_css(widget,"* { background-image:none; color:#DE5E09;}");
+    gui_widget_set_css(self->notice,"* { background-image:none; border-color:#FAB05B; border-radius:16px}");
 
     gtk_container_add(GTK_CONTAINER(self->notice),widget);
     

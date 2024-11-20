@@ -26,7 +26,7 @@ static void change_color (GtkWidget * widget, gpointer * ptr){
 
     char str[255];
     sprintf(str, "* { color: %s; }", colors[color_index]);
-    gui_widget_set_css(widget, str, NULL);
+    gui_widget_set_css(widget, str);
 }
 
 GtkWidget * create_image(){

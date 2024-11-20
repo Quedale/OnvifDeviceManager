@@ -2,6 +2,7 @@
 #include <gtk/gtk.h>
 #include "clogger.h"
 #include "../../animations/gtk/gtk_dotted_slider_widget.h"
+#include "../gui_utils.h"
 
 #define ONVIFMGR_APPDIALOG_TITLE_PREFIX "<span size=\"x-large\">"
 #define ONVIFMGR_APPDIALOG_TITLE_SUFFIX "</span>"
@@ -123,8 +124,6 @@ OnvifMgrAppDialog__dummy_create_ui(OnvifMgrAppDialog * self){
 
 static GtkWidget * 
 OnvifMgrAppDialog__create_panel(OnvifMgrAppDialog * self){
-    GtkCssProvider * cssProvider;
-    GtkStyleContext * context;
     OnvifMgrAppDialogPrivate *priv = OnvifMgrAppDialog__get_instance_private (self);
     priv->panel_decor = gtk_grid_new ();
     //Add title strip
@@ -132,13 +131,7 @@ OnvifMgrAppDialog__create_panel(OnvifMgrAppDialog * self){
     gtk_widget_set_margin_bottom(priv->title_lbl,10);
     gtk_widget_set_hexpand (priv->title_lbl, TRUE);
     gtk_grid_attach (GTK_GRID (priv->panel_decor), priv->title_lbl, 0, 0, 1, 1);
-
-    //Lightgrey background for the title strip
-    cssProvider = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(cssProvider, "* { background-image:none; border-radius: 10px; padding: 10px; background: linear-gradient(to top, @theme_bg_color, @theme_bg_color);}",-1,NULL); 
-    context = gtk_widget_get_style_context(priv->panel_decor);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
-
+    
     OnvifMgrAppDialog__create_buttons(self);
     gtk_grid_attach (GTK_GRID (priv->panel_decor), priv->action_panel, 0, 3, 1, 1);
 
@@ -151,12 +144,9 @@ OnvifMgrAppDialog__create_panel(OnvifMgrAppDialog * self){
     gtk_label_set_justify(GTK_LABEL(priv->lblerr), GTK_JUSTIFY_CENTER);
     gtk_widget_set_no_show_all(priv->lblerr,TRUE);
 
-    cssProvider = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(cssProvider, "* { background-image:none; color:#DE5E09;}",-1,NULL); 
-    context = gtk_widget_get_style_context(priv->lblerr);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
-
-    g_object_unref (cssProvider);  
+    //Lightgrey background for the title strip
+    gui_widget_set_css(priv->panel_decor,"* { background-image:none; border-radius: 10px; padding: 10px; background: linear-gradient(to top, @theme_bg_color, @theme_bg_color);}");
+    gui_widget_set_css(priv->lblerr,"* { background-image:none; color:#DE5E09;}");
 
     return priv->panel_decor;
 }
@@ -164,57 +154,43 @@ OnvifMgrAppDialog__create_panel(OnvifMgrAppDialog * self){
 static void
 OnvifMgrAppDialog__real_create_ui(OnvifMgrAppDialog * self){
     GtkWidget * empty;
-    GtkCssProvider * cssProvider;
-    GtkStyleContext * context;
-
-    //See-through overlay background
-    cssProvider = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(cssProvider, "* { background-image:none; background-color:black; opacity:0.3;}",-1,NULL); 
 
     //Remove this to align left
     empty = gtk_label_new("");
     gtk_widget_set_vexpand (empty, TRUE);
     gtk_widget_set_hexpand (empty, TRUE);
     gtk_grid_attach (GTK_GRID (self), empty, 0, 0, 1, 3);
-    context = gtk_widget_get_style_context(empty);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
+    //See-through overlay background
+    gui_widget_set_css(empty,"* { background-image:none; background-color:black; opacity:0.3;}");
 
     //Remove this to align rights
     empty = gtk_label_new("");
     gtk_widget_set_vexpand (empty, TRUE);
     gtk_widget_set_hexpand (empty, TRUE);
     gtk_grid_attach (GTK_GRID (self), empty, 2, 0, 1, 3);
-    context = gtk_widget_get_style_context(empty);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
+    gui_widget_set_css(empty,"* { background-image:none; background-color:black; opacity:0.3;}");
 
     //Remove this to align top
     empty = gtk_label_new("");
     gtk_widget_set_vexpand (empty, TRUE);
     gtk_widget_set_hexpand (empty, TRUE);
     gtk_grid_attach (GTK_GRID (self), empty, 1, 0, 1, 1);
-    context = gtk_widget_get_style_context(empty);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
+    gui_widget_set_css(empty,"* { background-image:none; background-color:black; opacity:0.3;}");
 
     //Remove this to align bot
     empty = gtk_label_new("");
     gtk_widget_set_vexpand (empty, TRUE);
     gtk_widget_set_hexpand (empty, TRUE);
     gtk_grid_attach (GTK_GRID (self), empty, 1, 2, 1, 1);
-    context = gtk_widget_get_style_context(empty);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
+    gui_widget_set_css(empty,"* { background-image:none; background-color:black; opacity:0.3;}");
     
     empty = OnvifMgrAppDialog__create_panel(self);
     gtk_grid_attach (GTK_GRID (self), empty, 1, 1, 1, 1);
 
     //Creating empty panel, to create opacity background behind corners
-    cssProvider = gtk_css_provider_new();
-    gtk_css_provider_load_from_data(cssProvider, "* { background-image:none; background-color:black; opacity:0.3;}",-1,NULL); 
     empty = gtk_label_new("");
-    context = gtk_widget_get_style_context(empty);
-    gtk_style_context_add_provider(context, GTK_STYLE_PROVIDER(cssProvider),GTK_STYLE_PROVIDER_PRIORITY_USER);
+    gui_widget_set_css(empty,"* { background-image:none; background-color:black; opacity:0.3;}");
     gtk_grid_attach (GTK_GRID (self), empty, 1, 1, 1, 1);
-
-    g_object_unref (cssProvider);  
 }
 
 static void

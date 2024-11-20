@@ -199,7 +199,7 @@ updatethumb:
     if(!OnvifMgrDeviceRow__is_initialized(omgr_device)){ //First time initialization
         OnvifMgrDeviceRow__set_initialized(omgr_device);
         //If it was selected while initializing, redispatch select_device
-        if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(omgr_device) && gtk_list_box_row_is_selected(GTK_LIST_BOX_ROW(omgr_device)) && !QueueEvent__is_cancelled(qevt)){
+        if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(omgr_device) && OnvifMgrDeviceRow__is_selected(omgr_device) && !QueueEvent__is_cancelled(qevt)){
             g_object_ref(omgr_device);
             //TODO Handle event cancellation within GUI event
             gdk_threads_add_idle(G_SOURCE_FUNC(idle_select_device),omgr_device);
@@ -797,7 +797,6 @@ void OnvifApp__create_ui (OnvifApp * app) {
     gtk_grid_attach (GTK_GRID (left_grid), hbox, 0, 0, 1, 1);
 
     char * btn_css = "* { padding: 0px; font-size: 1.5em; }";
-    GtkCssProvider * btn_css_provider = NULL;
 
     GError *error = NULL;
     GtkWidget * image = GtkStyledImage__new((unsigned char *)_binary_tower_png_start, _binary_tower_png_end - _binary_tower_png_start, 25, 25, error);
@@ -826,7 +825,7 @@ void OnvifApp__create_ui (OnvifApp * app) {
 
     gtk_box_pack_start (GTK_BOX(hbox),priv->btn_scan,TRUE,TRUE,0);
     g_signal_connect (priv->btn_scan, "clicked", G_CALLBACK (OnvifApp__btn_scan_cb), app);
-    btn_css_provider = gui_widget_set_css(priv->btn_scan, btn_css, btn_css_provider);
+    gui_widget_set_css(priv->btn_scan, btn_css);
 
 
     GtkWidget * add_btn = gtk_button_new ();
@@ -835,7 +834,7 @@ void OnvifApp__create_ui (OnvifApp * app) {
     // gtk_label_set_markup (GTK_LABEL (label), "&#x2795;"); //Heavy
     gtk_label_set_markup (GTK_LABEL (label), "&#xFF0B;"); //Full width
     gtk_container_add (GTK_CONTAINER (add_btn), label);
-    btn_css_provider = gui_widget_set_css(add_btn, btn_css, btn_css_provider);
+    gui_widget_set_css(add_btn, btn_css);
 
     gtk_box_pack_start (GTK_BOX(hbox),add_btn,FALSE,TRUE,0);
 
@@ -852,7 +851,7 @@ void OnvifApp__create_ui (OnvifApp * app) {
     gtk_container_add(GTK_CONTAINER(widget),priv->listbox);
     gtk_grid_attach (GTK_GRID (left_grid), widget, 0, 2, 1, 1);
     g_signal_connect (priv->listbox, "row-selected", G_CALLBACK (OnvifApp__row_selected_cb), app);
-    g_object_unref(gui_widget_set_css(widget, "* { padding-bottom: 3px; padding-top: 3px; padding-right: 3px; }", NULL)); 
+    gui_widget_set_css(widget, "* { padding-bottom: 3px; padding-top: 3px; padding-right: 3px; }"); 
 
     widget = gtk_button_new ();
     label = gtk_label_new("");
@@ -862,12 +861,12 @@ void OnvifApp__create_ui (OnvifApp * app) {
     gtk_widget_set_hexpand (widget, FALSE);
     g_signal_connect (G_OBJECT(widget), "clicked", G_CALLBACK (OnvifApp__quit_cb), app);
     gtk_grid_attach (GTK_GRID (left_grid), widget, 0, 3, 1, 1);
-    g_object_unref(gui_widget_set_css(widget, btn_css, btn_css_provider)); 
+    gui_widget_set_css(widget, btn_css); 
     
     GtkWidget *hpaned = gtk_paned_new (GTK_ORIENTATION_HORIZONTAL);
     gtk_widget_set_vexpand (hpaned, TRUE);
     gtk_widget_set_hexpand (hpaned, TRUE);
-    g_object_unref(gui_widget_set_css(hpaned, "paned separator{min-width: 10px;}", NULL));
+    gui_widget_set_css(hpaned, "paned separator{min-width: 10px;}");
     gtk_paned_pack1 (GTK_PANED (hpaned), left_grid, FALSE, FALSE);
 
     /* Create a new notebook, place the position of the tabs */
