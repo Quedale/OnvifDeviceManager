@@ -35,6 +35,7 @@ typedef struct _OnvifMgrEncryptedStoreClassPrivate {
 typedef struct _EncryptionChunkData {
     OnvifMgrEncryptedStore * store;
     unsigned char * data;
+    int len_parsed;
     int len;
     int expected_len;
 } EncryptionChunkData;
@@ -89,9 +90,17 @@ encrypted_chunk_callback (unsigned char * buffer, int buffer_length, void * user
     int data_parsed = 0;
     while(data_parsed < buffer_length){
         if(!chunk->data){//Extract object size
-            memcpy(&(chunk->expected_len),&buffer[data_parsed],int_size);
-            data_parsed+=int_size;
-            chunk->data = malloc(chunk->expected_len);
+            int * exp_len = &chunk->expected_len;
+            int int_len_to_read = (data_parsed + int_size > buffer_length) ? buffer_length-data_parsed : (chunk->len_parsed > 0) ? int_size-chunk->len_parsed : int_size;
+
+            memcpy(&exp_len[chunk->len_parsed],&buffer[data_parsed],int_len_to_read);
+            chunk->len_parsed += int_len_to_read;
+            data_parsed+= int_len_to_read;
+    
+            if(chunk->len_parsed == int_size){
+                chunk->data = malloc(chunk->expected_len);
+                chunk->len_parsed = 0;
+            }
         }
 
         int len_to_read = (buffer_length-data_parsed >= chunk->expected_len-chunk->len) ? chunk->expected_len-chunk->len : buffer_length-data_parsed;
@@ -99,7 +108,7 @@ encrypted_chunk_callback (unsigned char * buffer, int buffer_length, void * user
         if(len_to_read == 0) break; //Encryption adds extra \0 padding to chunks
         
         //Sanity check
-        if(data_parsed + len_to_read > buffer_length){
+        if(data_parsed + len_to_read > buffer_length || len_to_read < 0){
             C_WARN("Invalid serializble length detected.");
             return FALSE;
         }
@@ -145,6 +154,7 @@ OnvifMgrEncryptedStore__read_store(QueueEvent * qevt, void * user_data){
     floating_data->len = 0;
     floating_data->expected_len = 0;
     floating_data->store = self;
+    floating_data->len_parsed = 0;
     int decrypted_data_len = EncryptionUtils__read_encrypted((unsigned char *) priv->passphrase,
                                     priv->passphrase_len,
                                     klass->extension->store_path,
