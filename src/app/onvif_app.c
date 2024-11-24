@@ -49,16 +49,6 @@ struct IdleRetryData {
     OnvifMgrDeviceRow * device;
 };
 
-struct IdlePlayData {
-    GstRtspPlayer * player;
-    char * uri;
-    char * user;
-    char * pass;
-    char * host;
-    char * port;
-    OnvifMgrDeviceRow * device;
-};
-
 static guint signals[LAST_SIGNAL] = { 0 };
 
 static void OnvifApp__ownable_interface_init (COwnableObjectInterface *iface);
@@ -224,25 +214,6 @@ void _profile_callback (QueueEvent * qevt, void * user_data){
 
 }
 
-gboolean idle_play_stream(void * user_data){
-    struct IdlePlayData * data = (struct IdlePlayData*) user_data;
-    ONVIFMGR_DEVICEROW_TRACE("%s idle_play_stream",data->device);
-    OnvifDevice * odev = OnvifMgrDeviceRow__get_device(data->device);
-    if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(data->device) && OnvifDevice__is_authenticated(odev) && OnvifMgrDeviceRow__is_selected(data->device)) {
-        GstRtspPlayer__play(data->player,data->uri,data->user,data->pass,data->host,data->port, data->device);
-    }
-    
-    g_object_unref(data->device);
-    free(data->uri);
-    free(data->port);
-    free(data->host);
-    free(data->user);
-    free(data->pass);
-    free(data);
-    
-    return FALSE;
-}
-
 void _play_onvif_stream(QueueEvent * qevt, void * user_data){
     ONVIFMGR_DEVICEROW_TRACE("_play_onvif_stream %s",user_data);
     OnvifMgrDeviceRow * device = ONVIFMGR_DEVICEROW(user_data);
@@ -268,23 +239,21 @@ void _play_onvif_stream(QueueEvent * qevt, void * user_data){
     SoapFault * fault = SoapObject__get_fault(SOAP_OBJECT(media_uri));
     
     if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) && *fault == SOAP_FAULT_NONE && !(qevt != NULL && QueueEvent__is_cancelled(qevt))){
-        struct IdlePlayData * data = malloc(sizeof(struct IdlePlayData));
-        data->player = priv->player;
-        data->device = device;
-
-        data->port = OnvifDevice__get_port(OnvifMgrDeviceRow__get_device(device));
-        data->host = OnvifDevice__get_host(OnvifMgrDeviceRow__get_device(device));
-        
         OnvifCredentials * ocreds = OnvifDevice__get_credentials(odev);
-        data->user = OnvifCredentials__get_username(ocreds);
-        data->pass = OnvifCredentials__get_password(ocreds);
-        
-        char * uri = OnvifMediaUri__get_uri(media_uri);
-        data->uri = malloc(strlen(uri)+1);
-        strcpy(data->uri,uri);
+        char * user = OnvifCredentials__get_username(ocreds);
+        char * pass = OnvifCredentials__get_password(ocreds);
+        char * port = OnvifDevice__get_port(OnvifMgrDeviceRow__get_device(device));
+        char * host = OnvifDevice__get_host(OnvifMgrDeviceRow__get_device(device));
+        GstRtspPlayer__play(priv->player,OnvifMediaUri__get_uri(media_uri),user,pass,host,port, device);
+        if(pass)
+            free(pass);
+        if(user)
+            free(user);
+        if(port)
+            free(port);
+        if(host)
+            free(host);
 
-        g_object_ref(device);
-        g_idle_add(G_SOURCE_FUNC(idle_play_stream),data);
     } else if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device)) {
         C_TRAIL("_play_onvif_stream - invalid device.");
     }

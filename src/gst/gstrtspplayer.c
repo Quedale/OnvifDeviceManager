@@ -15,31 +15,34 @@ typedef enum {
 
 
 struct _GstRtspPlayerSession {
-  GstRtspPlayer * player;
-  GstElement *pipeline;
-  GstElement *src;  /* RtspSrc to support backchannel */
-  GList * dynamic_elements;
-  GstRtspPlayerFallbackType fallback;
+    GstRtspPlayer * player;
+    GstElement *pipeline;
+    GstElement *src;  /* RtspSrc to support backchannel */
+    GList * dynamic_elements;
+    GstRtspPlayerFallbackType fallback;
 
-  //Keep location to used on retry
-  char * location_set;
-  char * location;
-  int valid_location;
+    //Keep location to used on retry
+    char * location_set;
+    char * location;
+    int valid_location;
 
-  //Retry count
-  int retry;
-  char * user;
-  char * pass;
-  char * port_fallback;
-  char * host_fallback;
-  int enable_backchannel;
-  void * user_data;
+    //Retry count
+    int retry;
+    char * user;
+    char * pass;
+    char * port_fallback;
+    char * host_fallback;
+    int enable_backchannel;
+    void * user_data;
 };
 
 typedef struct {
     GstRtspPlayer * owner;
     GstRtspPlayerSession * session;
-
+    GMainContext * player_context;
+    GMainLoop * player_loop;
+    P_COND_TYPE loop_cond;
+    P_MUTEX_TYPE loop_lock;
     //Reusable bins containing encoder and sink
     GstElement * video_bin;
     GstElement * audio_bin;
@@ -62,6 +65,25 @@ typedef struct {
     P_MUTEX_TYPE player_lock;
 } GstRtspPlayerPrivate;
 
+typedef struct {
+    GstRtspPlayer * player;
+    guint signalid;
+    va_list args;
+
+    int done;
+    P_COND_TYPE cond;
+    P_MUTEX_TYPE lock;
+} GstSignalWaitData;
+
+struct GstInitData{
+    GMainContext ** context;
+    GMainLoop ** loop;
+    int done;
+    P_COND_TYPE * finish_cond;
+    P_COND_TYPE cond;
+    P_MUTEX_TYPE lock;
+};
+
 enum {
   STOPPED,
   STARTED,
@@ -74,8 +96,30 @@ static guint signals[LAST_SIGNAL] = { 0 };
 
 G_DEFINE_TYPE_WITH_PRIVATE(GstRtspPlayer, GstRtspPlayer_, G_TYPE_OBJECT)
 
-static void 
+static gboolean 
 GstRtspPlayerSession__message_handler (GstBus * bus, GstMessage * message, GstRtspPlayerSession * session);
+
+static gboolean _player_signal_and_wait(GstSignalWaitData * data){
+    g_signal_emit_valist (data->player, data->signalid, 0, data->args);
+    data->done = 1;
+    P_COND_BROADCAST(data->cond);
+    return FALSE;
+}
+
+void player_signal_and_wait(GstRtspPlayer * self, guint signalid, ...){
+    GstSignalWaitData data;
+    va_start(data.args, signalid);
+    data.done = 0;
+    data.player = self;
+    data.signalid = signalid;
+    P_COND_SETUP(data.cond);
+    P_MUTEX_SETUP(data.lock);
+    g_main_context_invoke(g_main_context_default(),G_SOURCE_FUNC(_player_signal_and_wait),&data);
+    if(!data.done) { P_COND_WAIT(data.cond, data.lock); }
+    P_COND_CLEANUP(data.cond);
+    P_MUTEX_CLEANUP(data.lock);
+    va_end(data.args);
+}
 
 static GstRtspPlayerSession * GstRtspPlayerSession__create(GstRtspPlayer * player, char * url, char * user, char * pass, char * fallback_host, char * fallback_port, void * user_data){
     GstRtspPlayerSession * session = malloc(sizeof(GstRtspPlayerSession));
@@ -458,8 +502,9 @@ GstRtspPlayerSession__on_rtsp_pad_added (GstElement *element, GstPad *new_pad, G
         P_MUTEX_SETUP(data.lock);
 
         C_TRACE("%s dispatch idle_attach_video_pad", session->location);
-        g_idle_add(G_SOURCE_FUNC(GstRtspPlayerSession__idle_attach_video_pad),&data);
-        
+        // g_idle_add(G_SOURCE_FUNC(GstRtspPlayerSession__idle_attach_video_pad),&data);
+        GstRtspPlayerSession__idle_attach_video_pad(&data);
+
         if(!data.done) { C_TRACE("%s wait idle_attach_video_pad", session->location); P_COND_WAIT(data.cond, data.lock); }
         P_COND_CLEANUP(data.cond);
         P_MUTEX_CLEANUP(data.lock);
@@ -533,13 +578,26 @@ GstRtspPlayerSession__setup_pipeline (GstRtspPlayerSession * session)
     g_object_set (G_OBJECT (session->src), "do-retransmission", TRUE, NULL);
     g_object_set (G_OBJECT (session->src), "onvif-mode", FALSE, NULL); //It seems onvif mode can cause segmentation fault with libva
     g_object_set (G_OBJECT (session->src), "is-live", TRUE, NULL);
-    g_object_set (G_OBJECT (session->src), "tcp-timeout", 1000000, NULL);
+    g_object_set (G_OBJECT (session->src), "tcp-timeout", 10000, NULL);
     g_object_set (G_OBJECT (session->src), "protocols", GST_RTSP_LOWER_TRANS_TCP, NULL); //TODO Allow changing this via settings
 
     /* set up bus */
     GstBus *bus = gst_element_get_bus (session->pipeline);
-    gst_bus_add_signal_watch (bus);
-    g_signal_connect (bus, "message", G_CALLBACK (GstRtspPlayerSession__message_handler), session);
+    GSource *source = gst_bus_create_watch (bus);
+    if (!source) {
+        g_critical ("Creating bus watch failed");
+        return 0;
+    }
+    // g_source_set_priority (source, priority);
+    g_source_set_callback (source, G_SOURCE_FUNC(GstRtspPlayerSession__message_handler), session, NULL);
+    if(priv->player_context){
+        g_source_attach (source, priv->player_context);
+    } else {
+        GMainContext *ctx = g_main_context_get_thread_default ();
+        g_source_attach (source, ctx);
+    }
+
+    g_source_unref (source);
     gst_object_unref (bus);
 
     return session;
@@ -550,13 +608,22 @@ gboolean GstRtspPlayerPrivate__idle_hide(GtkWidget * widget){
     return FALSE;
 }
 
-void GstRtspPlayerPrivate__stop_unlocked(GstRtspPlayerPrivate * priv){
+gboolean GstRtspPlayerPrivate__idle_show(GtkWidget * widget){
+    gtk_widget_show(widget);
+    return FALSE;
+}
+
+gboolean GstRtspPlayerPrivate__stop_unlocked(GstRtspPlayerPrivate * priv){
     GstStateChangeReturn ret;
 
     if(!priv->session){
         C_TRACE("Nothing to stop.");
-        return;
+        return FALSE;
     }
+
+    //New pipeline causes previous pipe to stop dispatching state change.
+    //Force hide the previous stream
+    g_main_context_invoke(g_main_context_default(),G_SOURCE_FUNC(GstRtspPlayerPrivate__idle_hide),priv->canvas);
 
     //Pause backchannel
     if(!RtspBackchannel__pause(priv->backchannel)){
@@ -581,19 +648,17 @@ void GstRtspPlayerPrivate__stop_unlocked(GstRtspPlayerPrivate * priv){
         g_list_free(priv->session->dynamic_elements);
         priv->session->dynamic_elements = NULL;
     }
-    //New pipeline causes previous pipe to stop dispatching state change.
-    //Force hide the previous stream
-    g_idle_add(G_SOURCE_FUNC(GstRtspPlayerPrivate__idle_hide),priv->canvas);
+    return TRUE;
 }
 
 void GstRtspPlayerPrivate__stop(GstRtspPlayerPrivate * priv){
-    C_DEBUG("GstRtspPlayer__stop\n");
+    C_DEBUG("GstRtspPlayerPrivate__stop\n");
     P_MUTEX_LOCK(priv->player_lock);
     priv->playing = 0;
 
-    GstRtspPlayerPrivate__stop_unlocked(priv);
+    if(GstRtspPlayerPrivate__stop_unlocked(priv))
+        player_signal_and_wait (priv->owner, signals[STOPPED]);
     
-    g_signal_emit (priv->owner, signals[STOPPED], 0 /* details */);
     P_MUTEX_UNLOCK(priv->player_lock);
 }
 
@@ -732,10 +797,7 @@ GstRtspPlayerSession__error_msg (GstRtspPlayerSession * session, GstBus *bus, Gs
     
     int fallback = 0;
     GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (session->player);
-    if(priv->session != session){
-        C_DEBUG("%s State was most likely destroyed because a new stream started.", session->location);
-        return;
-    }
+    P_MUTEX_LOCK(priv->player_lock);
     gst_message_parse_error (msg, &err, &debug_info);
 
     switch(err->code){
@@ -788,7 +850,7 @@ GstRtspPlayerSession__error_msg (GstRtspPlayerSession * session, GstBus *bus, Gs
         default:
             C_ERROR ("%s Error received from element [%d] %s: %s",session->location,err->code, GST_OBJECT_NAME (msg->src), err->message);
             C_ERROR ("%s Debugging information: %s",session->location, debug_info ? debug_info : "none");
-            g_signal_emit (priv->owner, signals[ERROR], 0, session);
+            player_signal_and_wait (priv->owner, signals[ERROR], session);
     }
 
     g_clear_error (&err);
@@ -796,23 +858,28 @@ GstRtspPlayerSession__error_msg (GstRtspPlayerSession * session, GstBus *bus, Gs
 
     if((fallback && priv->playing) || (session->retry < 3 && priv->playing)){ //TODO Check if any retry callback exists
         //Stopping player after if condition because "playing" gets reset
-        GstRtspPlayerPrivate__stop(priv);
+        GstRtspPlayerPrivate__stop_unlocked(priv);
         C_WARN("****************************************************");
         if(fallback) C_WARN("* URI fallback attempt %s", session->location); else C_WARN("* Retry attempt #%i - %s",session->retry, session->location);
         C_WARN("****************************************************");
         //Retry signal - The player doesn't invoke retry on its own to allow the invoker to dispatch it asynchroniously
         if(!fallback)
             session->retry++;
-        g_signal_emit (priv->owner, signals[RETRY], 0, session);
+        P_MUTEX_UNLOCK(priv->player_lock);
+        player_signal_and_wait (priv->owner, signals[RETRY], session);
+        return;
     } else if(priv->playing == 1) {
         C_TRACE("%s Player giving up. Too many retries...", session->location);
         priv->playing = 0;
-        GstRtspPlayerPrivate__stop(priv);
+        GstRtspPlayerPrivate__stop_unlocked(priv);
+        P_MUTEX_UNLOCK(priv->player_lock);
         //Error signal
-        g_signal_emit (priv->owner, signals[ERROR], 0, session);
+        player_signal_and_wait (priv->owner, signals[ERROR], session);
+        return;
     } else { //Ignoring error after the player requested to stop (gst_rtspsrc_try_send)
         C_TRACE("Player no longer playing...");
     }
+    P_MUTEX_UNLOCK(priv->player_lock);
 }
 
 /* This function is called when an End-Of-Stream message is posted on the bus.
@@ -867,9 +934,9 @@ GstRtspPlayerSession__state_changed_msg (GstRtspPlayerSession * session, GstBus 
     }
 
     if(GstRtspPlayerSession__is_video_bin(element) && new_state != GST_STATE_PLAYING && GTK_IS_WIDGET (priv->canvas)){
-        gtk_widget_set_visible(priv->canvas, FALSE);
+        g_main_context_invoke(g_main_context_default(),G_SOURCE_FUNC(GstRtspPlayerPrivate__idle_hide),priv->canvas);
     } else if(GstRtspPlayerSession__is_video_bin(element) && new_state == GST_STATE_PLAYING && GTK_IS_WIDGET (priv->canvas)){
-        gtk_widget_set_visible(priv->canvas, TRUE);
+        g_main_context_invoke(g_main_context_default(),G_SOURCE_FUNC(GstRtspPlayerPrivate__idle_show),priv->canvas);
 
         /*
         * Waiting for fix https://gitlab.freedesktop.org/gstreamer/gst-plugins-good/-/issues/245
@@ -882,13 +949,13 @@ GstRtspPlayerSession__state_changed_msg (GstRtspPlayerSession * session, GstBus 
         session->retry = 0;
         session->valid_location = 1;
         session->fallback = RTSP_FALLBACK_NONE;
-        
-        g_signal_emit (priv->owner, signals[STARTED], 0, session);
+
+        player_signal_and_wait (priv->owner, signals[STARTED],session);
     }
 }
 
 
-static void 
+static gboolean 
 GstRtspPlayerSession__message_handler (GstBus * bus, GstMessage * message, GstRtspPlayerSession * session)
 { 
     GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (session->player);
@@ -949,6 +1016,11 @@ GstRtspPlayerSession__message_handler (GstBus * bus, GstMessage * message, GstRt
             } else if (strcmp (name, "GstNavigationMessage") == 0 || 
                         strcmp (name, "application/x-rtp-source-sdes") == 0){
                 //Ignore intentionally left unhandled for now
+            } else if (strcmp (name, "GstRTSPSrcTimeout") == 0){
+                C_WARN("RtspServer rtp stream timedout [GstRTSPSrcTimeout]");
+                GstRtspPlayerPrivate__stop(priv);
+                session->retry=0;
+                player_signal_and_wait (priv->owner, signals[RETRY], session);
             } else {
                 C_ERROR("%s Unhandled element msg name : %s//%d", session->location,name,message->type);
             }
@@ -1026,6 +1098,26 @@ GstRtspPlayerSession__message_handler (GstBus * bus, GstMessage * message, GstRt
         default:
             C_WARN("%s msg : default....", session->location);
     }
+    return TRUE;
+}
+
+void * init_gst_seprate_mainloop(void * event){
+    struct GstInitData * data = (struct GstInitData*)event;
+    //Keeping location pointer because data won't be value after cond broadcast
+    GMainLoop ** loop = data->loop;
+    P_COND_TYPE * finish_cond = data->finish_cond;
+
+    c_log_set_thread_color(ANSI_COLOR_CYAN, P_THREAD_ID);
+    *data->context = g_main_context_new ();
+    *loop = g_main_loop_new (*data->context, FALSE);
+
+    data->done = 1;          //Flag that the context and loop are ready
+    P_COND_BROADCAST(data->cond);
+    g_main_loop_run (*loop);
+    *loop = NULL;            //Setting loop to NULL flags it as finished
+    P_COND_BROADCAST(*finish_cond); //broadcast to potentially waiting threads
+
+    return NULL;
 }
 
 static void
@@ -1033,7 +1125,26 @@ GstRtspPlayer__init (GstRtspPlayer * self)
 {
     GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
     priv->owner = self;
-    
+    P_COND_SETUP(priv->loop_cond);
+    P_MUTEX_SETUP(priv->loop_lock);
+
+    struct GstInitData data;
+    data.done = 0;
+    data.finish_cond = &priv->loop_cond;
+    data.context = &priv->player_context;
+    data.loop = &priv->player_loop;
+    P_COND_SETUP(data.cond);
+    P_MUTEX_SETUP(data.lock);
+
+    pthread_t pthread;
+    pthread_create(&pthread, NULL, init_gst_seprate_mainloop, &data);
+    pthread_detach(pthread);
+
+    if(!data.done) { C_TRACE("Waiting for Gstreamer loop initialization"); P_COND_WAIT(data.cond, data.lock); }
+    P_COND_CLEANUP(data.cond);
+    P_MUTEX_CLEANUP(data.lock);
+    C_TRACE("Gstreamer loop initialization successfull");
+
     priv->view_mode = GST_RTSP_PLAYER_VIEW_MODE_FIT_WINDOW;
     priv->overlay_state = OverlayState__create();
     priv->canvas_handle = gtk_grid_new ();
@@ -1047,7 +1158,7 @@ GstRtspPlayer__init (GstRtspPlayer * self)
     priv->audio_bin = GstRtspPlayerPrivate__create_audio_pad();
     g_object_ref(priv->audio_bin);
 
-    priv->backchannel = RtspBackchannel__create();
+    priv->backchannel = RtspBackchannel__create(priv->player_context);
 }
 
 GstRtspPlayer*  GstRtspPlayer__new (){
@@ -1169,9 +1280,23 @@ GstRtspPlayer__dispose (GObject *gobject)
 
     //Making sure stream is stopped
     GstRtspPlayerPrivate__stop(priv);
+    if(priv->player_loop){
+        g_main_loop_quit(priv->player_loop);
+        //Making sure the loop is finished so that session isn't destroyed while an event is running
+        if(priv->player_loop != NULL) { C_TRACE("Waiting for Gstreamer loop to finish"); P_COND_WAIT(priv->loop_cond, priv->loop_lock); }
+    }
+
+    P_COND_CLEANUP(priv->loop_cond);
+    P_MUTEX_CLEANUP(priv->loop_lock);
+
+    if(priv->player_context){
+        g_main_context_unref(priv->player_context);
+        priv->player_context = NULL;
+    }
 
     if(priv->session){
         GstRtspPlayerSession__destroy(priv->session);
+        priv->session = NULL;
     }
     OverlayState__destroy(priv->overlay_state);
     RtspBackchannel__destroy(priv->backchannel);

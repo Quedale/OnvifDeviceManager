@@ -5,8 +5,8 @@
 
 typedef struct _RtspBackchannel RtspBackchannel;
 
-RtspBackchannel * RtspBackchannel__create();
-void RtspBackchannel__init(RtspBackchannel * self);
+RtspBackchannel * RtspBackchannel__create(GMainContext * player_context);
+void RtspBackchannel__init(RtspBackchannel * self, GMainContext * player_context);
 void RtspBackchannel__destroy(RtspBackchannel * self);
 
 GstStateChangeReturn RtspBackchannel__pause(RtspBackchannel * self);

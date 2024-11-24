@@ -20,9 +20,9 @@ static void RtspBackchannel__message_handler (GstBus * bus, GstMessage * message
 GstFlowReturn RtspBackchannel__new_sample (GstElement * appsink, RtspBackchannel * self);
 gboolean RtspBackchannel__remove_extra_fields (GQuark field_id, GValue * value G_GNUC_UNUSED, gpointer user_data G_GNUC_UNUSED);
 
-RtspBackchannel * RtspBackchannel__create(){
+RtspBackchannel * RtspBackchannel__create(GMainContext * player_context){
     RtspBackchannel * self = malloc(sizeof(RtspBackchannel));
-    RtspBackchannel__init(self);
+    RtspBackchannel__init(self,player_context);
     return self;
 }
 
@@ -91,7 +91,7 @@ void RtspBackchannel__check_mic(RtspBackchannel * self){
     P_MUTEX_UNLOCK(init_lock);
 }
 
-void RtspBackchannel__init(RtspBackchannel * self){
+void RtspBackchannel__init(RtspBackchannel * self, GMainContext * player_context){
     GstElement *src;
     GstElement *enc;
     GstElement *pay;
@@ -148,8 +148,21 @@ void RtspBackchannel__init(RtspBackchannel * self){
 
     /* set up pipeline bus */
     GstBus *bus = gst_element_get_bus (self->pipeline);
-    gst_bus_add_signal_watch (bus);
-    g_signal_connect (bus, "message", G_CALLBACK (RtspBackchannel__message_handler), self);
+    GSource *source = gst_bus_create_watch (bus);
+    if (!source) {
+        C_FATAL ("Creating bus watch failed");
+        return;
+    }
+
+    g_source_set_callback (source, G_SOURCE_FUNC(RtspBackchannel__message_handler), self, NULL);
+    if(player_context){
+        g_source_attach (source, player_context);
+    } else {
+        GMainContext *ctx = g_main_context_get_thread_default ();
+        g_source_attach (source, ctx);
+    }
+
+    g_source_unref (source);
     gst_object_unref (bus);
 }
 
