@@ -180,8 +180,8 @@ char * GstRtspPlayerSession__get_uri(GstRtspPlayerSession * session){
 }
 
 static void GstRtspPlayerSession__destroy(GstRtspPlayerSession * session){
-    C_DEBUG("GstRtspPlayerSession__destroy");
     if(session){
+        C_DEBUG("%s GstRtspPlayerSession__destroy",session->location);
         if(GST_IS_ELEMENT(session->pipeline)){
             gst_object_unref (session->pipeline);
             session->pipeline = NULL;
@@ -502,8 +502,8 @@ GstRtspPlayerSession__on_rtsp_pad_added (GstElement *element, GstPad *new_pad, G
         P_MUTEX_SETUP(data.lock);
 
         C_TRACE("%s dispatch idle_attach_video_pad", session->location);
-        // g_idle_add(G_SOURCE_FUNC(GstRtspPlayerSession__idle_attach_video_pad),&data);
-        GstRtspPlayerSession__idle_attach_video_pad(&data);
+        //x11 hw acceleration requires to be attached on main thread.
+        g_main_context_invoke(g_main_context_default(),G_SOURCE_FUNC(GstRtspPlayerSession__idle_attach_video_pad),&data);
 
         if(!data.done) { C_TRACE("%s wait idle_attach_video_pad", session->location); P_COND_WAIT(data.cond, data.lock); }
         P_COND_CLEANUP(data.cond);
@@ -525,7 +525,7 @@ GstRtspPlayerSession__on_rtsp_pad_added (GstElement *element, GstPad *new_pad, G
         new_pad_struct = gst_caps_get_structure (new_pad_caps, 0);
         gint payload_v;
         gst_structure_get_int(new_pad_struct,"payload", &payload_v);
-        C_ERROR("%s Support other payload formats %i", session->location,payload_v);
+        C_ERROR("%s Support other payload formats %d", session->location,payload_v);
     }
 
 exit:
@@ -743,7 +743,8 @@ static int GstRtspPlayerSession__process_fallback(GstRtspPlayerSession * session
                 session->location = host_fallback;
                 break;
             } else {
-                free(host_fallback);
+                if(host_fallback)
+                    free(host_fallback);
             }
             __attribute__ ((fallthrough));
         case RTSP_FALLBACK_HOST:
@@ -756,7 +757,8 @@ static int GstRtspPlayerSession__process_fallback(GstRtspPlayerSession * session
                 session->location = port_fallback;
                 break;
             } else {
-                free(port_fallback);
+                if(port_fallback)
+                    free(port_fallback);
             }
             __attribute__ ((fallthrough));
         case RTSP_FALLBACK_PORT:
@@ -774,8 +776,10 @@ static int GstRtspPlayerSession__process_fallback(GstRtspPlayerSession * session
                 free(tmp_fallback);
                 break;
             } else {
-                free(url_fallback);
-                free(tmp_fallback);
+                if(url_fallback)
+                    free(url_fallback);
+                if(tmp_fallback)
+                    free(tmp_fallback);
             }
             __attribute__ ((fallthrough));
         case RTSP_FALLBACK_URL:
@@ -799,7 +803,7 @@ GstRtspPlayerSession__error_msg (GstRtspPlayerSession * session, GstBus *bus, Gs
     GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (session->player);
     P_MUTEX_LOCK(priv->player_lock);
     if(priv->session != session){
-        C_DEBUG("State was most likely destroyed because a new stream started.", session->location);
+        C_DEBUG("State was most likely destroyed because a new stream started.");
         goto exit;
     }
     gst_message_parse_error (msg, &err, &debug_info);
@@ -823,12 +827,14 @@ GstRtspPlayerSession__error_msg (GstRtspPlayerSession * session, GstBus *bus, Gs
             } else if(!strcmp(err->message,"Could not read from resource.")){
                 // We allow these errors to retry without fallback with less debug
                 // This may happen with unreliable network route
-                C_ERROR ("%s Error received from element [%d] %s: %s", session->location, err->code, GST_OBJECT_NAME (msg->src), err->message);
+                C_ERROR ("%s Error received from element %s", session->location, err->message);
+                C_ERROR ("%s Error code : %d", session->location,err->code);
                 break;
             } else {
                 // We allow other errors to retry without fallback with added debug
-                C_ERROR ("%s Error received from element [%d] %s: %s", session->location, err->code, GST_OBJECT_NAME (msg->src), err->message);
+                C_ERROR ("%s Error received from element %s: %s", session->location, GST_OBJECT_NAME (msg->src), err->message);
                 C_ERROR ("%s Debugging information: %s", session->location, debug_info ? debug_info : "none");
+                C_ERROR ("%s Error code : %d", session->location,err->code);
                 break;
             }
         case GST_RESOURCE_ERROR_OPEN_READ:
@@ -852,8 +858,9 @@ GstRtspPlayerSession__error_msg (GstRtspPlayerSession * session, GstBus *bus, Gs
             priv->playing = 0;
             __attribute__ ((fallthrough));
         default:
-            C_ERROR ("%s Error received from element [%d] %s: %s",session->location,err->code, GST_OBJECT_NAME (msg->src), err->message);
+            C_ERROR ("%s Error received from element %s: %s",session->location, GST_OBJECT_NAME (msg->src), err->message);
             C_ERROR ("%s Debugging information: %s",session->location, debug_info ? debug_info : "none");
+            C_ERROR ("%s Error code : %d", session->location,err->code);
             player_signal_and_wait (priv->owner, signals[ERROR], session);
     }
 
@@ -864,13 +871,13 @@ GstRtspPlayerSession__error_msg (GstRtspPlayerSession * session, GstBus *bus, Gs
         //Stopping player after if condition because "playing" gets reset
         GstRtspPlayerPrivate__stop_unlocked(priv);
         C_WARN("****************************************************");
-        if(fallback) C_WARN("* URI fallback attempt %s", session->location); else C_WARN("* Retry attempt #%i - %s",session->retry, session->location);
+        if(fallback) C_WARN("* URI fallback attempt %s", session->location); else C_WARN("* Retry %s attempt #%d", session->location, session->retry);
         C_WARN("****************************************************");
         //Retry signal - The player doesn't invoke retry on its own to allow the invoker to dispatch it asynchroniously
         if(!fallback)
             session->retry++;
         P_MUTEX_UNLOCK(priv->player_lock);
-        player_signal_and_wait (priv->owner, signals[RETRY], session);
+        g_signal_emit (priv->owner, signals[RETRY], 0, session);
         return;
     } else if(priv->playing == 1) {
         C_TRACE("%s Player giving up. Too many retries...", session->location);
@@ -1145,7 +1152,8 @@ GstRtspPlayer__init (GstRtspPlayer * self)
     pthread_create(&pthread, NULL, init_gst_seprate_mainloop, &data);
     pthread_detach(pthread);
 
-    if(!data.done) { C_TRACE("Waiting for Gstreamer loop initialization"); P_COND_WAIT(data.cond, data.lock); }
+    C_TRACE("Waiting for Gstreamer loop initialization");
+    if(!data.done) { P_COND_WAIT(data.cond, data.lock); }
     P_COND_CLEANUP(data.cond);
     P_MUTEX_CLEANUP(data.lock);
     C_TRACE("Gstreamer loop initialization successfull");
@@ -1288,7 +1296,8 @@ GstRtspPlayer__dispose (GObject *gobject)
     if(priv->player_loop){
         g_main_loop_quit(priv->player_loop);
         //Making sure the loop is finished so that session isn't destroyed while an event is running
-        if(priv->player_loop != NULL) { C_TRACE("Waiting for Gstreamer loop to finish"); P_COND_WAIT(priv->loop_cond, priv->loop_lock); }
+        C_TRACE("Waiting for Gstreamer loop to finish");
+        if(priv->player_loop != NULL) { P_COND_WAIT(priv->loop_cond, priv->loop_lock); }
     }
 
     P_COND_CLEANUP(priv->loop_cond);

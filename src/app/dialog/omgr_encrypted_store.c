@@ -100,6 +100,8 @@ encrypted_chunk_callback (unsigned char * buffer, int buffer_length, void * user
             if(chunk->len_parsed == int_size){
                 chunk->data = malloc(chunk->expected_len);
                 chunk->len_parsed = 0;
+            } else {
+                continue;
             }
         }
 
@@ -149,21 +151,20 @@ OnvifMgrEncryptedStore__read_store(QueueEvent * qevt, void * user_data){
     OnvifMgrEncryptedStorePrivate *priv = OnvifMgrEncryptedStore__get_instance_private (self);
     OnvifMgrEncryptedStoreClass * klass = ONVIFMGR_ENCRYPTEDSTORE_GET_CLASS(self);
 
-    EncryptionChunkData * floating_data = malloc(sizeof(EncryptionChunkData));
-    floating_data->data = NULL;
-    floating_data->len = 0;
-    floating_data->expected_len = 0;
-    floating_data->store = self;
-    floating_data->len_parsed = 0;
+    EncryptionChunkData floating_data;
+    floating_data.data = NULL;
+    floating_data.len = 0;
+    floating_data.expected_len = 0;
+    floating_data.store = self;
+    floating_data.len_parsed = 0;
     int decrypted_data_len = EncryptionUtils__read_encrypted((unsigned char *) priv->passphrase,
                                     priv->passphrase_len,
                                     klass->extension->store_path,
                                     encrypted_chunk_callback, 
-                                    floating_data);
+                                    &floating_data);
 
-    if(floating_data->data)
-        free(floating_data->data);
-    free(floating_data);
+    if(floating_data.data)
+        free(floating_data.data);
 
     if(decrypted_data_len <= 0){
         void ** input = malloc(sizeof(void*) *2);
