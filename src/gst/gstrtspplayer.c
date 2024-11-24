@@ -798,6 +798,10 @@ GstRtspPlayerSession__error_msg (GstRtspPlayerSession * session, GstBus *bus, Gs
     int fallback = 0;
     GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (session->player);
     P_MUTEX_LOCK(priv->player_lock);
+    if(priv->session != session){
+        C_DEBUG("State was most likely destroyed because a new stream started.", session->location);
+        goto exit;
+    }
     gst_message_parse_error (msg, &err, &debug_info);
 
     switch(err->code){
@@ -879,6 +883,7 @@ GstRtspPlayerSession__error_msg (GstRtspPlayerSession * session, GstBus *bus, Gs
     } else { //Ignoring error after the player requested to stop (gst_rtspsrc_try_send)
         C_TRACE("Player no longer playing...");
     }
+exit:
     P_MUTEX_UNLOCK(priv->player_lock);
 }
 
