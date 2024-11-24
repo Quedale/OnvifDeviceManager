@@ -192,7 +192,7 @@ OnvifMgrDeviceRow__unserialize (unsigned char * data, int length){
     char * location = NULL;
     char * hardware = NULL;
 
-    while(data_read <= length){
+    while(data_read < length){
         int line_len = strlen((char*)&data[data_read])+1;
 
         if(strncmp((char *)&data[data_read], OMGR_DEVICE_URL_PREFIX, strlen(OMGR_DEVICE_URL_PREFIX)) == 0){
