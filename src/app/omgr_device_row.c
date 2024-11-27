@@ -45,7 +45,7 @@ enum {
 typedef struct {
     OnvifApp * app;
     OnvifDevice * device;
-    OnvifProfile * profile;
+    OnvifMediaProfile * profile;
 
     gboolean owned;
     gboolean init;
@@ -213,10 +213,10 @@ OnvifMgrDeviceRow__unserialize (unsigned char * data, int length){
 
     g_return_val_if_fail(url != NULL,NULL);
 
-    OnvifDevice * onvif_dev = OnvifDevice__create(url);
+    OnvifDevice * onvif_dev = OnvifDevice__new(url);
     if(!OnvifDevice__is_valid(onvif_dev)){
         C_ERROR("Invalid URL provided\n");
-        OnvifDevice__destroy(onvif_dev);
+        g_object_unref(onvif_dev);
         return NULL;
     }
     OnvifCredentials * credentials = OnvifDevice__get_credentials(onvif_dev);
@@ -398,12 +398,12 @@ OnvifMgrDeviceRow__destroy (GtkWidget *object)
 
     //GTK may call destroy multiple times. Setting pointer to null to avoid segmentation fault
     if(priv->device){
-        OnvifDevice__destroy(priv->device);
+        g_object_unref(priv->device);
         priv->device = NULL;
     }
 
     if(priv->profile){
-        OnvifProfile__destroy(priv->profile);
+        g_object_unref(priv->profile);
         priv->profile = NULL;
     }
 
@@ -438,7 +438,7 @@ OnvifMgrDeviceRow__set_property (GObject      *object,
             priv->app = ONVIFMGR_APP(g_value_get_object (value));
             break;
         case PROP_DEVICE:
-            if(priv->device) OnvifDevice__destroy(priv->device);
+            if(priv->device) g_object_unref(priv->device);
             priv->device = g_value_get_pointer (value);
             if(priv->device){
                 char * host = OnvifDevice__get_host(priv->device);
@@ -596,7 +596,7 @@ gboolean OnvifMgrDeviceRow__update_profile_btn(void * user_data){
     OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
     
     if(priv->profile){
-        gtk_button_set_label(GTK_BUTTON(priv->btn_profile),OnvifProfile__get_name(priv->profile));
+        gtk_button_set_label(GTK_BUTTON(priv->btn_profile),OnvifMediaProfile__get_name(priv->profile));
         gtk_widget_set_sensitive (priv->btn_profile, TRUE);
     } else {
         gtk_button_set_label(GTK_BUTTON(priv->btn_profile), NULL);
@@ -607,29 +607,30 @@ gboolean OnvifMgrDeviceRow__update_profile_btn(void * user_data){
     return FALSE;
 }
 
-void OnvifMgrDeviceRow__set_profile(OnvifMgrDeviceRow * self, OnvifProfile * profile){
+void OnvifMgrDeviceRow__set_profile(OnvifMgrDeviceRow * self, OnvifMediaProfile * profile){
     g_return_if_fail (self != NULL);
     g_return_if_fail (ONVIFMGR_IS_DEVICEROW (self));
     OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
 
-    if(!profile){
-        OnvifProfile__destroy(priv->profile);
+    if(!profile && priv->profile){
+        g_object_unref(priv->profile);
         priv->profile = NULL;
         return;
     }
 
-    if(OnvifProfile__equals(priv->profile,profile)){
+    if(priv->profile == profile){
         return;
     }
 
-    priv->profile = OnvifProfile__copy(profile);
+    priv->profile = profile;
+    g_object_ref(priv->profile);
     g_signal_emit (self, signals[PROFILE_CHANGED], 0);
 
     g_object_ref(self);
     gdk_threads_add_idle(G_SOURCE_FUNC(OnvifMgrDeviceRow__update_profile_btn),self);
 }
 
-OnvifProfile * OnvifMgrDeviceRow__get_profile(OnvifMgrDeviceRow * self){
+OnvifMediaProfile * OnvifMgrDeviceRow__get_profile(OnvifMgrDeviceRow * self){
     g_return_val_if_fail (self != NULL, NULL);
     g_return_val_if_fail (ONVIFMGR_IS_DEVICEROW (self),NULL);
     ONVIFMGR_DEVICEROW_DEBUG("%s OnvifMgrDeviceRow__get_profile",self);
@@ -647,7 +648,7 @@ static gboolean
 OnvifMgrDeviceRow__display_snapshot(void * user_data){
     void ** arr = (void**)user_data;
     OnvifMgrDeviceRow * self = ONVIFMGR_DEVICEROW(arr[0]);
-    OnvifSnapshot * snapshot = arr[1];
+    OnvifMediaSnapshot * snapshot = arr[1];
     OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
     GError * error = NULL;
 
@@ -660,7 +661,7 @@ OnvifMgrDeviceRow__display_snapshot(void * user_data){
     SoapFault * fault = SoapObject__get_fault(SOAP_OBJECT(snapshot));
     switch(*fault){
         case SOAP_FAULT_NONE:
-            image = GtkBinaryImage__new((unsigned char *)OnvifSnapshot__get_buffer(snapshot),OnvifSnapshot__get_size(snapshot), -1, 40, error);
+            image = GtkBinaryImage__new((unsigned char *)OnvifMediaSnapshot__get_buffer(snapshot),OnvifMediaSnapshot__get_size(snapshot), -1, 40, error);
             break;
         case SOAP_FAULT_ACTION_NOT_SUPPORTED:
             goto unsupported;
@@ -768,7 +769,7 @@ void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
 
     if(OnvifDevice__is_authenticated(priv->device)){
         OnvifMediaService * media_service = OnvifDevice__get_media_service(priv->device);
-        OnvifSnapshot * snapshot = OnvifMediaService__getSnapshot(media_service,OnvifProfile__get_index(priv->profile));
+        OnvifMediaSnapshot * snapshot = OnvifMediaService__getSnapshot(media_service,OnvifMediaProfile__get_index(priv->profile));
         if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self) || QueueEvent__is_cancelled(QueueEvent__get_current())){
             C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
             return;

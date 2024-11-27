@@ -3,7 +3,7 @@
 #include "clogger.h"
 
 typedef struct {
-    OnvifProfile * profile;
+    OnvifMediaProfile * profile;
 } GtkProfilePanelPrivate;
 
 enum {
@@ -40,7 +40,7 @@ gtk_profile_panel_class_init (GtkProfilePanelClass *klass)
 
 }
 
-OnvifProfile * 
+OnvifMediaProfile * 
 gtk_profile_panel_get_profile (GtkProfilePanel *widget)
 {
     GtkProfilePanelPrivate *priv = gtk_profile_panel_get_instance_private (widget);
@@ -55,7 +55,7 @@ void gtk_profile_panel_clicked (GtkButton* widget, GtkProfilePanel * pbutton){
 }
 
 void
-gtk_profile_panel_set_profile (GtkProfilePanel * widget, OnvifProfile * profile)
+gtk_profile_panel_set_profile (GtkProfilePanel * widget, OnvifMediaProfile * profile)
 {
     GtkProfilePanelPrivate *priv = gtk_profile_panel_get_instance_private (widget);
 
@@ -63,13 +63,13 @@ gtk_profile_panel_set_profile (GtkProfilePanel * widget, OnvifProfile * profile)
 
     priv->profile = profile;
 
-    GtkWidget * btn = gtk_button_new_with_label(OnvifProfile__get_name(profile));
+    GtkWidget * btn = gtk_button_new_with_label(OnvifMediaProfile__get_name(profile));
     gtk_box_pack_start(GTK_BOX(widget), btn,     FALSE, FALSE, 0);
     g_signal_connect (G_OBJECT(btn), "clicked", G_CALLBACK (gtk_profile_panel_clicked), widget);
 }
 
 
-GtkWidget*  gtk_profile_panel_new (OnvifProfile * profile){
+GtkWidget*  gtk_profile_panel_new (OnvifMediaProfile * profile){
     GtkWidget * widget = g_object_new (GTK_TYPE_PROFILE_PANEL, 
                         "orientation", GTK_ORIENTATION_HORIZONTAL,
                         "spacing", 0,

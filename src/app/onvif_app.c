@@ -235,7 +235,7 @@ void _play_onvif_stream(QueueEvent * qevt, void * user_data){
     }
 
     /* Set the URI to play */
-    OnvifMediaUri * media_uri = OnvifMediaService__getStreamUri(OnvifDevice__get_media_service(odev),OnvifProfile__get_index(OnvifMgrDeviceRow__get_profile(device)));
+    OnvifUri * media_uri = OnvifMediaService__getStreamUri(OnvifDevice__get_media_service(odev),OnvifMediaProfile__get_index(OnvifMgrDeviceRow__get_profile(device)));
     SoapFault * fault = SoapObject__get_fault(SOAP_OBJECT(media_uri));
     
     if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) && *fault == SOAP_FAULT_NONE && !(qevt != NULL && QueueEvent__is_cancelled(qevt))){
@@ -244,7 +244,7 @@ void _play_onvif_stream(QueueEvent * qevt, void * user_data){
         char * pass = OnvifCredentials__get_password(ocreds);
         char * port = OnvifDevice__get_port(OnvifMgrDeviceRow__get_device(device));
         char * host = OnvifDevice__get_host(OnvifMgrDeviceRow__get_device(device));
-        GstRtspPlayer__play(priv->player,OnvifMediaUri__get_uri(media_uri),user,pass,host,port, device);
+        GstRtspPlayer__play(priv->player,OnvifUri__get_uri(media_uri),user,pass,host,port, device);
         if(pass)
             free(pass);
         if(user)
@@ -337,10 +337,10 @@ void _onvif_device_add(QueueEvent * qevt, void * user_data){
 
     C_INFO("Manually adding URL : '%s'",fullurl);
 
-    OnvifDevice * onvif_dev = OnvifDevice__create((char *)fullurl);
+    OnvifDevice * onvif_dev = OnvifDevice__new((char *)fullurl);
     if(!OnvifDevice__is_valid(onvif_dev)){
         C_ERROR("Invalid URL provided\n");
-        OnvifDevice__destroy(onvif_dev);
+        g_object_unref(onvif_dev);
         goto exit;
     }
     OnvifDevice__set_credentials(onvif_dev,OnvifMgrAddDialog__get_user(dialog),OnvifMgrAddDialog__get_pass(dialog));
@@ -350,7 +350,7 @@ void _onvif_device_add(QueueEvent * qevt, void * user_data){
 
     SoapFault fault = OnvifDevice__authenticate(onvif_dev);
     if(QueueEvent__is_cancelled(qevt)){
-        OnvifDevice__destroy(onvif_dev);
+        g_object_unref(onvif_dev);
         goto exit;
     }
 
@@ -408,7 +408,7 @@ static gboolean OnvifApp__disocvery_found_server_cb (DiscoveryEvent * event) {
         m = server->matches->matches[i];
         if(!OnvifApp__device_already_exist(app,m->addrs[0])){
             gchar * addr_dup = g_strdup(m->addrs[0]);
-            OnvifDevice * onvif_dev = OnvifDevice__create(addr_dup);
+            OnvifDevice * onvif_dev = OnvifDevice__new(addr_dup);
             free(addr_dup);
             
             char * name = onvif_extract_scope("name",m);
@@ -510,7 +510,7 @@ void OnvifApp__setting_view_mode_cb(AppSettingsStream * settings, GParamSpec* ps
     }
 }
 
-void OnvifApp__profile_selected_cb(OnvifMgrProfilesDialog * profile_dialog, OnvifProfile * profile, OnvifMgrDeviceRow * device){
+void OnvifApp__profile_selected_cb(OnvifMgrProfilesDialog * profile_dialog, OnvifMediaProfile * profile, OnvifMgrDeviceRow * device){
     OnvifMgrDeviceRow__set_profile(device,profile);
 }
 

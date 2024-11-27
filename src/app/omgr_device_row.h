@@ -38,8 +38,8 @@ struct _OnvifMgrDeviceRowClass
 GtkWidget* OnvifMgrDeviceRow__new(OnvifApp * app, OnvifDevice * device, char * name, char * hardware, char * location);
 OnvifApp * OnvifMgrDeviceRow__get_app(OnvifMgrDeviceRow * self);
 OnvifDevice * OnvifMgrDeviceRow__get_device(OnvifMgrDeviceRow * self);
-void OnvifMgrDeviceRow__set_profile(OnvifMgrDeviceRow * self, OnvifProfile * profile);
-OnvifProfile * OnvifMgrDeviceRow__get_profile(OnvifMgrDeviceRow * self);
+void OnvifMgrDeviceRow__set_profile(OnvifMgrDeviceRow * self, OnvifMediaProfile * profile);
+OnvifMediaProfile * OnvifMgrDeviceRow__get_profile(OnvifMgrDeviceRow * self);
 gboolean OnvifMgrDeviceRow__is_selected(OnvifMgrDeviceRow * self);
 
 void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self);

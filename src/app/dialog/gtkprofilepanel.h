@@ -27,15 +27,15 @@ struct _GtkProfilePanel
 
 struct _GtkProfilePanelClass
 {
-    void (* clicked)  (GtkProfilePanel * dialog, OnvifProfile * profile);
+    void (* clicked)  (GtkProfilePanel * dialog, OnvifMediaProfile * profile);
     GtkBoxClass parent_class;
 
 };
 
 GType          gtk_profile_panel_get_type        (void);
-GtkWidget*     gtk_profile_panel_new             (OnvifProfile * profile);
-void           gtk_profile_panel_set_profile (GtkProfilePanel *widget, OnvifProfile * profile);
-OnvifProfile * gtk_profile_panel_get_profile (GtkProfilePanel *widget);
+GtkWidget*     gtk_profile_panel_new             (OnvifMediaProfile * profile);
+void           gtk_profile_panel_set_profile (GtkProfilePanel *widget, OnvifMediaProfile * profile);
+OnvifMediaProfile * gtk_profile_panel_get_profile (GtkProfilePanel *widget);
 
 G_END_DECLS
 

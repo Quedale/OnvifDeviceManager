@@ -99,7 +99,7 @@ OnvifMgrProfilesDialog__show_profiles(void * user_data){
 
   priv->content_pane = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
   for(int i=0;i<OnvifMediaProfiles__get_size(priv->profiles);i++){
-      OnvifProfile * profile = OnvifMediaProfiles__get_profile(priv->profiles,i);
+      OnvifMediaProfile * profile = OnvifMediaProfiles__get_profile(priv->profiles,i);
 
       GtkWidget * btn = gtk_profile_panel_new(profile);
       gtk_box_pack_start(GTK_BOX(priv->content_pane), btn,     FALSE, FALSE, 0);
