@@ -180,7 +180,6 @@ void _display_onvif_device(QueueEvent * qevt, void * user_data){
         //We don't care for the initial profile event since the default index is 0.
         //Connecting to signal only after setting the default profile
         g_signal_connect (G_OBJECT (omgr_device), "profile-changed", G_CALLBACK (OnvifApp__profile_changed_cb), NULL);
-
     }
 
     /* Display row thumbnail. Default to profile index 0 */
@@ -235,7 +234,8 @@ void _play_onvif_stream(QueueEvent * qevt, void * user_data){
     }
 
     /* Set the URI to play */
-    OnvifUri * media_uri = OnvifMediaService__getStreamUri(OnvifDevice__get_media_service(odev),OnvifMediaProfile__get_index(OnvifMgrDeviceRow__get_profile(device)));
+    OnvifMediaProfile * profile = OnvifMgrDeviceRow__get_profile(device);
+    OnvifUri * media_uri = OnvifMediaService__getStreamUri(OnvifDevice__get_media_service(odev),(profile) ? OnvifMediaProfile__get_index(profile) : 0);
     SoapFault * fault = SoapObject__get_fault(SOAP_OBJECT(media_uri));
     
     if(ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) && *fault == SOAP_FAULT_NONE && !(qevt != NULL && QueueEvent__is_cancelled(qevt))){
@@ -530,27 +530,29 @@ void OnvifApp__btn_scan_cb (GtkWidget *widget, OnvifApp * app) {
 
     gtk_widget_set_sensitive(widget,FALSE);
 
-    //Cancell all pending events associated to devices removed.
-    GList * childs = gtk_container_get_children(GTK_CONTAINER(priv->listbox));
-    GList * tmp = childs;
-    int scopes_count = 0;
-    void ** scopes = NULL;
-    OnvifMgrDeviceRow * device;
-    GLIST_FOREACH(device, childs) {
-        scopes_count++;
-        if(!scopes){
-            scopes = malloc(sizeof(void*)*scopes_count);
-        } else {
-            scopes = realloc(scopes,sizeof(void*)*scopes_count);
-        }
-        scopes[scopes_count-1] = device;
-        childs = childs->next;
-    }
-    g_list_free(tmp);
+    //Only need to cancel scope if list is cleared.
+    //TODO Cancel scope when removing individual devices
+    // //Cancell all pending events associated to devices removed.
+    // GList * childs = gtk_container_get_children(GTK_CONTAINER(priv->listbox));
+    // GList * tmp = childs;
+    // int scopes_count = 0;
+    // void ** scopes = NULL;
+    // OnvifMgrDeviceRow * device;
+    // GLIST_FOREACH(device, childs) {
+    //     scopes_count++;
+    //     if(!scopes){
+    //         scopes = malloc(sizeof(void*)*scopes_count);
+    //     } else {
+    //         scopes = realloc(scopes,sizeof(void*)*scopes_count);
+    //     }
+    //     scopes[scopes_count-1] = device;
+    //     childs = childs->next;
+    // }
+    // g_list_free(tmp);
 
-    //Submit cancellation request
-    EventQueue__cancel_scopes(priv->queue,scopes, scopes_count);
-    free(scopes);
+    // //Submit cancellation request
+    // EventQueue__cancel_scopes(priv->queue,scopes, scopes_count);
+    // free(scopes);
 
     //Clearing the list
     // gtk_container_foreach (GTK_CONTAINER (priv->listbox), (GtkCallback)gui_container_remove, priv->listbox);

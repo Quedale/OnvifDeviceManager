@@ -769,7 +769,7 @@ void OnvifMgrDeviceRow__load_thumbnail(OnvifMgrDeviceRow * self){
 
     if(OnvifDevice__is_authenticated(priv->device)){
         OnvifMediaService * media_service = OnvifDevice__get_media_service(priv->device);
-        OnvifMediaSnapshot * snapshot = OnvifMediaService__getSnapshot(media_service,OnvifMediaProfile__get_index(priv->profile));
+        OnvifMediaSnapshot * snapshot = OnvifMediaService__getSnapshot(media_service,(priv->profile) ? OnvifMediaProfile__get_index(priv->profile) : 0);
         if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(self) || QueueEvent__is_cancelled(QueueEvent__get_current())){
             C_TRAIL("OnvifMgrDeviceRow__load_thumbnail - invalid device");
             return;
