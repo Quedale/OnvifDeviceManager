@@ -866,9 +866,8 @@ if [ ! -z "$(progVersionCheck project="bison" program=bison linenumber=1 lineind
   buildMakeProject project="bison" srcdir="bison-3.8.2" prefix="$SUBPROJECT_DIR/bison-3.8.2/build/dist" skipbootstrap="true"
 fi
 
-#Setting up Virtual Python environment
-if [ ! -f "./venvfolder/bin/activate" ]; then
-  printlines project="virtualenv" task="check" msg="not found"
+VENV_EXEC=""
+if [ ! -z "$(progVersionCheck project="virtualenv" program=virtualenv)" ]; then
   if [ $NO_DOWNLOAD -eq 0 ] && [ ! -f "virtualenv.pyz" ]; then
     wget --show-progress --progress=bar:force https://bootstrap.pypa.io/virtualenv.pyz 2>&1 | printlines project="virtualenv" task="wget"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
@@ -876,7 +875,14 @@ if [ ! -f "./venvfolder/bin/activate" ]; then
       exit 1;
     fi
   fi
-  python3 virtualenv.pyz ./venvfolder 2>&1 | printlines project="virtualenv" task="setup"
+  VENV_EXEC="python3 virtualenv.pyz"
+else
+  VENV_EXEC="virtualenv"
+fi
+
+#Setting up Virtual Python environment
+if [ ! -f "./venvfolder/bin/activate" ]; then
+  $VENV_EXEC ./venvfolder 2>&1 | printlines project="virtualenv" task="setup"
   if [ "${PIPESTATUS[0]}" -ne 0 ]; then
     printError project="virtualenv" task="setup" msg="failed to run python3 virtualenv.pyz"
     exit 1;
