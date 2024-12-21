@@ -4,6 +4,7 @@ ENABLE_LIBAV=0    #Enables building and linking Gstreamer libav plugin.   enable
 ENABLE_NVCODEC=0  #Enables building and linking Gstreamer nvidia pluging. enabled using --enable-nvcodec
 ENABLE_DEBUG=1    #Disables debug build flag.                                   disabled using --no-debug
 NO_DOWNLOAD=0
+WGET_CMD="wget"   #Default wget command. Gets properly initialized later with parameters adequate for its version
 
 #Save current working directory to run configure in
 WORK_DIR=$(pwd)
@@ -65,52 +66,89 @@ unbufferCall(){
   fi
 }
 
+##############################
+# Function to decorate lines with project, task and color
+# It handles targeted ANSI and VT codes to maintain appropriate decoration
+#   Codes : \r, \n, ^[[1K, ^[[2K, ^[<n>G
+##############################
+CSI_G_REGEX='^\[([0-9][0-9]*)G' #CSI <n> G: Cursor horizontal absolute
+VT_CLEARLINE_REGEX='^\[[{1}|{2}]K' #EL1 clearbol & EL2 clearline
 printline(){
-  local project task color padding prefix
+  local project task color padding prefix val escape_buff
   local "${@}"
   line="" #Reset variable before using it
-  nextchar=""
-  postfix=""
-  cross_carriage=0
-  clearline=0
+  escape_marker=0
+  escape_buff=""
+  carriage_returned=1
+
   while IFS= read -rn1 data; do
-    #Support for VT100 clear line escape codes.
-    if [ $clearline -eq 0 ] && [[ "$data" == *\* ]]; then
-      ((clearline++))
-    elif [ $clearline -gt 0 ]; then #Seperated the rest of the condition to save on performance
-      if ([ $clearline -eq 1 ] && [[ "$data" == *\[* ]]) || \
-         ([ $clearline -eq 2 ] && [[ "$data" == *\1* ]]) || \
-         ([ $clearline -eq 2 ] && [[ "$data" == *\2* ]]) || \
-         ([ $clearline -eq 3 ] && [[ "$data" == *\K* ]]); then
-        ((clearline++))
+    if [[ "$data" == *\* ]]; then #escape codes flag
+      if [ ! -z "$escape_buff" ]; then #save previous parsed escape code for later flush
+        line="$line""$escape_buff"
+        escape_buff=""
+      fi
+      escape_marker=1 #Reset marker
+    elif [ -z "$data" ]; then #Newline, Flush buffer with newline
+      if [ $carriage_returned -eq 1 ]; then
+        printf "${GREEN}${project}${CYAN} ${task}${color}${prefix}${padding}%s%s${NC}\n" "$line" "$escape_buff" >&2
       else
-        clearline=0
+        printf "%s%s\n" "$line" "$escape_buff" >&2
       fi
-    elif [ $clearline -ne 0 ]; then
-      clearline=0
-    fi
-    
-    
-    if [ "$data" =  $'\r' ] || [ $clearline -eq 4 ]; then
-      postfix=$postfix$'\r'
-      cross_carriage=1
-      continue
-    elif [ -z "$data" ]; then #newline
-      postfix=$postfix$'\n'
-    else
-      if [ $cross_carriage -eq 0 ]; then
-        line=$line"$data"
-        continue
+      escape_marker=0
+      escape_buff=""
+      line=""
+      carriage_returned=1
+    elif [ "$data" == $'\r' ]; then #Carriage return. Flush buffer
+      if [ $carriage_returned -eq 1 ]; then
+        printf "${GREEN}${project}${CYAN} ${task}${color}${prefix}${padding}%s%s%s${NC}" "$line" "$escape_buff" "$data" >&2
+      else
+        printf "%s%s%s\n" "$line" "$escape_buff" "$data" >&2
       fi
-      nextchar="$data"
+      escape_marker=0
+      escape_buff=""
+      line=""
+      carriage_returned=1
+    elif [ $escape_marker -gt 0 ]; then #Seperated the rest of the condition to save on performance
+      escape_buff+=$data
+      ((escape_marker++))
+
+      if [ $escape_marker -eq 4 ] && [[ "$escape_buff" =~ $VT_CLEARLINE_REGEX ]]; then
+        printf "%s%s" "$line" "$escape_buff"
+        escape_marker=0
+        escape_buff=""
+        line=""
+        carriage_returned=1
+      elif  [ $escape_marker -ge 4 ] && [[ $escape_buff =~ $CSI_G_REGEX ]]; then
+        val=${BASH_REMATCH[1]}
+        ((val+=${#project})) #Adjust adsolute positioning after project and task label
+        ((val+=${#task}))
+        ((val+=${#padding}))
+        ((val++))
+        escape_buff="["$val"G"
+        printf "%s%s" "$line" "$escape_buff" #Print without decoaration since we moved after prefix
+        line=""
+        escape_marker=0
+        escape_buff=""
+        carriage_returned=0
+      elif [ $escape_marker -ge 5 ]; then #No processing of any other escape code
+        escape_marker=0
+        line="$line""$escape_buff"
+        escape_buff=""
+      else
+        continue;
+      fi
+    elif [ ! -z "$data" ]; then #Save regular character for later flush
+      line="$line""$data"
     fi
-    #TODO Extract last font color to restore it on nextline
-    printf "${GREEN}${project}${CYAN} ${task}${color}${prefix}${padding}%s${NC}$postfix" "$line" >&2
-    line="$nextchar" #Reset line after print and restore peeked charater
-    nextchar=""
-    postfix=""
-    cross_carriage=0
   done;
+
+  #Flush remaining buffers
+  if [ ! -z "$line" ]; then
+    printf "%s" "$line"
+  fi
+  if [ ! -z "$escape_buff" ]; then
+    printf "%s" "$escape_buff"
+  fi
 }
 
 printlines(){
@@ -194,7 +232,7 @@ downloadAndExtract (){
   if [ ! -f "$dest_val" ]; then
     printlines project="${project}" task="wget" msg="downloading: ${path}"
     cd "$pathprefix" #Changing directory so that wget logs only the filename
-    wget --show-progress --progress=bar:force ${path} -O ${file} 2>&1 | printlines project="${project}" task="wget";
+    $WGET_CMD ${path} -O ${file} 2>&1 | printlines project="${project}" task="wget";
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="wget" msg="failed to fetch ${path}"
       [[ ! -z "${noexit}" ]] && FAILED=1 && cd "$OLDPWD" && return || exit 1;
@@ -253,8 +291,16 @@ privatepullOrClone(){
     depthstr="--depth ${depth}"
   fi 
   
-  unbufferCall "git -C ${dest} pull ${tgstr}" 2> /dev/null | printlines project="${project}" task="git"
-  if [ "${PIPESTATUS[0]}" != "0" ]; then
+  should_clone=1
+  if [ -d ${dest} ]; then
+    unbufferCall "git -C ${dest} pull ${tgstr}" 2> /dev/null | printlines project="${project}" task="git"
+    should_clone=${PIPESTATUS[0]}
+    if [ $should_clone -ne 0 ]; then #Something failed. Remove to redownload
+      rm -rf ${dest}
+    fi
+  fi
+
+  if [ $should_clone -ne 0 ]; then
     unbufferCall "git clone -j$(nproc) $recursestr $depthstr $tgstr2 ${path} $dest" 2>&1 | printlines project="${project}" task="git"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="git" msg="failed to fetch ${path}"
@@ -792,6 +838,10 @@ fi
 
 if [ ! -z "$(progVersionCheck project="wget" program=wget)" ]; then
   MISSING_DEP=1
+elif [ -z "$(progVersionCheck project="wget" program=wget linenumber=1 lineindex=2 major=2)" ]; then
+  WGET_CMD="wget --force-progress" #Since version 2+ show-progress ins't supported
+elif [ -z "$(progVersionCheck project="wget" program=wget linenumber=1 lineindex=2 major=1 minor=16)" ]; then
+  WGET_CMD="wget --show-progress --progress=bar:force" #Since version 1.16 set show-progress
 fi
 
 if [ ! -z "$(pkgCheck project="gtk3" name=gtk+-3.0)" ]; then
@@ -869,7 +919,7 @@ fi
 VENV_EXEC=""
 if [ ! -z "$(progVersionCheck project="virtualenv" program=virtualenv)" ]; then
   if [ $NO_DOWNLOAD -eq 0 ] && [ ! -f "virtualenv.pyz" ]; then
-    wget --show-progress --progress=bar:force https://bootstrap.pypa.io/virtualenv.pyz 2>&1 | printlines project="virtualenv" task="wget"
+    $WGET_CMD https://bootstrap.pypa.io/virtualenv.pyz 2>&1 | printlines project="virtualenv" task="wget"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="virtualenv" task="wget" msg="failed to fetch https://bootstrap.pypa.io/virtualenv.pyz"
       exit 1;
