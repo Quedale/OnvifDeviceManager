@@ -70,10 +70,7 @@ exit:
     return pixbuf;
 }
 
-gboolean GtkBinaryImage__apply_data(void * user_data){
-    void ** arr = (void**) user_data;
-    GtkBinaryImage * self = GTK_BINARYIMAGE(arr[0]);
-    GdkPixbuf * old_pixbuf = GDK_PIXBUF(arr[1]);
+gboolean GtkBinaryImage__apply_data(GtkBinaryImage * self, GdkPixbuf * old_pixbuf){
     GdkPixbuf * pixbuf;
     GtkBinaryImagePrivate *priv = GtkBinaryImage__get_instance_private (self);
 
@@ -108,7 +105,6 @@ gboolean GtkBinaryImage__apply_data(void * user_data){
 
     gtk_image_set_from_pixbuf(GTK_IMAGE(self),newbuf);
     g_object_unref(newbuf);
-    free(user_data);
     return FALSE;
 }
 
@@ -118,11 +114,7 @@ void GtkBinaryImage__set_image(GtkBinaryImage *  self, GdkPixbuf * pixbuf){
         return;
     }
     g_return_if_fail (GTK_IS_BINARYIMAGE (self));
-    void ** arr = malloc(sizeof(void*)*2);
-    arr[0] = self;
-    arr[1] = pixbuf;
-    //setting image and executing modify_pixbuf from main thread, regardless of where the image was set
-    g_idle_add(GtkBinaryImage__apply_data,arr);
+    GtkBinaryImage__apply_data(self,pixbuf);
 }
 
 GtkWidget* GtkBinaryImage__new(unsigned char * data_start, unsigned int data_size, int width, int height, GError *error){
