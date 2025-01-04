@@ -90,9 +90,9 @@ printline(){
       escape_marker=1 #Reset marker
     elif [ -z "$data" ]; then #Newline, Flush buffer with newline
       if [ $carriage_returned -eq 1 ]; then
-        printf "${GREEN}${project}${CYAN} ${task}${color}${prefix}${padding}%s%s${NC}\n" "$line" "$escape_buff" >&2
+        printf "${GREEN}${project}${CYAN} ${task}${color}${prefix}${padding}%s%s${NC}"$'\n'$'\r' "$line" "$escape_buff" >&2
       else
-        printf "%s%s\n" "$line" "$escape_buff" >&2
+        printf "%s%s"$'\n'$'\r' "$line" "$escape_buff" >&2
       fi
       escape_marker=0
       escape_buff=""
@@ -100,9 +100,9 @@ printline(){
       carriage_returned=1
     elif [ "$data" == $'\r' ]; then #Carriage return. Flush buffer
       if [ $carriage_returned -eq 1 ]; then
-        printf "${GREEN}${project}${CYAN} ${task}${color}${prefix}${padding}%s%s%s${NC}" "$line" "$escape_buff" "$data" >&2
+        printf "${GREEN}${project}${CYAN} ${task}${color}${prefix}${padding}%s%s${NC}"$'\r' "$line" "$escape_buff" >&2
       else
-        printf "%s%s%s\n" "$line" "$escape_buff" "$data" >&2
+        printf "%s%s"$'\r' "$line" "$escape_buff" >&2
       fi
       escape_marker=0
       escape_buff=""
@@ -952,7 +952,7 @@ fi
 
 #Setup meson
 if [ $NO_DOWNLOAD -eq 0 ]; then
-  if [ ! -z "$(progVersionCheck project="meson" program=meson linenumber=1 lineindex=0 major=0 minor=63 micro=2)" ]; then
+  if [ ! -z "$(progVersionCheck project="meson" program=meson linenumber=1 lineindex=0 major=1 minor=1)" ]; then
     unbufferCall "python3 -m pip install --progress-bar on meson --upgrade" 2>&1 | printlines project="meson" task="pip"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="meson" task="install" msg="Failed to install meson via pip. Please try to install meson manually."
