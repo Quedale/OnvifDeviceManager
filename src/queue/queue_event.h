@@ -9,25 +9,38 @@ G_BEGIN_DECLS
 #define QUEUE_TYPE_QUEUEEVENT QueueEvent__get_type()
 G_DECLARE_FINAL_TYPE (QueueEvent, QueueEvent_, QUEUE, QUEUEEVENT, GObject)
 
-struct _QueueEvent
-{
+typedef void (*QueueEventCallback) (QueueEvent  *self, void * user_data);
+#define QUEUEEVENT_CALLBACK_FUNC(f) ((QueueEventCallback) (void (*)(void)) (f))
+
+typedef void (*QueueEventCleanupCallback) (QueueEvent  *self, int cancelled, void * user_data);
+#define QUEUEEVENT_CLEANUP_FUNC(f) ((QueueEventCleanupCallback) (void (*)(void)) (f))
+
+struct _QueueEvent {
   GObject parent_instance;
 };
 
-
-struct _QueueEventClass
-{
+struct _QueueEventClass {
   GObjectClass parent_class;
 };
 
-QueueEvent* QueueEvent__new(); 
+typedef enum {
+  QUEUEEVENT_DISPATCHED             = 0,
+  QUEUEEVENT_CANCELLED              = 1
+} QueueEventState;
+
+#ifndef g_enum_to_nick
+#define g_enum_to_nick(type,val) (g_enum_get_value(g_type_class_ref (type),val)->value_nick)
+#endif
+
+GType QueueEventState__get_type (void) G_GNUC_CONST;
+#define QUEUE_TYPE_EVENTSTATE (QueueEventState__get_type())
+
+QueueEvent* QueueEvent__new(void * scope, QueueEventCallback callback, QueueEventCleanupCallback cleanup_cb, void * user_data, int managed);
 void * QueueEvent__get_scope(QueueEvent * evt);
 void QueueEvent__cancel(QueueEvent * self);
-void QueueEvent__finish(QueueEvent * self); //This is only meant to be called by QueueThread
 int QueueEvent__is_cancelled(QueueEvent * self);
 int QueueEvent__is_finished(QueueEvent * self);
 void QueueEvent__invoke(QueueEvent * self);
-void QueueEvent__cleanup(QueueEvent * self);
 
 G_END_DECLS
 

@@ -203,9 +203,12 @@ exit:
     return FALSE;
 }
 
-void update_network_event_cancelled_cb(QueueEvent * qevt, void * user_data){
+void update_network_event_cancelled_cb(QueueEvent * qevt, QueueEventState state, void * user_data){
     NetworkGUIUpdate * input = (NetworkGUIUpdate *) user_data;
-    gui_signal_emit(input->network, signals[FINISHED], input->device);
+    //Do not dispatch on QUEUEEVENT_DISPATCHED.
+    //FINISHED will be invoked at the end of the GUI update
+    if(state == QUEUEEVENT_CANCELLED)
+        gui_signal_emit(input->network, signals[FINISHED], input->device);
 }
 
 void _update_network_page_cleanup(QueueEvent * qevt, int cancelled, void * user_data){
@@ -266,7 +269,7 @@ void OnvifNetworkPanel_update_details(OnvifNetworkPanel * self){
 
     g_signal_emit (self, signals[STARTED], 0, input->device);
     priv->previous_event = EventQueue__insert_plain(OnvifApp__get_EventQueue(priv->app), input->device, _update_network_page,input, _update_network_page_cleanup);
-    priv->event_signal = g_signal_connect (priv->previous_event, "cancelled", G_CALLBACK (update_network_event_cancelled_cb), input);
+    priv->event_signal = g_signal_connect (priv->previous_event, "state-changed", G_CALLBACK (update_network_event_cancelled_cb), input);
     g_object_ref(priv->previous_event);
 }
 

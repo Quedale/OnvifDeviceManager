@@ -15,14 +15,10 @@ void evt_cleanup_callback(QueueEvent * qevt, int cancelled, void * user_data){
 
 }
 
-void eventqueue_dispatch_cb(EventQueue * queue, QueueEventType type,  void * self){
-    int running = EventQueue__get_running_event_count(queue);
-    int pending = EventQueue__get_pending_event_count(queue);
-    int total = EventQueue__get_thread_count(queue);
-
+void eventqueue_dispatch_cb(EventQueue * queue, QueueEventType type, int running, int pending, int threadcount, QueueEvent * evt, void * self){
     char str[100];
     memset(&str,'\0',sizeof(str));
-    C_DEBUG("Event %s [%d/%d]",g_enum_to_nick(QUEUE_TYPE_EVENTTYPE,type), running + pending, total);
+    C_DEBUG("Event %s [%d/%d]",g_enum_to_nick(QUEUE_TYPE_EVENTTYPE,type), running + pending, threadcount);
 }
 
 int main()

@@ -211,9 +211,12 @@ exit:
     return FALSE;
 }
 
-void update_details_event_cancelled_cb(QueueEvent * qevt, void * user_data){
+void update_details_event_cancelled_cb(QueueEvent * qevt, QueueEventState state, void * user_data){
     InfoDataUpdate * input = (InfoDataUpdate *) user_data;
-    gui_signal_emit(input->info, signals[FINISHED], input->device);
+    //Do not dispatch on QUEUEEVENT_DISPATCHED.
+    //FINISHED will be invoked at the end of the GUI update
+    if(state == QUEUEEVENT_CANCELLED)
+        gui_signal_emit(input->info, signals[FINISHED], input->device);
 }
 
 void _update_details_page_cleanup(QueueEvent * qevt, int cancelled, void * user_data){
@@ -431,7 +434,7 @@ void OnvifInfoPanel_update_details(OnvifInfoPanel * self){
 
     g_signal_emit (self, signals[STARTED], 0, input->device);
     priv->previous_event = EventQueue__insert_plain(OnvifApp__get_EventQueue(priv->app), input->device, _update_details_page,input, _update_details_page_cleanup);
-    priv->event_signal = g_signal_connect (priv->previous_event, "cancelled", G_CALLBACK (update_details_event_cancelled_cb), input);
+    priv->event_signal = g_signal_connect (priv->previous_event, "state-changed", G_CALLBACK (update_details_event_cancelled_cb), input);
     g_object_ref(priv->previous_event);
 }
 
