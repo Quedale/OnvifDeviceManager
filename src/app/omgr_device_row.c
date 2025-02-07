@@ -269,8 +269,7 @@ static void OnvifMgrDeviceRow__btn_profile_clicked (GtkWidget * widget, OnvifMgr
 }
 
 static gboolean 
-OnvifMgrDeviceRow__attach_buttons(void * user_data){
-    OnvifMgrDeviceRow * self = ONVIFMGR_DEVICEROW(user_data);
+OnvifMgrDeviceRow__attach_buttons(OnvifMgrDeviceRow * self){
     OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
 
     GtkWidget* hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -335,7 +334,7 @@ OnvifMgrDeviceRow__create_layout(OnvifMgrDeviceRow * self){
     gtk_grid_attach (GTK_GRID (priv->button_grid), priv->lbl_location, 1, 3, 1, 1);
 
     //Dispatch image creation using GUI thread, because GtkImage construction isn't safe
-    g_idle_add(OnvifMgrDeviceRow__attach_buttons,self);
+    OnvifMgrDeviceRow__attach_buttons(self);
 
     gtk_container_add (GTK_CONTAINER (self), priv->button_grid);
     //For some reason, spinner has a floating ref
