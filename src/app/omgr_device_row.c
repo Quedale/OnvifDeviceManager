@@ -269,12 +269,14 @@ static void OnvifMgrDeviceRow__btn_profile_clicked (GtkWidget * widget, OnvifMgr
 }
 
 static gboolean 
-OnvifMgrDeviceRow__attach_buttons(OnvifMgrDeviceRow * self){
+OnvifMgrDeviceRow__attach_buttons(void * user_data){
+    OnvifMgrDeviceRow * self = ONVIFMGR_DEVICEROW(user_data);
     OnvifMgrDeviceRowPrivate *priv = OnvifMgrDeviceRow__get_instance_private (self);
 
     GtkWidget* hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     GtkWidget* vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 
+    //Creating the trash isn't safe casuing gtk_css_value_inherit_free error
     priv->btn_trash = OnvifMgrDeviceRow__create_trash_btn(self);
     g_object_set (priv->btn_trash, "margin-end", 3, NULL);
 
@@ -292,6 +294,7 @@ OnvifMgrDeviceRow__attach_buttons(OnvifMgrDeviceRow * self){
 
     gtk_grid_attach (GTK_GRID (priv->button_grid), vbox, 0, 4, 2, 1);
 
+    gtk_widget_show_all(priv->button_grid); //Call show in case it gets added after its parent is already visible
     return FALSE;
 }
 
@@ -334,7 +337,7 @@ OnvifMgrDeviceRow__create_layout(OnvifMgrDeviceRow * self){
     gtk_grid_attach (GTK_GRID (priv->button_grid), priv->lbl_location, 1, 3, 1, 1);
 
     //Dispatch image creation using GUI thread, because GtkImage construction isn't safe
-    OnvifMgrDeviceRow__attach_buttons(self);
+    g_idle_add(OnvifMgrDeviceRow__attach_buttons,self);
 
     gtk_container_add (GTK_CONTAINER (self), priv->button_grid);
     //For some reason, spinner has a floating ref
