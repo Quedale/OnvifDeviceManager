@@ -87,19 +87,18 @@ GtkWidget * OnvifNetworkPanelPrivate__create_network_widget(OnvifDeviceInterface
     gtk_grid_attach (GTK_GRID (grid), widget, 1, row_index, 1, 1);
     row_index++;
 
+    //Enabled
+    widget = gtk_label_new("Enabled : ");
+    gtk_label_set_xalign (GTK_LABEL(widget), 1.0);
+    gtk_grid_attach (GTK_GRID (grid), widget, 0, row_index, 1, 1);
+
+    widget = gtk_check_button_new();
+    gtk_widget_set_sensitive(widget,FALSE);    
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget),OnvifDeviceInterface__get_enabled(inet));
+    gtk_grid_attach (GTK_GRID (grid), widget, 1, row_index, 1, 1);
+    row_index++;
+    
     if(v4){
-        //Enabled
-        widget = gtk_label_new("Enabled : ");
-        gtk_label_set_xalign (GTK_LABEL(widget), 1.0);
-        gtk_grid_attach (GTK_GRID (grid), widget, 0, row_index, 1, 1);
-
-        widget = gtk_check_button_new();
-        gtk_widget_set_sensitive(widget,FALSE);
-        // gtk_editable_set_editable(GTK_EDITABLE(widget),FALSE);
-        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget),OnvifIPv4Configuration__is_enabled(v4));
-        gtk_grid_attach (GTK_GRID (grid), widget, 1, row_index, 1, 1);
-        row_index++;
-
         //DHCP
         widget = gtk_label_new("DHCP : ");
         gtk_label_set_xalign (GTK_LABEL(widget), 1.0);
@@ -168,7 +167,10 @@ GtkWidget * OnvifNetworkPanelPrivate__create_network_widget(OnvifDeviceInterface
     widget = gtk_entry_new();
     // gtk_widget_set_sensitive(widget,FALSE);
     gtk_editable_set_editable(GTK_EDITABLE(widget),FALSE);
-    gtk_entry_set_text(GTK_ENTRY(widget), OnvifDeviceInterface__get_mac(inet));
+    if(OnvifDeviceInterface__get_mac(inet))
+        gtk_entry_set_text(GTK_ENTRY(widget), OnvifDeviceInterface__get_mac(inet));
+    else
+         gtk_entry_set_text(GTK_ENTRY(widget), "MAC Address not defined.");
     gtk_grid_attach (GTK_GRID (grid), widget, 1, row_index, 1, 1);
     row_index++;
 
