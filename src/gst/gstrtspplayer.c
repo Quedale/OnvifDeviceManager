@@ -1126,6 +1126,7 @@ void * init_gst_seprate_mainloop(void * event){
     data->done = 1;          //Flag that the context and loop are ready
     P_COND_BROADCAST(data->cond);
     g_main_loop_run (*loop);
+    g_main_loop_unref(*loop);
     *loop = NULL;            //Setting loop to NULL flags it as finished
     P_COND_BROADCAST(*finish_cond); //broadcast to potentially waiting threads
 

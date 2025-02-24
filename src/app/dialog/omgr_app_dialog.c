@@ -249,6 +249,7 @@ OnvifMgrAppDialog__set_property (GObject      *object,
     switch (prop_id){
         case PROP_TITLELABEL:
             strvalue = g_value_get_string (value);
+            if(priv->title) free(priv->title);
             priv->title = malloc(strlen(strvalue)+1);
             strcpy(priv->title,strvalue);
 

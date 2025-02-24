@@ -181,6 +181,7 @@ OnvifMgrDeviceRow__serialize (OnvifMgrSerializable  *self, int * serialized_leng
         memcpy(output,url,*serialized_length);
     }
 
+    free(url);
     return output;
 }
 
