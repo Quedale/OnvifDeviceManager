@@ -157,7 +157,7 @@ QueueThread__class_init (QueueThreadClass *klass){
     signals[STATE_CHANGED] =
         g_signal_newv ("state-changed",
                         G_TYPE_FROM_CLASS (klass),
-                        G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
+                        G_SIGNAL_RUN_FIRST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
                         NULL /* closure */,
                         NULL /* accumulator */,
                         NULL /* accumulator data */,

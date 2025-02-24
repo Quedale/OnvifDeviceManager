@@ -165,12 +165,14 @@ OnvifMgrDeviceRow__serialize (OnvifMgrSerializable  *self, int * serialized_leng
             *serialized_length += strlen(OMGR_DEVICE_USER_PREFIX);
             memcpy(&output[*serialized_length],user,strlen(user)+1);
             *serialized_length += strlen(user)+1;
+            free(user);
         }
         if(pass){
             memcpy(&output[*serialized_length],OMGR_DEVICE_PASS_PREFIX,strlen(OMGR_DEVICE_PASS_PREFIX));
             *serialized_length += strlen(OMGR_DEVICE_PASS_PREFIX);
             memcpy(&output[*serialized_length],pass,strlen(pass)+1);
             *serialized_length += strlen(pass)+1;
+            free(pass);
         }
 
     } else {
