@@ -200,6 +200,7 @@ void AppSettings__create_ui(AppSettings * self){
     self->widget = gtk_grid_new(); //Create root setting container
 
     notebook = gtk_notebook_new(); //Create note containing setting pages
+    gtk_notebook_set_scrollable(GTK_NOTEBOOK(notebook),TRUE);
     gtk_widget_set_vexpand (notebook, TRUE);
     gtk_notebook_set_tab_pos (GTK_NOTEBOOK (notebook), GTK_POS_LEFT);
     gtk_grid_attach (GTK_GRID (self->widget), notebook, 0, 0, 1, 1);

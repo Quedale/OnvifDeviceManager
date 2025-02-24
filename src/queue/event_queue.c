@@ -95,10 +95,29 @@ EventQueue__emit_signal(EventQueue * self, QueueEvent * evt, QueueEventType type
 }
 
 static void 
-EventQueue__wait_finish(EventQueue* self){
-    int val = -1;
-    while((val = EventQueue__get_thread_count(self)) != 0){
-        sleep(0.05);
+EventQueue__stop_all_threads(EventQueue* self){
+    EventQueuePrivate *priv = EventQueue__get_instance_private (self);
+    P_MUTEX_LOCK(priv->threads_lock);
+    GList * childs = priv->threads;
+    QueueThread * thread;
+    int tlen = g_list_length(priv->threads);
+    P_THREAD_TYPE pthread_killed[tlen];
+    int index = 0;
+    for(;childs && (thread = childs->data, TRUE); childs = childs->next){
+        QueueThread__terminate(thread);
+        P_THREAD_TYPE pthread = QueueThread__get_thread(thread);
+        pthread_killed[index++] = pthread;
+    }
+    if(priv->threads){
+        g_list_free(priv->threads);
+        priv->threads = NULL;
+    }
+    P_MUTEX_UNLOCK(priv->threads_lock);
+    P_COND_BROADCAST(priv->sleep_cond); //Notify sleeping thread
+
+    //Thread resource clean up
+    for(index=0;index<tlen;index++){
+        P_THREAD_JOIN(pthread_killed[index]);
     }
 }
 
@@ -108,19 +127,12 @@ EventQueue__dispose(GObject * obj){
     EventQueuePrivate *priv = EventQueue__get_instance_private (queue);
 
     //Thread cleanup
-    int tcount = EventQueue__get_thread_count(queue);
-    if(tcount){
-        EventQueue__stop(queue,tcount);
-        EventQueue__wait_finish(queue);
-    }
+    EventQueue__stop_all_threads(queue);
+
     if(priv->events){
         //TODO Cancel pending event for clean up
         g_list_free(priv->events);
         priv->events = NULL;
-    }
-    if(priv->threads){
-        g_list_free(priv->threads);
-        priv->threads = NULL;
     }
 
     if(priv->running_events){

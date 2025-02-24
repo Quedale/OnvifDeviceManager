@@ -33,7 +33,7 @@ void OnvifDetails__create_ui(OnvifDetails *self, OnvifInfoPanel * info, OnvifNet
     GtkWidget *label;
 
     self->details_notebook = gtk_notebook_new ();
-
+    gtk_notebook_set_scrollable(GTK_NOTEBOOK (self->details_notebook),TRUE);
     gtk_notebook_set_tab_pos (GTK_NOTEBOOK (self->details_notebook), GTK_POS_LEFT);
 
     label = gtk_label_new ("Information");

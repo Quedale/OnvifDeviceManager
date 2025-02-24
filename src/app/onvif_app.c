@@ -739,33 +739,15 @@ static int OnvifApp__device_already_exist(OnvifApp * app, char * xaddr){
     return ret;
 }
 
-void OnvifApp__create_ui (OnvifApp * app) {
-    GtkWidget *main_window;  /* The uppermost window, containing all other windows */
-    GtkWidget *grid;
+GtkWidget * OnvifApp__create_browser_ui(OnvifApp * app){
+    GtkWidget * grid;
     GtkWidget *widget;
     GtkWidget *label;
-    GtkWidget * hbox;
-    GtkWidget *main_notebook;
 
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (app);
-
-    main_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
-    g_signal_connect (G_OBJECT (main_window), "delete-event", G_CALLBACK (OnvifApp__window_delete_event_cb), app);
-
-    gtk_window_set_title (GTK_WINDOW (main_window), "Onvif Device Manager");
-
-    priv->overlay = GTK_OVERLAY(gtk_overlay_new());
-    gtk_container_add (GTK_CONTAINER (main_window), GTK_WIDGET(priv->overlay));
-
-    /* Here we construct the container that is going pack our buttons */
     grid = gtk_grid_new ();
-    gtk_container_set_border_width (GTK_CONTAINER (grid), 5);
-    gtk_overlay_add_overlay(priv->overlay,grid);
-
-    GtkWidget * left_grid = gtk_grid_new ();
-
-    hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0);
-    gtk_grid_attach (GTK_GRID (left_grid), hbox, 0, 0, 1, 1);
+    GtkWidget * hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0); //Horizontal container for Scan and Add buttons
+    gtk_grid_attach (GTK_GRID (grid), hbox, 0, 0, 1, 1);
 
     char * btn_css = "* { padding: 0px; font-size: 1.5em; }";
 
@@ -807,7 +789,7 @@ void OnvifApp__create_ui (OnvifApp * app) {
     gtk_container_add (GTK_CONTAINER (add_btn), label);
     gui_widget_set_css(add_btn, btn_css);
 
-    gtk_box_pack_start (GTK_BOX(hbox),add_btn,FALSE,TRUE,0);
+    gtk_box_pack_start (GTK_BOX(hbox),add_btn,FALSE,FALSE,0);
 
     g_signal_connect (add_btn, "clicked", G_CALLBACK (OnvifApp__add_btn_cb), app);
 
@@ -816,11 +798,11 @@ void OnvifApp__create_ui (OnvifApp * app) {
     gtk_widget_set_hexpand (widget, TRUE);
     priv->listbox = gtk_list_box_new ();
     //TODO Calculate preferred width to display IP without scrollbar
-    gtk_widget_set_size_request(widget,135,-1);
+    gtk_widget_set_size_request(widget,200,-1);
     gtk_widget_set_vexpand (priv->listbox, TRUE);
     gtk_list_box_set_selection_mode (GTK_LIST_BOX (priv->listbox), GTK_SELECTION_SINGLE);
     gtk_container_add(GTK_CONTAINER(widget),priv->listbox);
-    gtk_grid_attach (GTK_GRID (left_grid), widget, 0, 2, 1, 1);
+    gtk_grid_attach (GTK_GRID (grid), widget, 0, 2, 1, 1);
     g_signal_connect (priv->listbox, "row-selected", G_CALLBACK (OnvifApp__row_selected_cb), app);
     gui_widget_set_css(widget, "* { padding-bottom: 3px; padding-top: 3px; padding-right: 3px; }"); 
 
@@ -831,23 +813,47 @@ void OnvifApp__create_ui (OnvifApp * app) {
     gtk_widget_set_vexpand (widget, FALSE);
     gtk_widget_set_hexpand (widget, FALSE);
     g_signal_connect (G_OBJECT(widget), "clicked", G_CALLBACK (OnvifApp__quit_cb), app);
-    gtk_grid_attach (GTK_GRID (left_grid), widget, 0, 3, 1, 1);
-    gui_widget_set_css(widget, btn_css); 
-    
+    gtk_grid_attach (GTK_GRID (grid), widget, 0, 3, 1, 1);
+    gui_widget_set_css(widget, btn_css);
+
+    return grid;
+}
+
+void OnvifApp__create_ui (OnvifApp * app) {
+    GtkWidget *main_window;  /* The uppermost window, containing all other windows */
+    GtkWidget *widget;
+    GtkWidget *label;
+    GtkWidget * hbox;
+    GtkWidget *main_notebook;
+
+    OnvifAppPrivate *priv = OnvifApp__get_instance_private (app);
+
+    main_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+    g_signal_connect (G_OBJECT (main_window), "delete-event", G_CALLBACK (OnvifApp__window_delete_event_cb), app);
+
+    gtk_window_set_title (GTK_WINDOW (main_window), "Onvif Device Manager");
+
+    priv->overlay = GTK_OVERLAY(gtk_overlay_new());
+    gtk_container_add (GTK_CONTAINER (main_window), GTK_WIDGET(priv->overlay));
+
+    //Division between the player and camera browser
     GtkWidget *hpaned = gtk_paned_new (GTK_ORIENTATION_HORIZONTAL);
+    gtk_container_set_border_width (GTK_CONTAINER (hpaned), 5);
     gtk_widget_set_vexpand (hpaned, TRUE);
     gtk_widget_set_hexpand (hpaned, TRUE);
     gui_widget_set_css(hpaned, "paned separator{min-width: 10px;}");
-    gtk_paned_pack1 (GTK_PANED (hpaned), left_grid, FALSE, FALSE);
+    //Add camera browser
+    gtk_paned_pack1 (GTK_PANED (hpaned), OnvifApp__create_browser_ui(app), FALSE, FALSE);
 
     /* Create a new notebook, place the position of the tabs */
     main_notebook = gtk_notebook_new ();
+    gtk_notebook_set_scrollable(GTK_NOTEBOOK(main_notebook),TRUE);
     gtk_notebook_set_tab_pos (GTK_NOTEBOOK (main_notebook), GTK_POS_TOP);
     gtk_widget_set_vexpand (main_notebook, TRUE);
     gtk_widget_set_hexpand (main_notebook, TRUE);
-    gtk_paned_pack2 (GTK_PANED (hpaned), main_notebook, FALSE, FALSE);
-
-    gtk_grid_attach (GTK_GRID (grid), hpaned, 0, 0, 1, 4);
+    gtk_paned_pack2 (GTK_PANED (hpaned), main_notebook, TRUE, FALSE);
+    gtk_overlay_add_overlay(priv->overlay,hpaned);
+    // gtk_grid_attach (GTK_GRID (grid), hpaned, 0, 0, 1, 4);
     gtk_paned_set_wide_handle(GTK_PANED(hpaned),TRUE);
     char * TITLE_STR = "NVT";
     label = gtk_label_new (TITLE_STR);
@@ -1095,9 +1101,6 @@ void OnvifApp__destroy(OnvifApp* self){
 
     g_object_ref(self);
     COwnableObject__disown(COWNABLE_OBJECT(self)); //Changing owned state, flagging pending events to be ignored
-    while(G_IS_OBJECT(self) && G_OBJECT(self)->ref_count > 1){ //Wait for destruction to complete
-        usleep(500000);
-    }
     g_object_unref(self);
 }
 

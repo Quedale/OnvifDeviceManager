@@ -15,7 +15,8 @@ void * _thread_destruction(void * event){
     OnvifApp__destroy(app);
     
     //Quitting from idle thread allows the windows and OnvifMgrDeviceRow (and nested OnvifDevice) to destroy properly
-    gdk_threads_add_idle(G_SOURCE_FUNC(safely_quit_gtk_main),NULL);
+    //Using LOW priority to allow other event to run first.
+    g_idle_add_full (G_PRIORITY_LOW, G_SOURCE_FUNC(safely_quit_gtk_main), NULL, NULL);
 
     pthread_exit(0);
 }

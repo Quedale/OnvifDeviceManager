@@ -8,6 +8,7 @@ typedef struct _QueueThread QueueThread;
 
 #include "event_queue.h"
 #include "queue_event.h"
+#include "portable_thread.h"
 
 G_BEGIN_DECLS
 
@@ -39,6 +40,7 @@ QueueThread * QueueThread__new(EventQueue* queue);
 void QueueThread__terminate(QueueThread* self);
 int QueueThread__is_terminated(QueueThread* self);
 void QueueThread__start(QueueThread * self);
+P_THREAD_TYPE QueueThread__get_thread(QueueThread* self);
 
 //Thread-local function returning the current context pointers
 //Designed to be used within background events

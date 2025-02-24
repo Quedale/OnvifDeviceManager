@@ -199,7 +199,6 @@ QueueThread__start(QueueThread * self){
     g_return_if_fail (priv->started == 0); 
     g_object_ref(self);
     P_THREAD_CREATE(priv->pthread, priv_QueueThread_call, self);
-    P_THREAD_DETACH(priv->pthread);
     priv->started = 1;
 }
 
@@ -229,4 +228,12 @@ QueueThread__is_terminated(QueueThread* self){
     ret = priv->terminated;
     P_MUTEX_UNLOCK(priv->cancel_lock);
     return ret;
+}
+
+P_THREAD_TYPE 
+QueueThread__get_thread(QueueThread* self){
+    g_return_val_if_fail (self != NULL,FALSE);
+    g_return_val_if_fail (QUEUE_IS_THREAD (self),FALSE);
+    QueueThreadPrivate *priv = QueueThread__get_instance_private (self);
+    return priv->pthread;
 }

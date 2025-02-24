@@ -115,6 +115,7 @@ void GtkBinaryImage__set_image(GtkBinaryImage *  self, GdkPixbuf * pixbuf){
     }
     g_return_if_fail (GTK_IS_BINARYIMAGE (self));
     GtkBinaryImage__apply_data(self,pixbuf);
+    g_object_unref(pixbuf);
 }
 
 GtkWidget* GtkBinaryImage__new(unsigned char * data_start, unsigned int data_size, int width, int height, GError *error){
