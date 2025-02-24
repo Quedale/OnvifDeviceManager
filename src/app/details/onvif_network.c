@@ -2,14 +2,17 @@
 #include "../gui_utils.h"
 #include "clogger.h"
 
+#define MANUAL_LABEL "Static : "
+#define DHCP_LABEL "DHCP : "
+#define LOCAL_LABEL "Local : "
+
 enum {
     STARTED,
     FINISHED,
     LAST_SIGNAL
 };
 
-enum
-{
+enum {
   PROP_APP = 1,
   N_PROPERTIES
 };
@@ -38,7 +41,8 @@ typedef struct {
 void OnvifNetworkPanel_update_details(OnvifNetworkPanel * self);
 void OnvifNetworkPanel_clear_details(OnvifNetworkPanel * self);
 
-void OnvifNetworkPanel__device_changed_cb(OnvifApp * app, OnvifMgrDeviceRow * device, OnvifNetworkPanel * network){
+static void 
+OnvifNetworkPanel__device_changed_cb(OnvifApp * app, OnvifMgrDeviceRow * device, OnvifNetworkPanel * network){
     OnvifNetworkPanelPrivate *priv = OnvifNetworkPanel__get_instance_private (network);
     priv->device = device;
     OnvifNetworkPanel_clear_details(network);
@@ -47,7 +51,8 @@ void OnvifNetworkPanel__device_changed_cb(OnvifApp * app, OnvifMgrDeviceRow * de
     }
 }
 
-void OnvifNetworkPanel__map_event_cb (GtkWidget* self, OnvifNetworkPanel * info){
+static void 
+OnvifNetworkPanel__map_event_cb (GtkWidget* self, OnvifNetworkPanel * info){
     OnvifNetworkPanelPrivate *priv = OnvifNetworkPanel__get_instance_private (info);
     if(gtk_widget_get_mapped(GTK_WIDGET(info)) && ONVIFMGR_IS_DEVICEROW(priv->device) && OnvifMgrDeviceRow__is_initialized(priv->device)){
         OnvifNetworkPanel_clear_details(info);
@@ -55,117 +60,125 @@ void OnvifNetworkPanel__map_event_cb (GtkWidget* self, OnvifNetworkPanel * info)
     }
 }
 
-GtkWidget * OnvifNetworkPanelPrivate__create_network_widget(OnvifDeviceInterface * inet){
-    GtkWidget * frame = gtk_frame_new(OnvifDeviceInterface__get_name(inet));
-    gtk_frame_set_label_align(GTK_FRAME(frame),0.03,0.5);
-    gtk_widget_set_margin_start(frame,5);
+static void
+OnvifNetworkPanelPrivate__add_ipaddr(OnvifPrefixedIPAddress ** addrs, int count, char * label, GtkWidget * grid, int * row_index){
+    GtkWidget * widget;
+    OnvifPrefixedIPAddress * addr;
+    for(int i=0;i<count;i++){
+        addr = addrs[i];
+        widget = gtk_label_new(label);
+        gtk_label_set_xalign (GTK_LABEL(widget), 1.0);
+        gtk_grid_attach (GTK_GRID (grid), widget, 0, *row_index, 1, 1);
+
+        widget = gtk_entry_new();
+        gtk_entry_set_max_width_chars(GTK_ENTRY(widget),23);
+        gtk_editable_set_editable(GTK_EDITABLE(widget),FALSE);
+        char strIp[strlen(OnvifPrefixedIPAddress__get_address(addr)) + 4];
+        sprintf(strIp, "%s/%d", OnvifPrefixedIPAddress__get_address(addr),OnvifPrefixedIPAddress__get_prefix(addr));
+        gtk_entry_set_text(GTK_ENTRY(widget),strIp);
+        gtk_grid_attach (GTK_GRID (grid), widget, 1, *row_index, 1, 1);
+        *row_index =  *row_index + 1;
+    }
+}
+
+static void
+OnvifNetworkPanelPrivate__create_ips_panel(OnvifDeviceInterface * inet, GtkWidget * grid, int * row_index){
+    OnvifIPv4Configuration * v4 = OnvifDeviceInterface__get_ipv4(inet);
+    if(v4){
+        OnvifPrefixedIPAddress * addr = OnvifIPv4Configuration__get_fromdhcp(v4);
+        if(addr)
+            OnvifNetworkPanelPrivate__add_ipaddr(&addr,1,DHCP_LABEL,grid,row_index);
+
+        addr = OnvifIPv4Configuration__get_local(v4);
+        if(addr)
+            OnvifNetworkPanelPrivate__add_ipaddr(&addr,1,LOCAL_LABEL,grid,row_index);
+
+        OnvifNetworkPanelPrivate__add_ipaddr(OnvifIPv4Configuration__get_manuals(v4),
+                                            OnvifIPv4Configuration__get_manual_count(v4),
+                                            MANUAL_LABEL,
+                                            grid,
+                                            row_index);
+    }
+
+    OnvifIPv6Configuration * v6 = OnvifDeviceInterface__get_ipv6(inet);
+    if(v6){
+        OnvifNetworkPanelPrivate__add_ipaddr(OnvifIPv6Configuration__get_fromdhcp(v6),
+                                            OnvifIPv6Configuration__get_fromdhcp_count(v6),
+                                            DHCP_LABEL,
+                                            grid,
+                                            row_index);
+        OnvifNetworkPanelPrivate__add_ipaddr(OnvifIPv6Configuration__get_local(v6),
+                                            OnvifIPv6Configuration__get_local_count(v6),
+                                            LOCAL_LABEL,
+                                            grid,
+                                            row_index);
+        OnvifNetworkPanelPrivate__add_ipaddr(OnvifIPv6Configuration__get_manuals(v6),
+                                            OnvifIPv6Configuration__get_manual_count(v6),
+                                            MANUAL_LABEL,
+                                            grid,
+                                            row_index);
+        OnvifNetworkPanelPrivate__add_ipaddr(OnvifIPv6Configuration__get_fromra(v6),
+                                            OnvifIPv6Configuration__get_fromra_count(v6),
+                                            "RA : ",
+                                            grid,
+                                            row_index);
+    }
+}
+
+static GtkWidget * 
+OnvifNetworkPanelPrivate__create_interface_panel(OnvifDeviceInterface * inet){
+    GtkWidget * frame = gtk_frame_new(NULL);
+    gtk_frame_set_label_align(GTK_FRAME(frame),0.08,0.2);
+    gtk_widget_set_margin_start(frame,10);
     gtk_widget_set_margin_end(frame,5);
+    gtk_widget_set_margin_top(frame,5);
 
     GtkWidget * grid = gtk_grid_new();
     gtk_widget_set_margin_bottom(grid,5);
+    gtk_widget_set_margin_top(grid,5);
     gtk_widget_set_margin_start(grid,5);
+    gtk_widget_set_margin_end(grid,5);
     gtk_grid_set_row_spacing(GTK_GRID(grid),5);
 
     gtk_container_add(GTK_CONTAINER(frame),grid);
 
     int row_index = 0;
 
-    OnvifIPv4Configuration * v4 = OnvifDeviceInterface__get_ipv4(inet);
     char mtu[10];
     sprintf(mtu, "%d", OnvifDeviceInterface__get_mtu(inet));
 
-    GtkWidget * widget = gtk_label_new("MTU : ");
-    gtk_label_set_xalign (GTK_LABEL(widget), 1.0);
-    gtk_grid_attach (GTK_GRID (grid), widget, 0, row_index, 1, 1);
-
-    widget = gtk_entry_new();
-    gtk_entry_set_text(GTK_ENTRY(widget), mtu);
-    // gtk_widget_set_sensitive(widget,FALSE);
-    gtk_editable_set_editable(GTK_EDITABLE(widget),FALSE);
-
-
-    gtk_grid_attach (GTK_GRID (grid), widget, 1, row_index, 1, 1);
-    row_index++;
-
-    //Enabled
-    widget = gtk_label_new("Enabled : ");
-    gtk_label_set_xalign (GTK_LABEL(widget), 1.0);
-    gtk_grid_attach (GTK_GRID (grid), widget, 0, row_index, 1, 1);
+    GtkWidget * widget;
 
     widget = gtk_check_button_new();
+    gtk_widget_set_margin_top(widget,2);
+    gtk_widget_set_margin_bottom(widget,2);
+    gtk_widget_set_margin_start(widget,5);
     gtk_widget_set_sensitive(widget,FALSE);    
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget),OnvifDeviceInterface__get_enabled(inet));
-    gtk_grid_attach (GTK_GRID (grid), widget, 1, row_index, 1, 1);
-    row_index++;
-    
-    if(v4){
-        //DHCP
-        widget = gtk_label_new("DHCP : ");
-        gtk_label_set_xalign (GTK_LABEL(widget), 1.0);
-        gtk_grid_attach (GTK_GRID (grid), widget, 0, row_index, 1, 1);
+    GtkWidget * lbl = gtk_label_new(OnvifDeviceInterface__get_name(inet));
+    gtk_widget_set_margin_top(lbl,2);
+    gtk_widget_set_margin_bottom(lbl,2);
+    gtk_widget_set_margin_end(lbl,5);
+    GtkWidget* hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    gtk_box_pack_start(GTK_BOX(hbox), widget, TRUE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(hbox), lbl, TRUE, FALSE, 0);
+    GtkWidget * titleframe = gtk_frame_new(NULL);
+    gtk_container_add(GTK_CONTAINER(titleframe),hbox);
+    gtk_frame_set_label_widget(GTK_FRAME(frame),titleframe);
 
-        widget = gtk_check_button_new();
-        gtk_widget_set_sensitive(widget,FALSE);
-        // gtk_editable_set_editable(GTK_EDITABLE(widget),FALSE);
-        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget),OnvifIPv4Configuration__is_dhcp(v4));
-        gtk_grid_attach (GTK_GRID (grid), widget, 1, row_index, 1, 1);
-        row_index++;
-
-        OnvifPrefixedIPv4Address * addr = OnvifIPv4Configuration__get_fromdhcp(v4);
-        if(addr){
-            widget = gtk_label_new("DHCP IPv4 : ");
-            gtk_label_set_xalign (GTK_LABEL(widget), 1.0);
-            gtk_grid_attach (GTK_GRID (grid), widget, 0, row_index, 1, 1);
-
-            widget = gtk_entry_new();
-            // gtk_widget_set_sensitive(widget,FALSE);
-            gtk_editable_set_editable(GTK_EDITABLE(widget),FALSE);
-            char strIp[strlen(OnvifPrefixedIPv4Address__get_address(addr)) + 4];
-            sprintf(strIp, "%s/%d", OnvifPrefixedIPv4Address__get_address(addr),OnvifPrefixedIPv4Address__get_prefix(addr));
-            gtk_entry_set_text(GTK_ENTRY(widget),strIp);
-            gtk_grid_attach (GTK_GRID (grid), widget, 1, row_index, 1, 1);
-            row_index++;
-        }
-
-        addr = OnvifIPv4Configuration__get_local(v4);
-        if(addr){
-            widget = gtk_label_new("Local IPv4 : ");
-            gtk_label_set_xalign (GTK_LABEL(widget), 1.0);
-            gtk_grid_attach (GTK_GRID (grid), widget, 0, row_index, 1, 1);
-
-            widget = gtk_entry_new();
-            // gtk_widget_set_sensitive(widget,FALSE);
-            gtk_editable_set_editable(GTK_EDITABLE(widget),FALSE);
-            char strIp[strlen(OnvifPrefixedIPv4Address__get_address(addr)) + 4];
-            sprintf(strIp, "%s/%d", OnvifPrefixedIPv4Address__get_address(addr),OnvifPrefixedIPv4Address__get_prefix(addr));
-            gtk_entry_set_text(GTK_ENTRY(widget),strIp);
-            gtk_grid_attach (GTK_GRID (grid), widget, 1, row_index, 1, 1);
-            row_index++;
-        }
-
-        for(int i=0;i<OnvifIPv4Configuration__get_manual_count(v4);i++){
-            addr = OnvifIPv4Configuration__get_manual(v4, i);
-            widget = gtk_label_new("Manual IPv4 : ");
-            gtk_label_set_xalign (GTK_LABEL(widget), 1.0);
-            gtk_grid_attach (GTK_GRID (grid), widget, 0, row_index, 1, 1);
-
-            widget = gtk_entry_new();
-            // gtk_widget_set_sensitive(widget,FALSE);
-            gtk_editable_set_editable(GTK_EDITABLE(widget),FALSE);
-            char strIp[strlen(OnvifPrefixedIPv4Address__get_address(addr)) + 4];
-            sprintf(strIp, "%s/%d", OnvifPrefixedIPv4Address__get_address(addr),OnvifPrefixedIPv4Address__get_prefix(addr));
-            gtk_entry_set_text(GTK_ENTRY(widget),strIp);
-            gtk_grid_attach (GTK_GRID (grid), widget, 1, row_index, 1, 1);
-            row_index++;
-        }
+    if(OnvifDeviceInterface__get_enabled(inet)){
+        gui_widget_set_css(widget,"* { color:green; border-color:green; }");
+    } else {
+        gui_widget_set_css(widget,"* { color:#A52A2A; border-color:#A52A2A; }");
     }
 
     widget = gtk_label_new("MAC : ");
+    gtk_widget_set_hexpand(widget,TRUE);
     gtk_label_set_xalign (GTK_LABEL(widget), 1.0);
     gtk_grid_attach (GTK_GRID (grid), widget, 0, row_index, 1, 1);
 
     widget = gtk_entry_new();
-    // gtk_widget_set_sensitive(widget,FALSE);
+    gtk_entry_set_max_width_chars(GTK_ENTRY(widget),23);
     gtk_editable_set_editable(GTK_EDITABLE(widget),FALSE);
     if(OnvifDeviceInterface__get_mac(inet))
         gtk_entry_set_text(GTK_ENTRY(widget), OnvifDeviceInterface__get_mac(inet));
@@ -174,10 +187,27 @@ GtkWidget * OnvifNetworkPanelPrivate__create_network_widget(OnvifDeviceInterface
     gtk_grid_attach (GTK_GRID (grid), widget, 1, row_index, 1, 1);
     row_index++;
 
+    widget = gtk_label_new("MTU : ");
+    gtk_widget_set_hexpand(widget,TRUE);
+    gtk_label_set_xalign (GTK_LABEL(widget), 1.0);
+    gtk_grid_attach (GTK_GRID (grid), widget, 0, row_index, 1, 1);
+
+    widget = gtk_entry_new();
+    gtk_entry_set_max_width_chars(GTK_ENTRY(widget),23);
+    gtk_entry_set_text(GTK_ENTRY(widget), mtu);
+    gtk_editable_set_editable(GTK_EDITABLE(widget),FALSE);
+
+
+    gtk_grid_attach (GTK_GRID (grid), widget, 1, row_index, 1, 1);
+    row_index++;
+    
+    OnvifNetworkPanelPrivate__create_ips_panel(inet, grid, &row_index);
+
     return frame;
 }
 
-gboolean onvif_network_gui_update (void * user_data){
+static gboolean 
+onvif_network_gui_update (void * user_data){
     NetworkGUIUpdate * update = (NetworkGUIUpdate *) user_data;
 
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(update->device) || !OnvifMgrDeviceRow__is_selected(update->device) || QueueEvent__is_cancelled(update->qevt)){
@@ -185,12 +215,16 @@ gboolean onvif_network_gui_update (void * user_data){
     }
     
     GtkWidget* vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_widget_set_hexpand(vbox,FALSE);
 
-    gtk_container_add(GTK_CONTAINER(update->network),vbox);
+    GtkWidget* hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_box_pack_start(GTK_BOX(hbox), vbox, FALSE, FALSE, 0);
+
+    gtk_container_add(GTK_CONTAINER(update->network),hbox);
 
     for(int a=0;a<OnvifDeviceInterfaces__get_count(update->inet);a++){
         OnvifDeviceInterface * inet = OnvifDeviceInterfaces__get_interface(update->inet,a);
-        gtk_box_pack_start(GTK_BOX(vbox), OnvifNetworkPanelPrivate__create_network_widget(inet), FALSE, FALSE, 0);
+        gtk_box_pack_start(GTK_BOX(vbox), OnvifNetworkPanelPrivate__create_interface_panel(inet), FALSE, FALSE, 0);
     }
 
     gtk_widget_show_all(GTK_WIDGET(update->network));
@@ -205,7 +239,8 @@ exit:
     return FALSE;
 }
 
-void update_network_event_cancelled_cb(QueueEvent * qevt, QueueEventState state, void * user_data){
+static void 
+update_network_event_cancelled_cb(QueueEvent * qevt, QueueEventState state, void * user_data){
     NetworkGUIUpdate * input = (NetworkGUIUpdate *) user_data;
     //Do not dispatch on QUEUEEVENT_DISPATCHED.
     //FINISHED will be invoked at the end of the GUI update
@@ -213,13 +248,15 @@ void update_network_event_cancelled_cb(QueueEvent * qevt, QueueEventState state,
         gui_signal_emit(input->network, signals[FINISHED], input->device);
 }
 
-void _update_network_page_cleanup(QueueEvent * qevt, int cancelled, void * user_data){
+static void 
+_update_network_page_cleanup(QueueEvent * qevt, int cancelled, void * user_data){
     NetworkGUIUpdate * input = (NetworkGUIUpdate *) user_data;
     g_object_unref(input->device);
     free(input);
 }
 
-void _update_network_page(QueueEvent * qevt, void * user_data){
+static void 
+_update_network_page(QueueEvent * qevt, void * user_data){
     NetworkGUIUpdate * input = (NetworkGUIUpdate *) user_data;
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device) || QueueEvent__is_cancelled(qevt)){
         return;
@@ -242,7 +279,8 @@ void _update_network_page(QueueEvent * qevt, void * user_data){
     gdk_threads_add_idle(G_SOURCE_FUNC(onvif_network_gui_update),gui_update);
 }
 
-void OnvifNetworkPanel_update_details(OnvifNetworkPanel * self){
+void 
+OnvifNetworkPanel_update_details(OnvifNetworkPanel * self){
     OnvifNetworkPanelPrivate *priv = OnvifNetworkPanel__get_instance_private (self);
     if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(priv->device)){
         return;
@@ -283,8 +321,7 @@ static void
 OnvifNetworkPanel__set_property (GObject      *object,
                           guint         prop_id,
                           const GValue *value,
-                          GParamSpec   *pspec)
-{
+                          GParamSpec   *pspec){
     OnvifNetworkPanel * info = ONVIFMGR_NETWORKPANEL (object);
     OnvifNetworkPanelPrivate *priv = OnvifNetworkPanel__get_instance_private (info);
     switch (prop_id){
@@ -302,8 +339,7 @@ static void
 OnvifNetworkPanel__get_property (GObject    *object,
                           guint       prop_id,
                           GValue     *value,
-                          GParamSpec *pspec)
-{
+                          GParamSpec *pspec){
     OnvifNetworkPanel *info = ONVIFMGR_NETWORKPANEL (object);
     OnvifNetworkPanelPrivate *priv = OnvifNetworkPanel__get_instance_private (info);
     switch (prop_id){
@@ -317,8 +353,7 @@ OnvifNetworkPanel__get_property (GObject    *object,
 }
 
 static void
-OnvifNetworkPanel__class_init (OnvifNetworkPanelClass * klass)
-{
+OnvifNetworkPanel__class_init (OnvifNetworkPanelClass * klass){
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
     object_class->set_property = OnvifNetworkPanel__set_property;
@@ -362,8 +397,7 @@ OnvifNetworkPanel__class_init (OnvifNetworkPanelClass * klass)
 }
 
 static void
-OnvifNetworkPanel__init (OnvifNetworkPanel * self)
-{
+OnvifNetworkPanel__init (OnvifNetworkPanel * self){
     OnvifNetworkPanelPrivate *priv = OnvifNetworkPanel__get_instance_private (self);
     priv->app = NULL;
     priv->device = NULL;
@@ -371,7 +405,8 @@ OnvifNetworkPanel__init (OnvifNetworkPanel * self)
     g_signal_connect (self, "map", G_CALLBACK (OnvifNetworkPanel__map_event_cb), self);
 }
 
-OnvifNetworkPanel * OnvifNetworkPanel__new(OnvifApp * app){
+OnvifNetworkPanel * 
+OnvifNetworkPanel__new(OnvifApp * app){
     if(!ONVIFMGR_IS_APP(app)){
         return NULL;
     }
