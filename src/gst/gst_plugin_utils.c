@@ -499,6 +499,6 @@ void gst_print_elements_by_type(char * type){
      C_INFO("*    None");
   }
   gst_caps_unref (caps);
-  g_list_free(filtered);
-  g_list_free (factories);
+  gst_plugin_feature_list_free(filtered);
+  gst_plugin_feature_list_free (factories);
 }
