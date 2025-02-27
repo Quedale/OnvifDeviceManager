@@ -41,8 +41,8 @@ typedef struct {
     GstRtspPlayerSession * session;
     GMainContext * player_context;
     GMainLoop * player_loop;
-    P_COND_TYPE loop_cond;
-    P_MUTEX_TYPE loop_lock;
+    P_THREAD_TYPE thread_loop;
+
     //Reusable bins containing encoder and sink
     GstElement * video_bin;
     GstElement * audio_bin;
@@ -78,8 +78,7 @@ typedef struct {
 struct GstInitData{
     GMainContext ** context;
     GMainLoop ** loop;
-    int done;
-    P_COND_TYPE * finish_cond;
+    int ready;
     P_COND_TYPE cond;
     P_MUTEX_TYPE lock;
 };
@@ -1117,18 +1116,15 @@ void * init_gst_seprate_mainloop(void * event){
     struct GstInitData * data = (struct GstInitData*)event;
     //Keeping location pointer because data won't be value after cond broadcast
     GMainLoop ** loop = data->loop;
-    P_COND_TYPE * finish_cond = data->finish_cond;
-
     c_log_set_thread_color(ANSI_COLOR_CYAN, P_THREAD_ID);
     *data->context = g_main_context_new ();
     *loop = g_main_loop_new (*data->context, FALSE);
 
-    data->done = 1;          //Flag that the context and loop are ready
+    data->ready = 1;          //Flag that the context and loop are ready
     P_COND_BROADCAST(data->cond);
     g_main_loop_run (*loop);
     g_main_loop_unref(*loop);
     *loop = NULL;            //Setting loop to NULL flags it as finished
-    P_COND_BROADCAST(*finish_cond); //broadcast to potentially waiting threads
 
     return NULL;
 }
@@ -1138,23 +1134,17 @@ GstRtspPlayer__init (GstRtspPlayer * self)
 {
     GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
     priv->owner = self;
-    P_COND_SETUP(priv->loop_cond);
-    P_MUTEX_SETUP(priv->loop_lock);
 
     struct GstInitData data;
-    data.done = 0;
-    data.finish_cond = &priv->loop_cond;
+    data.ready = 0;
     data.context = &priv->player_context;
     data.loop = &priv->player_loop;
     P_COND_SETUP(data.cond);
     P_MUTEX_SETUP(data.lock);
-
-    pthread_t pthread;
-    pthread_create(&pthread, NULL, init_gst_seprate_mainloop, &data);
-    pthread_detach(pthread);
+    P_THREAD_CREATE(priv->thread_loop, init_gst_seprate_mainloop, &data);
 
     C_TRACE("Waiting for Gstreamer loop initialization");
-    if(!data.done) { P_COND_WAIT(data.cond, data.lock); }
+    if(!data.ready) { P_COND_WAIT(data.cond, data.lock); }
     P_COND_CLEANUP(data.cond);
     P_MUTEX_CLEANUP(data.lock);
     C_TRACE("Gstreamer loop initialization successfull");
@@ -1298,11 +1288,8 @@ GstRtspPlayer__dispose (GObject *gobject)
         g_main_loop_quit(priv->player_loop);
         //Making sure the loop is finished so that session isn't destroyed while an event is running
         C_TRACE("Waiting for Gstreamer loop to finish");
-        if(priv->player_loop != NULL) { P_COND_WAIT(priv->loop_cond, priv->loop_lock); }
+        P_THREAD_JOIN(priv->thread_loop);
     }
-
-    P_COND_CLEANUP(priv->loop_cond);
-    P_MUTEX_CLEANUP(priv->loop_lock);
 
     if(priv->player_context){
         g_main_context_unref(priv->player_context);
