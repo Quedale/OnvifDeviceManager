@@ -81,7 +81,7 @@ sudo apt install libpulse-dev
 sudo apt install nasm
 sudo apt install libntlm0-dev
 ```
-If your system already has gstreamer pre-installed, I strongly recommend using `--enable-latest` to download the latest gstreamer release supported.   
+If your system already has gstreamer pre-installed (run in terminal `gst-inspect-1.0 --version` to check ), I strongly recommend using `--enable-latest` to download the latest gstreamer release supported.   
 Note that autogen will automatically call "./configure".
 ```
 ./autogen.sh --prefix=$(pwd)/dist --enable-latest
