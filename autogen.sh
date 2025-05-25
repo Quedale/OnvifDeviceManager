@@ -31,6 +31,7 @@ GREEN='\033[0;32m'
 FAILED=0
 
 script_start=$SECONDS
+og_pkg_path=$PKG_CONFIG_PATH
 
 i=1;
 for arg in "$@" 
@@ -418,7 +419,10 @@ buildMakeProject(){
   if [ ! -z "${autoreconf}" ] 
   then
     printlines project="${project}" task="autoreconf" msg="src: ${srcdir}"
+    currdir=$(pwd)
+    cd "${rel_path}"
     unbufferCall "autoreconf ${autoreconf}" 2>&1 | printlines project="${project}" task="autoreconf"
+    cd "${currdir}"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="autoreconf" msg="Autoreconf failed ${srcdir}"
       [[ ! -z "${noexit}" ]] && FAILED=1 && cd "$OLDPWD" && return || exit 1;
@@ -771,7 +775,12 @@ checkPerl(){
 
 
 export PATH="$SUBPROJECT_DIR/glibc-2.40/build/dist/bin":$PATH
-export LIBRARY_PATH="$SUBPROJECT_DIR/glibc-2.40/build/dist/lib":$LIBRARY_PATH
+if [ ! -z "$LIBRARY_PATH" ]; then
+  export LIBRARY_PATH="$SUBPROJECT_DIR/glibc-2.40/build/dist/lib":$LIBRARY_PATH
+else
+  export LIBRARY_PATH="$SUBPROJECT_DIR/glibc-2.40/build/dist/lib"
+fi
+
 HAS_GLIBC=0
 checkGlibc(){
   if [ $HAS_GLIBC -eq 0 ] && \
@@ -814,13 +823,73 @@ checkGitRepoState(){
   echo $ret
 }
 
+VENV_SETUP=0
+setupPythonVirtualEnv(){
+
+  if [ $VENV_SETUP -eq 1 ]; then
+    return
+  fi
+
+  VENV_EXEC=""
+  if [ ! -z "$(progVersionCheck project="virtualenv" program=virtualenv)" ]; then
+    if [ $NO_DOWNLOAD -eq 0 ] && [ ! -f "virtualenv.pyz" ]; then
+      $WGET_CMD https://bootstrap.pypa.io/virtualenv.pyz 2>&1 | printlines project="virtualenv" task="wget"
+      if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+        printError project="virtualenv" task="wget" msg="failed to fetch https://bootstrap.pypa.io/virtualenv.pyz"
+        exit 1;
+      fi
+    fi
+    VENV_EXEC="python3 virtualenv.pyz"
+  else
+    VENV_EXEC="virtualenv"
+  fi
+
+  #Setting up Virtual Python environment
+  if [ ! -f "./venvfolder/bin/activate" ]; then
+    $VENV_EXEC ./venvfolder 2>&1 | printlines project="virtualenv" task="setup"
+    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+      printError project="virtualenv" task="setup" msg="failed to run python3 virtualenv.pyz"
+      exit 1;
+    fi
+  else
+    printlines project="virtualenv" task="check" msg="found"
+  fi
+
+  #Activate virtual environment
+  if [[ ! -f "venvfolder/bin/activate" ]]; then
+    printError project="virtualenv" task="activate" msg="failed to activate python virtual environment."
+    exit 1;
+  else
+    source venvfolder/bin/activate 
+    printlines project="virtualenv" task="activate" msg="activated python virtual environment."
+  fi
+
+  #Setup meson
+  if [ $NO_DOWNLOAD -eq 0 ]; then
+    if [ ! -z "$(progVersionCheck project="meson" program=meson linenumber=1 lineindex=0 major=1 minor=1)" ]; then
+      unbufferCall "python3 -m pip install --progress-bar on meson --upgrade" 2>&1 | printlines project="meson" task="pip"
+      if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+        printError project="meson" task="install" msg="Failed to install meson via pip. Please try to install meson manually."
+        exit 1
+      fi
+    fi
+
+    if [ ! -z "$(progVersionCheck project="ninja" program=ninja)" ]; then
+      unbufferCall "python3 -m pip install --progress-bar on ninja --upgrade" 2>&1 | printlines project="ninja" task="pip"
+      if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+        printError project="ninja" task="check" msg="Failed to install ninja via pip. Please try to install ninja manually."
+        exit 1
+      fi
+    fi
+  else
+    printlines project="onvifmgr" task="check" msg="Skipping pip install. NO_DOWNLOAD is set."
+  fi
+  VENV_SETUP=1
+}
+
 # Hard dependency check
 MISSING_DEP=0
 if [ ! -z "$(progVersionCheck project="make" program='make')" ]; then
-  MISSING_DEP=1
-fi
-
-if [ ! -z "$(progVersionCheck project="pkg-config" program=pkg-config)" ]; then
   MISSING_DEP=1
 fi
 
@@ -844,11 +913,8 @@ elif [ -z "$(progVersionCheck project="wget" program=wget linenumber=1 lineindex
   WGET_CMD="wget --show-progress --progress=bar:force" #Since version 1.16 set show-progress
 fi
 
-if [ ! -z "$(pkgCheck project="gtk3" name=gtk+-3.0)" ]; then
-  MISSING_DEP=1
-fi
-
 if [ $MISSING_DEP -eq 1 ]; then
+  printError project="onvifmgr" task="check" msg="Missing core dependency program"
   exit 1
 fi
 
@@ -859,6 +925,27 @@ mkdir -p "$SUBPROJECT_DIR"
 mkdir -p "$SRC_CACHE_DIR"
 
 cd "$SUBPROJECT_DIR"
+
+#Setup pkg-config before package checking starts
+if [ ! -z "$(progVersionCheck project="pkg-config" program=pkg-config)" ]; then
+  export PATH=:"$SUBPROJECT_DIR/pkgconf/build/dist/bin":$PATH
+  export PKG_CONFIG_PATH=/usr/lib/pkgconfig:/usr/local/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH
+  if [ ! -z "$(progVersionCheck project="pkg-config" program=pkgconf)" ]; then
+    setupPythonVirtualEnv
+    pullOrClone project="pkgconf" path=https://github.com/pkgconf/pkgconf.git tag=pkgconf-2.4.3
+    buildMesonProject project="pkgconf" srcdir="pkgconf" prefix="$SUBPROJECT_DIR/pkgconf/build/dist" mesonargs=""
+    ln $SUBPROJECT_DIR/pkgconf/build/dist/bin/pkgconf $SUBPROJECT_DIR/pkgconf/build/dist/bin/pkg-config
+  fi
+fi
+
+if [ ! -z "$(pkgCheck project="gtk3" name=gtk+-3.0)" ]; then
+  MISSING_DEP=1
+fi
+
+if [ $MISSING_DEP -eq 1 ]; then
+  printError project="onvifmgr" task="check" msg="Missing core dependency package"
+  exit 1
+fi
 
 export ACLOCAL_PATH="$ACLOCAL_PATH:/usr/share/aclocal" #When using locally built autoconf, we need to add system path
 export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$(pkg-config --variable pc_path pkg-config)" #When using locally built pkgconf, we need to add system path
@@ -875,7 +962,7 @@ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$(pkg-config --variable pc_path pkg-con
 #   echo "make already installed."
 # fi
 
-export PATH=$SUBPROJECT_DIR/m4-1.4.19/build/dist/bin:$PATH
+export PATH="$SUBPROJECT_DIR/m4-1.4.19/build/dist/bin":$PATH
 if [ ! -z "$(progVersionCheck project="m4" program=m4 linenumber=1 lineindex=3 major=1 minor=4 micro=18 )" ]; then
   downloadAndExtract project="m4" file="m4-1.4.19.tar.xz" path="https://ftp.gnu.org/gnu/m4/m4-1.4.19.tar.xz"
   buildMakeProject project="m4" srcdir="m4-1.4.19" prefix="$SUBPROJECT_DIR/m4-1.4.19/build/dist" skipbootstrap="true"
@@ -916,60 +1003,8 @@ if [ ! -z "$(progVersionCheck project="bison" program=bison linenumber=1 lineind
   buildMakeProject project="bison" srcdir="bison-3.8.2" prefix="$SUBPROJECT_DIR/bison-3.8.2/build/dist" skipbootstrap="true"
 fi
 
-VENV_EXEC=""
-if [ ! -z "$(progVersionCheck project="virtualenv" program=virtualenv)" ]; then
-  if [ $NO_DOWNLOAD -eq 0 ] && [ ! -f "virtualenv.pyz" ]; then
-    $WGET_CMD https://bootstrap.pypa.io/virtualenv.pyz 2>&1 | printlines project="virtualenv" task="wget"
-    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-      printError project="virtualenv" task="wget" msg="failed to fetch https://bootstrap.pypa.io/virtualenv.pyz"
-      exit 1;
-    fi
-  fi
-  VENV_EXEC="python3 virtualenv.pyz"
-else
-  VENV_EXEC="virtualenv"
-fi
-
-#Setting up Virtual Python environment
-if [ ! -f "./venvfolder/bin/activate" ]; then
-  $VENV_EXEC ./venvfolder 2>&1 | printlines project="virtualenv" task="setup"
-  if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-    printError project="virtualenv" task="setup" msg="failed to run python3 virtualenv.pyz"
-    exit 1;
-  fi
-else
-  printlines project="virtualenv" task="check" msg="found"
-fi
-
-#Activate virtual environment
-if [[ ! -f "venvfolder/bin/activate" ]]; then
-  printError project="virtualenv" task="activate" msg="failed to activate python virtual environment."
-  exit 1;
-else
-  source venvfolder/bin/activate 
-  printlines project="virtualenv" task="activate" msg="activated python virtual environment."
-fi
-
-#Setup meson
-if [ $NO_DOWNLOAD -eq 0 ]; then
-  if [ ! -z "$(progVersionCheck project="meson" program=meson linenumber=1 lineindex=0 major=1 minor=1)" ]; then
-    unbufferCall "python3 -m pip install --progress-bar on meson --upgrade" 2>&1 | printlines project="meson" task="pip"
-    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-      printError project="meson" task="install" msg="Failed to install meson via pip. Please try to install meson manually."
-      exit 1
-    fi
-  fi
-
-  if [ ! -z "$(progVersionCheck project="ninja" program=ninja)" ]; then
-    unbufferCall "python3 -m pip install --progress-bar on ninja --upgrade" 2>&1 | printlines project="ninja" task="pip"
-    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-      printError project="ninja" task="check" msg="Failed to install ninja via pip. Please try to install ninja manually."
-      exit 1
-    fi
-  fi
-else
-  printlines project="onvifmgr" task="check" msg="Skipping pip install. NO_DOWNLOAD is set."
-fi
+#TODO only call this if necessary
+setupPythonVirtualEnv
 
 # export PKG_CONFIG_PATH="$SUBPROJECT_DIR/gtk/dist/lib/pkgconfig":$PKG_CONFIG_PATH
 # echo $SUBPROJECT_DIR/gtk/dist/lib/pkgconfig
@@ -1030,13 +1065,18 @@ if [ $rebuild != 0 ]; then
   buildMakeProject project="cutils" srcdir="CUtils" prefix="$SUBPROJECT_DIR/CUtils/build/dist" cmakedir=".." outoftree=true cmakeclean=true
 fi
 
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/libntlm-1.8/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
+if [ ! -z "$(pkgCheck project="libntlm" name=libntlm minver=v1.5)" ]; then
+  downloadAndExtract project="libntlm" file="libntlm-1.8.tar.gz" path="https://download-mirror.savannah.gnu.org/releases/libntlm/libntlm-1.8.tar.gz"
+  buildMakeProject project="libntlm" srcdir="libntlm-1.8" skipbootstrap="true" prefix="$SUBPROJECT_DIR/libntlm-1.8/build/dist" configure="--enable-shared=no" #TODO support shared linking
+fi
+
 ################################################################
 # 
 #    Build OnvifSoapLib
 #       
 ################################################################
 export PKG_CONFIG_PATH="$SUBPROJECT_DIR/OnvifSoapLib/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
-export PKG_CONFIG_PATH="$SUBPROJECT_DIR/libntlm-1.8/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
 export PATH="$SUBPROJECT_DIR/gsoap-2.8/build/dist/bin":$PATH
 export PKG_CONFIG_PATH="$SUBPROJECT_DIR/gsoap-2.8/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
 export PKG_CONFIG_PATH="$SUBPROJECT_DIR/zlib-1.2.13/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
@@ -1098,11 +1138,6 @@ if [ $rebuild != 0 ]; then
     buildMakeProject project="gsoap" srcdir="gsoap-2.8" prefix="$SUBPROJECT_DIR/gsoap-2.8/build/dist" autogen="skip" configure="--with-openssl=/usr/lib/ssl"
   fi
 
-  if [ ! -z "$(pkgCheck project="libntlm" name=libntlm minver=v1.5)" ]; then
-    downloadAndExtract project="libntlm" file="libntlm-1.8.tar.gz" path="https://download-mirror.savannah.gnu.org/releases/libntlm/libntlm-1.8.tar.gz"
-    buildMakeProject project="libntlm" srcdir="libntlm-1.8" skipbootstrap="true" prefix="$SUBPROJECT_DIR/libntlm-1.8/build/dist" configure="--enable-shared=no" #TODO support shared linking
-  fi
-
   pullOrClone project="onvifsoap" path=https://github.com/Quedale/OnvifSoapLib.git ignorecache="true"
 
   nodownload=""
@@ -1136,7 +1171,7 @@ export PKG_CONFIG_PATH="$SUBPROJECT_DIR/gstreamer/build/dist/lib/pkgconfig":$PKG
 export PKG_CONFIG_PATH="$SUBPROJECT_DIR/gstreamer/build/dist/lib/gstreamer-1.0/pkgconfig":$PKG_CONFIG_PATH
 
 gst_ret=0
-GSTREAMER_LATEST=1.24.8
+GSTREAMER_LATEST=1.26.1
 if [ $ENABLE_LATEST == 0 ]; then
   GSTREAMER_VERSION=1.14.4
 else
@@ -1533,7 +1568,7 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
             FFMPEG_CONFIGURE_ARGS="$FFMPEG_CONFIGURE_ARGS --enable-version3"
             FFMPEG_CONFIGURE_ARGS="$FFMPEG_CONFIGURE_ARGS --enable-gpl"
 
-            pullOrClone project="ffmpeg" path="https://github.com/FFmpeg/FFmpeg.git" tag=n6.1.1
+            pullOrClone project="ffmpeg" path="https://github.com/FFmpeg/FFmpeg.git" tag=n7.1.1
             buildMakeProject project="ffmpeg" srcdir="FFmpeg" prefix="$SUBPROJECT_DIR/FFmpeg/dist" configure="$FFMPEG_CONFIGURE_ARGS"
             rm -rf "$SUBPROJECT_DIR/FFmpeg/dist/lib/*.so"
         else
@@ -1575,8 +1610,8 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
     # echo "url=https://github.com/tinyalsa/tinyalsa.git" >> subprojects/tinyalsa.wrap
     # echo "revision=v2.0.0" >> subprojects/tinyalsa.wrap
     # MESON_PARAMS="$MESON_PARAMS -Dgst-plugins-bad:tinyalsa=enabled"
-
-    LIBRARY_PATH=$LD_LIBRARY_PATH:"$SUBPROJECT_DIR/systemd-256/dist/lib" \
+    CFLAGS='-DGST_DISABLE_GST_DEBUG=1 -DGST_DISABLE_REGISTRY=1' \
+    LIBRARY_PATH=$LIBRARY_PATH:"$SUBPROJECT_DIR/systemd-256/dist/lib" \
     buildMesonProject project="gstreamer" srcdir="gstreamer" prefix="$SUBPROJECT_DIR/gstreamer/build/dist" mesonargs="$MESON_PARAMS" builddir="build"
   else
       printlines project="latest-gstreamer" task="check" msg="found"
@@ -1604,7 +1639,7 @@ configArgs=$@
 printlines project="onvifmgr" task="build" msg="configure $configArgs"
 cd "$WORK_DIR"
 
-$SCRT_DIR/configure $configArgs 2>&1 | printlines project="onvifmgr" task="configure"
+PKG_CONFIG_PATH=$og_pkg_path $SCRT_DIR/configure $configArgs 2>&1 | printlines project="onvifmgr" task="configure"
 if [ "${PIPESTATUS[0]}" -ne 0 ]; then
   printError project="onvifmgr" task="build" msg="Failed to configure OnvifDeviceManager"
 else

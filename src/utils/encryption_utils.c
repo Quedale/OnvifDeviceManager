@@ -85,12 +85,32 @@ EncryptionUtils__new_context(unsigned char *key_data, int key_data_len, unsigned
     }
 
     EVP_CIPHER_CTX* context = EVP_CIPHER_CTX_new();
+    if(!context){
+        C_ERROR("Failed to allocate cipher context.");
+        return NULL;
+    }
+
+    if(!EVP_CIPHER_CTX_init(context)){
+        C_ERROR("Failed to initialize plain cipher context.");
+        EVP_CIPHER_CTX_cleanup(context);
+        EVP_CIPHER_CTX_free(context);
+        return NULL;
+    }
+
     if(encrypt){
-        EVP_CIPHER_CTX_init(context);
-        EVP_EncryptInit_ex(context, EVP_aes_256_cbc(), NULL, key, iv);
+        if(!EVP_EncryptInit_ex(context, EVP_aes_256_cbc(), NULL, key, iv)){
+            C_ERROR("Failed to initialize cipher encryption context.");
+            EVP_CIPHER_CTX_cleanup(context);
+            EVP_CIPHER_CTX_free(context);
+            return NULL;
+        }
     } else {
-        EVP_CIPHER_CTX_init(context);
-        EVP_DecryptInit_ex(context, EVP_aes_256_cbc(), NULL, key, iv);
+        if(!EVP_DecryptInit_ex(context, EVP_aes_256_cbc(), NULL, key, iv)){
+            C_ERROR("Failed to initialize cipher decryption context.");
+            EVP_CIPHER_CTX_cleanup(context);
+            EVP_CIPHER_CTX_free(context);
+            return NULL; 
+        }
     }
 
     return context;
@@ -131,7 +151,7 @@ EncryptionUtils__encrypt(unsigned char * pass,
         }
 
         EncryptionUtils__printHex("Encrypted Chunk", encrypted_data, encrypted_data_length);
-
+        EVP_CIPHER_CTX_cleanup(context);
         EVP_CIPHER_CTX_free(context);
 
         return encrypted_data_length + tmp_len;
@@ -158,6 +178,7 @@ EncryptionUtils__encrypt(unsigned char * pass,
         EncryptionUtils__printHex("Padded Encrypted Chunk", encrypted_data, encrypted_data_length);
 
 exit:
+        EVP_CIPHER_CTX_cleanup(context);
         EVP_CIPHER_CTX_free(context);
         return encrypted_data_length + tmp_len;
     }
@@ -196,6 +217,7 @@ EncryptionUtils__decrypt(unsigned char * pass,
     }
 
 exit:
+    EVP_CIPHER_CTX_cleanup(context);
     EVP_CIPHER_CTX_free(context);
     return decrypted_data_len + tmp_len;
 }
@@ -215,7 +237,7 @@ int EncryptionUtils__write_encrypted(unsigned char * pass,
 
         //Write salt value
         fwrite(salt,ENCRYPTION_UTILS_SALT_MAX_LENGTH,1,fptr);
-
+        EncryptionUtils__printHex("Encryption Salt", salt, ENCRYPTION_UTILS_SALT_MAX_LENGTH);
         unsigned char encrypted_data[plain_data_len + AES_BLOCK_SIZE];
         int to_encrypt_len = plain_data_len;
         if (to_encrypt_len > ENCRYPTION_UTILS_PLAIN_BUFFER_SIZE) to_encrypt_len=ENCRYPTION_UTILS_PLAIN_BUFFER_SIZE;
@@ -267,7 +289,7 @@ int EncryptionUtils__read_encrypted(unsigned char * pass,
     int decripted_data_total_len = 0;
     char salt[ENCRYPTION_UTILS_SALT_MAX_LENGTH];
     unsigned char encrypted_data[ENCRYPTION_UTILS_ENC_BUFFER_SIZE];
-    unsigned char decrypted_data[ENCRYPTION_UTILS_PLAIN_BUFFER_SIZE];
+    unsigned char decrypted_data[ENCRYPTION_UTILS_ENC_BUFFER_SIZE];
     FILE * fptr = fopen(path,"r");
     if(fptr != NULL){
         //Extract salt
@@ -275,7 +297,7 @@ int EncryptionUtils__read_encrypted(unsigned char * pass,
             C_ERROR("Failed to read encrypted setting file! '%s'",path);
             goto drop;
         }
-        
+        EncryptionUtils__printHex("Decryption Salt", (unsigned char *)salt, ENCRYPTION_UTILS_SALT_MAX_LENGTH);
         int data_read = 0;
         while((data_read = fread(&encrypted_data, 1, ENCRYPTION_UTILS_ENC_BUFFER_SIZE, fptr)) != 0){
             decripted_data_len = EncryptionUtils__decrypt(pass,pass_len,encrypted_data,data_read, (unsigned char *) salt, decrypted_data);

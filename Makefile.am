@@ -16,7 +16,7 @@ EXTRA_PROGRAMS = gifdemo overlaytest queuedemo csssliderdemo playerdemo cssfiles
 
 encryptiondemo_SOURCES = $(top_srcdir)/src/demo/encryptiondemo.c \
 					$(top_srcdir)/src/utils/encryption_utils.c
-encryptiondemo_LDFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs  cutils` -lcrypto
+encryptiondemo_LDFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs  cutils libcrypto`
 
 playerdemo_SOURCES = $(top_srcdir)/src/demo/player-demo.c \
 					$(top_srcdir)/src/alsa/alsa_devices.c \
@@ -68,7 +68,7 @@ onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c \
 					$(top_srcdir)/src/queue/event_queue.c \
 					$(top_srcdir)/src/queue/queue_event.c \
 					$(top_srcdir)/src/queue/queue_thread.c
-onvifmgr_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0 libntlm cutils onvifsoap libssl libcrypto` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
+onvifmgr_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0 libntlm cutils libssl libcrypto onvifsoap` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
 onvifmgr_LDADD = locked-icon.o microphone.o warning.o trash.o tower.o
 
 queuedemo_SOURCES = $(top_srcdir)/src/demo/queue-demo.c $(top_srcdir)/src/queue/event_queue.c $(top_srcdir)/src/queue/queue_event.c $(top_srcdir)/src/queue/queue_thread.c
