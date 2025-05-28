@@ -1027,10 +1027,10 @@ if [ ! -z "$(pkgCheck project="openssl" name=libcrypto minver=1.1.1f)" ]; then
   buildMakeProject project="openssl" srcdir="openssl" configcustom="./config --prefix='$SUBPROJECT_DIR/openssl/build/dist' --openssldir='$SUBPROJECT_DIR/openssl/build/dist/ssl' -static"
 fi
 
-export PATH="$SUBPROJECT_DIR/cmake-3.25.2/build/dist/bin":$PATH
-if [ ! -z "$(progVersionCheck project="cmake" program=cmake linenumber=1 lineindex=2 major=3 minor=16 micro=3 )" ]; then
-  downloadAndExtract project="cmake" file="cmake-3.25.2.tar.gz" path="https://github.com/Kitware/CMake/releases/download/v3.25.2/cmake-3.25.2.tar.gz"
-  buildMakeProject project="cmake" srcdir="cmake-3.25.2" prefix="$SUBPROJECT_DIR/cmake-3.25.2/build/dist" skipbootstrap="true" configure="--parallel=$(nproc)"
+export PATH="$SUBPROJECT_DIR/cmake-4.0.2/build/dist/bin":$PATH
+if [ ! -z "$(progVersionCheck project="cmake" program=cmake linenumber=1 lineindex=2 major=4 minor=0 micro=0 )" ]; then
+  downloadAndExtract project="cmake" file="cmake-4.0.2.tar.gz" path="https://github.com/Kitware/CMake/releases/download/v4.0.2/cmake-4.0.2.tar.gz"
+  buildMakeProject project="cmake" srcdir="cmake-4.0.2" prefix="$SUBPROJECT_DIR/cmake-4.0.2/build/dist" skipbootstrap="true" configure="--parallel=$(nproc) --no-debugger"
 fi
 
 ################################################################
@@ -1494,7 +1494,8 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
         LIBSNDFILE_CMAKEARGS="$LIBSNDFILE_CMAKEARGS -DBUILD_SHARED_LIBS=on"
         LIBSNDFILE_CMAKEARGS="$LIBSNDFILE_CMAKEARGS -DINSTALL_PKGCONFIG_MODULE=on"
         LIBSNDFILE_CMAKEARGS="$LIBSNDFILE_CMAKEARGS -DINSTALL_MANPAGES=off"
-        pullOrClone project="sndfile" path="https://github.com/libsndfile/libsndfile.git" tag=1.2.0
+        LIBSNDFILE_CMAKEARGS="$LIBSNDFILE_CMAKEARGS -DCMAKE_POLICY_VERSION_MINIMUM=3.5" #Necessary to build with cmake version 4.x
+        pullOrClone project="sndfile" path="https://github.com/libsndfile/libsndfile.git" tag=1.2.2
         mkdir "libsndfile/build"
         buildMakeProject project="sndfile" srcdir="libsndfile/build" prefix="$SUBPROJECT_DIR/libsndfile/dist" cmakedir=".." cmakeargs="$LIBSNDFILE_CMAKEARGS"
       fi
