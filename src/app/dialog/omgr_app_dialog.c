@@ -437,6 +437,8 @@ OnvifMgrAppDialog__show (GtkWidget * widget){
         OnvifMgrAppDialogClass *klass = ONVIFMGR_APPDIALOG_GET_CLASS (self);
         if(klass->showing) klass->showing(widget);
         g_signal_emit (self, signals[SIGNAL_SHOWING], 0);
+    } else {
+        C_TRAIL("Dialog not signaling showing since it was already showing");
     }
 }
 

@@ -1068,6 +1068,7 @@ OnvifApp__init (OnvifApp *self)
 
     //Defaults 8 paralell event threads.
     //TODO support configuration to modify this
+    C_TRAIL("Starting EventQueue thread pool...");
     EventQueue__start(priv->queue);
     EventQueue__start(priv->queue);
     EventQueue__start(priv->queue);

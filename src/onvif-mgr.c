@@ -7,6 +7,35 @@
 #include <execinfo.h>
 #include <signal.h>
 #include "clogger.h"
+#include <argp.h>
+
+static struct argp_option options[] = {
+    { "loglevel",       'l',    "INT",     0,  "Set the application log level. (Default: 6)", 1},
+    { 0 }
+};
+
+//Define argument struct
+struct arguments {
+    int log_level;
+};
+
+//main arguments processing function
+static error_t 
+parse_opt(int key, char *arg, struct argp_state *state) {
+    struct arguments *arguments = state->input;
+    switch (key) {
+    case 'l': arguments->log_level = atoi(arg); break;
+    case ARGP_KEY_ARG: return 0;
+    default: return ARGP_ERR_UNKNOWN;
+    }   
+    return 0;
+}
+
+static char doc[] = "OnvifManager";
+
+//Initialize argp context
+static struct argp argp = { options, parse_opt, NULL, doc, 0, 0, 0 };
+
 
 static void handler(int sig, siginfo_t *dont_care, void *dont_care_either)
 {
@@ -50,10 +79,22 @@ int main(int argc, char *argv[]) {
 
   sigaction(SIGSEGV, &sa, NULL);
   signal(SIGSEGV, handler_signal);  
-  
-  c_log_set_level(C_TRACE_E);
   c_log_set_thread_color(ANSI_COLOR_DRK_GREEN, P_THREAD_ID);
 
+  struct arguments arguments;
+
+  /* Default values. */
+  arguments.log_level = C_TRACE_E;
+  argp_parse(&argp, argc, argv, 0, 0, &arguments);
+
+  if(arguments.log_level < -1){
+    arguments.log_level = C_OFF_E;
+    C_WARN("Invalid loglevel parameter. Should be between -1 and %d",C_ALL_E);
+  } else if(arguments.log_level > C_ALL_E){
+    arguments.log_level = C_ALL_E;
+    C_WARN("Invalid loglevel parameter. Should be between -1 and %d",C_ALL_E);
+  }
+  c_log_set_level(arguments.log_level);
   /* Initialize GTK */
   gtk_init (&argc, &argv);
 
@@ -82,6 +123,7 @@ int main(int argc, char *argv[]) {
   /* Initialize Application */
   OnvifApp__new();
 
+  C_TRAIL("Starting GTK MainLoop");
   /* Start the GTK main loop. We will not regain control until gtk_main_quit is called. */
   gtk_main ();
 

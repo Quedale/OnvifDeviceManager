@@ -229,8 +229,9 @@ OnvifMgrEncryptedStore__check_store_exists(QueueEvent * qevt, void * user_data){
     OnvifMgrEncryptedStore* self = ONVIFMGR_ENCRYPTEDSTORE(user_data);
     OnvifMgrEncryptedStorePrivate *priv = OnvifMgrEncryptedStore__get_instance_private (self);
     OnvifMgrEncryptedStoreClass * klass = ONVIFMGR_ENCRYPTEDSTORE_GET_CLASS(self);
-    
+    C_TRAIL("OnvifMgrEncryptedStore__check_store_exists %s",klass->extension->store_path);
     priv->store_exists = access(klass->extension->store_path, F_OK) == 0;
+    C_TRAIL("OnvifMgrEncryptedStore__check_store_exists exstis : %d",priv->store_exists);
     gdk_threads_add_idle(G_SOURCE_FUNC(OnvifMgrEncryptedStore__show_panel),self);
 }
 
@@ -283,6 +284,7 @@ OnvifMgrEncryptedStore__cancel(OnvifMgrTrustStoreDialog * dialog, OnvifMgrEncryp
 
 static void
 OnvifMgrEncryptedStore__showing (GtkWidget *widget, OnvifMgrEncryptedStore * self){
+    C_TRAIL("OnvifMgrEncryptedStore__showing");
     OnvifMgrEncryptedStorePrivate *priv = OnvifMgrEncryptedStore__get_instance_private (self);
     OnvifMgrAppDialog__show_loading(ONVIFMGR_APPDIALOG(widget),"Checking if encrypted store file exists...");
     EventQueue__insert(priv->queue, self, OnvifMgrEncryptedStore__check_store_exists,self, NULL);
@@ -290,6 +292,7 @@ OnvifMgrEncryptedStore__showing (GtkWidget *widget, OnvifMgrEncryptedStore * sel
 
 void
 OnvifMgrEncryptedStore__capture_passphrase(OnvifMgrEncryptedStore * self){
+    C_TRAIL("OnvifMgrEncryptedStore__capture_passphrase");
     g_return_if_fail (self != NULL);
     g_return_if_fail (ONVIFMGR_IS_ENCRYPTEDSTORE (self));
 
@@ -307,8 +310,8 @@ OnvifMgrEncryptedStore__capture_passphrase(OnvifMgrEncryptedStore * self){
     g_signal_connect (G_OBJECT (priv->dialog), "cancel", G_CALLBACK (OnvifMgrEncryptedStore__cancel), self);
 
     gtk_overlay_add_overlay(priv->overlay,GTK_WIDGET(priv->dialog));
+    C_TRAIL("OnvifMgrEncryptedStore__capture_passphrase show overlay");
     gtk_widget_show_all(GTK_WIDGET(priv->overlay));
-
 }
 
 static void
@@ -465,10 +468,12 @@ OnvifMgrEncryptedStore__class_init (OnvifMgrEncryptedStoreClass *klass){
     g_object_class_install_properties (object_class,
                                         N_PROPERTIES,
                                         obj_properties);
+    C_TRAIL("Encrypted store type initialized");
 }
 
 static void
 OnvifMgrEncryptedStore__init (OnvifMgrEncryptedStore *self){
+    C_TRAIL("Initializing Encrypted store instance");
     OnvifMgrEncryptedStorePrivate *priv = OnvifMgrEncryptedStore__get_instance_private (self);
     priv->queue = NULL;
     priv->overlay = NULL;
