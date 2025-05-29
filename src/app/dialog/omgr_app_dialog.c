@@ -607,6 +607,7 @@ OnvifMgrAppDialog__show_loading(OnvifMgrAppDialog * self, char * message){
     g_return_if_fail(ONVIFMGR_IS_APPDIALOG(self));
     OnvifMgrAppDialogPrivate *priv = OnvifMgrAppDialog__get_instance_private (self);
     //Save previous focused element
+    C_TRAIL("Saving previously focused widget");
     GtkWidget *window = gtk_widget_get_toplevel (GTK_WIDGET(self));
     if (gtk_widget_is_toplevel (window)){  
         priv->innerFocusedWidget = gtk_window_get_focus(GTK_WINDOW(window));
@@ -614,6 +615,7 @@ OnvifMgrAppDialog__show_loading(OnvifMgrAppDialog * self, char * message){
 
     if(GTK_IS_WIDGET(priv->loading_panel)) gtk_widget_destroy(priv->loading_panel);
 
+    C_TRAIL("Creating new loading widget");
     //Create loading panel
     GtkWidget * widget;
     priv->loading_panel = gtk_grid_new ();
@@ -663,6 +665,7 @@ OnvifMgrAppDialog__show_loading(OnvifMgrAppDialog * self, char * message){
     //Attach and show new panel
     gtk_grid_attach (GTK_GRID (priv->panel_decor), priv->loading_panel, 0, 1, 1, 1);
     gtk_widget_show_all(priv->loading_panel);
+    C_TRAIL("Showig loadinng panel");
 }
 
 void 

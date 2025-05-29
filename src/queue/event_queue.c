@@ -304,6 +304,7 @@ EventQueue__insert_private(EventQueue* self, void * scope, void (*callback)(Queu
     g_return_val_if_fail (QUEUE_IS_EVENTQUEUE (self), NULL);
     EventQueuePrivate *priv = EventQueue__get_instance_private (self);
     QueueEvent * record = NULL;
+    C_TRAIL("Adding new event to queue");
     if(!QueueEvent__get_current() || !QueueEvent__is_cancelled(QueueEvent__get_current())){
         P_MUTEX_LOCK(priv->pool_lock);
         record = QueueEvent__new(scope, callback,cleanup_cb, user_data, managed);

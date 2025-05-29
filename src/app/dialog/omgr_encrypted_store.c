@@ -288,6 +288,7 @@ OnvifMgrEncryptedStore__showing (GtkWidget *widget, OnvifMgrEncryptedStore * sel
     OnvifMgrEncryptedStorePrivate *priv = OnvifMgrEncryptedStore__get_instance_private (self);
     OnvifMgrAppDialog__show_loading(ONVIFMGR_APPDIALOG(widget),"Checking if encrypted store file exists...");
     EventQueue__insert(priv->queue, self, OnvifMgrEncryptedStore__check_store_exists,self, NULL);
+    C_TRAIL("OnvifMgrEncryptedStore__showing check store dispatched");
 }
 
 void

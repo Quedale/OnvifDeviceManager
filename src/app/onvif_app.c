@@ -1064,7 +1064,9 @@ OnvifApp__init (OnvifApp *self)
     priv->store = OnvifMgrEncryptedStore__new(priv->queue,priv->overlay);
     g_signal_connect (G_OBJECT (priv->store), "cancel", G_CALLBACK (OnvifApp__cancelled_store), self);
     g_signal_connect (G_OBJECT (priv->store), "new-object", G_CALLBACK (OnvifApp__new_object_store), self);
-    OnvifMgrEncryptedStore__capture_passphrase(priv->store);
+
+    //TODO Below can be initialized in parallel while showing a loading for faster windows startup
+    //More could be more here slowing down app startup like reading the settings file
 
     //Defaults 8 paralell event threads.
     //TODO support configuration to modify this
@@ -1078,6 +1080,7 @@ OnvifApp__init (OnvifApp *self)
     EventQueue__start(priv->queue);
     EventQueue__start(priv->queue);
 
+    OnvifMgrEncryptedStore__capture_passphrase(priv->store);
 }
 
 
