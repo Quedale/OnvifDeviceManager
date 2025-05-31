@@ -105,6 +105,8 @@ int main(int argc, char *argv[]) {
   C_INFO("Onvif Manager Version : %d.%d", ONVIFMGR_VERSION_MAJ, ONVIFMGR_VERSION_MIN);
   C_INFO("Gstreamer Version : %i.%i.%i.%i",GST_PLUGINS_BASE_VERSION_MAJOR,GST_PLUGINS_BASE_VERSION_MINOR,GST_PLUGINS_BASE_VERSION_MICRO,GST_PLUGINS_BASE_VERSION_NANO);
   C_INFO("GTK Version : %d.%d.%d", gtk_get_major_version(), gtk_get_minor_version(), gtk_get_micro_version());
+  C_INFO("GLib Version %d.%d.%d", GLIB_MAJOR_VERSION, GLIB_MINOR_VERSION, GLIB_MICRO_VERSION);
+  C_INFO("GLibc Version %d.%d", __GLIBC__, __GLIBC_MINOR__);
   #ifdef GDK_WINDOWING_WAYLAND
       C_INFO("Display Type : Wayland"); 
   #elif GDK_WINDOWING_X11
