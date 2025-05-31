@@ -50,7 +50,7 @@ gtk_dotted_slider_get_item_count (GtkDottedSlider *slider)
 }
 
 static void gtk_dotted_slider_change_direction (CustomGtkRevealer *revealer){
-    C_TRAIL("gtk_dotted_slider_change_direction");
+    C_TRAIL("gtk_dotted_slider_change_direction %p", (void*) revealer);
     gboolean revealed = custom_gtk_revealer_get_reveal_child(CUSTOM_GTK_REVEALER(revealer));
     if (gtk_widget_get_mapped (GTK_WIDGET (revealer))){
         custom_gtk_revealer_set_reveal_child(CUSTOM_GTK_REVEALER(revealer),!revealed);
@@ -58,7 +58,7 @@ static void gtk_dotted_slider_change_direction (CustomGtkRevealer *revealer){
 }
 
 void gtk_dotted_slider_map_event (GtkWidget* self, gpointer user_data){
-    C_TRAIL("gtk_dotted_slider mapping dot");
+    C_TRAIL("gtk_dotted_slider mapping dot %p", (void*) self);
     custom_gtk_revealer_restart(CUSTOM_GTK_REVEALER(self));
     custom_gtk_revealer_set_reveal_child(CUSTOM_GTK_REVEALER(self),TRUE);
 }
@@ -139,7 +139,10 @@ gtk_dotted_slider_set_item_count (GtkDottedSlider *revealer,
     return;
 
   priv->item_count = value;
-  gtk_dotted_slider_refresh_items(revealer);
+
+  if(gtk_widget_get_mapped(GTK_WIDGET(revealer)))
+    gtk_dotted_slider_refresh_items(revealer);
+
   g_object_notify_by_pspec (G_OBJECT (revealer), props[PROP_ITEM_COUNT]);
 }
 
@@ -166,7 +169,9 @@ gtk_dotted_slider_set_animation_time (GtkDottedSlider *revealer,
     return;
 
   priv->animation_time = value;
-  gtk_dotted_slider_refresh_items(revealer);
+  if(gtk_widget_get_mapped(GTK_WIDGET(revealer)))
+    gtk_dotted_slider_refresh_items(revealer);
+
   g_object_notify_by_pspec (G_OBJECT (revealer), props[PROP_ANIMATION_TIME]);
 }
 
@@ -226,12 +231,19 @@ gtk_dotted_slider_dispose(GObject * gobject){
   G_OBJECT_CLASS (gtk_dotted_slider_parent_class)->dispose (gobject);
 }
 
+static void
+gtk_dotted_slider_map(GtkWidget * widget){
+  gtk_dotted_slider_refresh_items(GTK_DOTTED_SLIDER(widget));
+  GTK_WIDGET_CLASS (gtk_dotted_slider_parent_class)->map (widget);
+}
+
 static void 
 gtk_dotted_slider_class_init (GtkDottedSliderClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
     GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(klass);
 
+    widget_class->map = gtk_dotted_slider_map;
     object_class->dispose = gtk_dotted_slider_dispose;
     object_class->get_property = gtk_dotted_slider_get_property;
     object_class->set_property = gtk_dotted_slider_set_property;

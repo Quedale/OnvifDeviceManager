@@ -8,6 +8,7 @@
 #include <signal.h>
 #include "clogger.h"
 #include <argp.h>
+#include <gdk/gdk.h>
 
 static struct argp_option options[] = {
     { "loglevel",       'l',    "INT",     0,  "Set the application log level. (Default: 6)", 1},
@@ -101,8 +102,16 @@ int main(int argc, char *argv[]) {
   /* Initialize GStreamer */
   gst_init (&argc, &argv);
   
-  C_INFO("Onvif Device Manager Version : %d.%d", ONVIFMGR_VERSION_MAJ, ONVIFMGR_VERSION_MIN);
-  C_INFO("Using Gstreamer Version : %i.%i.%i.%i",GST_PLUGINS_BASE_VERSION_MAJOR,GST_PLUGINS_BASE_VERSION_MINOR,GST_PLUGINS_BASE_VERSION_MICRO,GST_PLUGINS_BASE_VERSION_NANO);
+  C_INFO("Onvif Manager Version : %d.%d", ONVIFMGR_VERSION_MAJ, ONVIFMGR_VERSION_MIN);
+  C_INFO("Gstreamer Version : %i.%i.%i.%i",GST_PLUGINS_BASE_VERSION_MAJOR,GST_PLUGINS_BASE_VERSION_MINOR,GST_PLUGINS_BASE_VERSION_MICRO,GST_PLUGINS_BASE_VERSION_NANO);
+  C_INFO("GTK Version : %d.%d.%d", gtk_get_major_version(), gtk_get_minor_version(), gtk_get_micro_version());
+  #ifdef GDK_WINDOWING_WAYLAND
+      C_INFO("Display Type : Wayland"); 
+  #elif GDK_WINDOWING_X11
+      C_INFO("Display Type : X11"); 
+  #else
+      C_INFO("Display Type : Unkown"); 
+  #endif
 
   gst_plugin_init_static();
 
