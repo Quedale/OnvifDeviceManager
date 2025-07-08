@@ -5,7 +5,7 @@ ENABLE_NVCODEC=0  #Enables building and linking Gstreamer nvidia pluging. enable
 ENABLE_DEBUG=1    #Disables debug build flag.                                   disabled using --no-debug
 NO_DOWNLOAD=0
 WGET_CMD="wget"   #Default wget command. Gets properly initialized later with parameters adequate for its version
-
+MIRROR_BASE_URL="https://ftp.gnu.org/gnu/" # Change this to your working mirror. Mind the last slash. For example: https://gnu.c3sl.ufpr.br/ftp/.
 #Save current working directory to run configure in
 WORK_DIR=$(pwd)
 #Get project root directory based on autogen.sh file location
@@ -785,7 +785,7 @@ HAS_GLIBC=0
 checkGlibc(){
   if [ $HAS_GLIBC -eq 0 ] && \
       [ ! -z "$(checkLibrary project="glibc" name=c static=true)" ]; then
-      downloadAndExtract project="glibc" file="glibc-2.40.tar.xz" path="https://ftp.gnu.org/gnu/glibc/glibc-2.40.tar.xz"
+      downloadAndExtract project="glibc" file="glibc-2.40.tar.xz" path="https://gnu.c3sl.ufpr.br/ftp/glibc/glibc-2.40.tar.xz"
       buildMakeProject project="glibc" srcdir="glibc-2.40" prefix="$SUBPROJECT_DIR/glibc-2.40/build/dist" skipbootstrap="true" outoftree="true"
   fi
   HAS_GLIBC=1
@@ -954,7 +954,7 @@ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$(pkg-config --variable pc_path pkg-con
 # export PATH="$SUBPROJECT_DIR/make-4.4.1/build/dist/bin":$PATH
 # if [ ! -z "$(progVersionCheck program=make linenumber=1 lineindex=2 major=4 minor=4 micro=1 )" ]; then
 #   echo "building make from source..."
-#   downloadAndExtract file="make-4.4.1.tar.gz" path="https://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz"
+#   downloadAndExtract file="make-4.4.1.tar.gz" path="https://gnu.c3sl.ufpr.br/ftp/make/make-4.4.1.tar.gz"
 #   if [ $FAILED -eq 1 ]; then exit 1; fi
 #   buildMakeProject srcdir="make-4.4.1" prefix="$SUBPROJECT_DIR/make-4.4.1/build/dist" skipbootstrap="true"
 #   if [ $FAILED -eq 1 ]; then exit 1; fi
@@ -964,7 +964,7 @@ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$(pkg-config --variable pc_path pkg-con
 
 export PATH="$SUBPROJECT_DIR/m4-1.4.19/build/dist/bin":$PATH
 if [ ! -z "$(progVersionCheck project="m4" program=m4 linenumber=1 lineindex=3 major=1 minor=4 micro=18 )" ]; then
-  downloadAndExtract project="m4" file="m4-1.4.19.tar.xz" path="https://ftp.gnu.org/gnu/m4/m4-1.4.19.tar.xz"
+  downloadAndExtract project="m4" file="m4-1.4.19.tar.xz" path="https://gnu.c3sl.ufpr.br/ftp/m4/m4-1.4.19.tar.xz"
   buildMakeProject project="m4" srcdir="m4-1.4.19" prefix="$SUBPROJECT_DIR/m4-1.4.19/build/dist" skipbootstrap="true"
 fi
 
@@ -972,21 +972,21 @@ export PATH="$SUBPROJECT_DIR/autoconf-2.72/build/dist/bin":$PATH
 export ACLOCAL_PATH="$SUBPROJECT_DIR/autoconf-2.72/build/dist/share/autoconf":$ACLOCAL_PATH
 if [ ! -z "$(progVersionCheck project="autoconf" program=autoconf linenumber=1 lineindex=3 major=2 minor=70)" ]; then
   checkPerl
-  downloadAndExtract project="autoconf" file="autoconf-2.72.tar.xz" path="https://ftp.gnu.org/gnu/autoconf/autoconf-2.72.tar.xz"
+  downloadAndExtract project="autoconf" file="autoconf-2.72.tar.xz" path="https://gnu.c3sl.ufpr.br/ftp/autoconf/autoconf-2.72.tar.xz"
   buildMakeProject project="autoconf" srcdir="autoconf-2.72" prefix="$SUBPROJECT_DIR/autoconf-2.72/build/dist" skipbootstrap="true"
 fi
 
 export PATH="$SUBPROJECT_DIR/automake-1.17/build/dist/bin":$PATH
 export ACLOCAL_PATH="$SUBPROJECT_DIR/automake-1.17/build/dist/share/aclocal-1.17":$ACLOCAL_PATH
 if [ ! -z "$(progVersionCheck project="automake" program=automake linenumber=1 lineindex=3 major=1 minor=16 micro=1)" ]; then
-  downloadAndExtract project="automake" file="automake-1.17.tar.xz" path="https://ftp.gnu.org/gnu/automake/automake-1.17.tar.xz"
+  downloadAndExtract project="automake" file="automake-1.17.tar.xz" path="https://gnu.c3sl.ufpr.br/ftp/automake/automake-1.17.tar.xz"
   buildMakeProject project="automake" srcdir="automake-1.17" prefix="$SUBPROJECT_DIR/automake-1.17/build/dist" skipbootstrap="true"
 fi
 
 export PATH="$SUBPROJECT_DIR/libtool-2.5.3/build/dist/bin":$PATH
 export ACLOCAL_PATH="$SUBPROJECT_DIR/libtool-2.5.3/build/dist/share/aclocal":$ACLOCAL_PATH
 if [ ! -z "$(progVersionCheck project="libtool" program=libtoolize linenumber=1 lineindex=3 major=2 minor=4 micro=6)" ]; then
-  downloadAndExtract project="libtool" file="libtool-2.5.3.tar.xz" path="https://ftp.gnu.org/gnu/libtool/libtool-2.5.3.tar.xz"
+  downloadAndExtract project="libtool" file="libtool-2.5.3.tar.xz" path="https://gnu.c3sl.ufpr.br/ftp/libtool/libtool-2.5.3.tar.xz"
   buildMakeProject project="libtool" srcdir="libtool-2.5.3" prefix="$SUBPROJECT_DIR/libtool-2.5.3/build/dist" skipbootstrap="true"
 fi
 
@@ -999,7 +999,7 @@ fi
 
 export PATH="$SUBPROJECT_DIR/bison-3.8.2/build/dist/bin":$PATH
 if [ ! -z "$(progVersionCheck project="bison" program=bison linenumber=1 lineindex=3 major=3 minor=5 micro=1 )" ]; then
-  downloadAndExtract project="bison" file="bison-3.8.2.tar.xz" path="https://ftp.gnu.org/gnu/bison/bison-3.8.2.tar.xz"
+  downloadAndExtract project="bison" file="bison-3.8.2.tar.xz" path="https://gnu.c3sl.ufpr.br/ftp/bison/bison-3.8.2.tar.xz"
   buildMakeProject project="bison" srcdir="bison-3.8.2" prefix="$SUBPROJECT_DIR/bison-3.8.2/build/dist" skipbootstrap="true"
 fi
 
