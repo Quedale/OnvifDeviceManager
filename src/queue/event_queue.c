@@ -310,8 +310,10 @@ EventQueue__insert_private(EventQueue* self, void * scope, void (*callback)(Queu
         record = QueueEvent__new(scope, callback,cleanup_cb, user_data, managed);
         g_signal_connect (G_OBJECT (record), "state-changed", G_CALLBACK (EventQueue__evt_state_changed_cb), self);
         priv->events = g_list_append(priv->events, record);
-        P_COND_SIGNAL(priv->sleep_cond);
+        P_COND_SIGNAL(priv->sleep_cond); //Signal q thread that the event is ready to invoke
+        g_object_ref(record); //Adding extra reference in case thread finish the event before the signal completes
         EventQueue__emit_signal_prelocked(self,record,EVENTQUEUE_ADDED);
+        g_object_unref(record);
     } else {
         C_WARN("Ignoring event dispatched from cancelled event...");
         if(cleanup_cb){
