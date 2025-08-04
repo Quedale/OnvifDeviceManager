@@ -1,6 +1,9 @@
 
 #include <math.h>
+#include "portable_thread.h"
+PUSH_WARNING_IGNORE(-1,-Wpedantic)
 #include <gst/gst.h>
+POP_WARNING_IGNORE(NULL)
 #include <gst/video/video.h>
 
 #include <gio/gio.h>

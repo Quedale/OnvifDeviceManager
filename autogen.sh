@@ -962,10 +962,10 @@ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:"$(pkg-config --variable pc_path pkg-con
 #   echo "make already installed."
 # fi
 
-export PATH="$SUBPROJECT_DIR/m4-1.4.19/build/dist/bin":$PATH
+export PATH="$SUBPROJECT_DIR/m4-1.4.20/build/dist/bin":$PATH
 if [ ! -z "$(progVersionCheck project="m4" program=m4 linenumber=1 lineindex=3 major=1 minor=4 micro=18 )" ]; then
-  downloadAndExtract project="m4" file="m4-1.4.19.tar.xz" path="https://ftp.gnu.org/gnu/m4/m4-1.4.19.tar.xz"
-  buildMakeProject project="m4" srcdir="m4-1.4.19" prefix="$SUBPROJECT_DIR/m4-1.4.19/build/dist" skipbootstrap="true"
+  downloadAndExtract project="m4" file="m4-1.4.20.tar.xz" path="https://ftp.gnu.org/gnu/m4/m4-1.4.20.tar.xz"
+  buildMakeProject project="m4" srcdir="m4-1.4.20" prefix="$SUBPROJECT_DIR/m4-1.4.20/build/dist" skipbootstrap="true"
 fi
 
 export PATH="$SUBPROJECT_DIR/autoconf-2.72/build/dist/bin":$PATH
@@ -1039,11 +1039,11 @@ fi
 #   sudo apt-get install libglib2.0-dev (gstreamer minimum 2.64.0)
 # 
 ################################################################
-export PATH="$SUBPROJECT_DIR/glib-2.74.1/dist/bin":$PATH
-export PKG_CONFIG_PATH="$SUBPROJECT_DIR/glib-2.74.1/dist/lib/pkgconfig":$PKG_CONFIG_PATH
-if [ ! -z "$(pkgCheck project="glib" name=glib-2.0 minver=2.64.0)" ]; then
-  downloadAndExtract project="glib" file="glib-2.74.1.tar.xz" path="https://download.gnome.org/sources/glib/2.74/glib-2.74.1.tar.xz"
-  buildMesonProject project="glib" srcdir="glib-2.74.1" prefix="$SUBPROJECT_DIR/glib-2.74.1/dist" mesonargs="-Dpcre2:test=false -Dpcre2:grep=false -Dxattr=false -Db_lundef=false -Dtests=false -Dglib_debug=disabled -Dglib_assert=false -Dglib_checks=false"
+export PATH="$SUBPROJECT_DIR/glib-2.85.2/dist/bin":$PATH
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/glib-2.85.2/dist/lib/pkgconfig":$PKG_CONFIG_PATH
+if [ ! -z "$(pkgCheck project="glib" name=glib-2.0 minver=2.64.0)" ] || [ ! -z "$(progVersionCheck project="glib-mkenums" program=glib-mkenums)" ]; then
+  downloadAndExtract project="glib" file="glib-2.85.2.tar.xz" path="https://download.gnome.org/sources/glib/2.85/glib-2.85.2.tar.xz"
+  buildMesonProject project="glib" srcdir="glib-2.85.2" prefix="$SUBPROJECT_DIR/glib-2.85.2/dist" mesonargs="-Dsysprof=disabled -Dpcre2:test=false -Dpcre2:grep=false -Dxattr=false -Db_lundef=false -Dtests=false -Dglib_debug=disabled -Dglib_assert=false -Dglib_checks=false"
 fi
 
 ################################################################
@@ -1166,12 +1166,9 @@ fi
 #       sudo apt install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 ################################################################
 export PKG_CONFIG_PATH="$SUBPROJECT_DIR/FFmpeg/dist/lib/pkgconfig":$PKG_CONFIG_PATH
-export PKG_CONFIG_PATH="$SUBPROJECT_DIR/gstreamer/build_omx/dist/lib/gstreamer-1.0/pkgconfig":$PKG_CONFIG_PATH
-export PKG_CONFIG_PATH="$SUBPROJECT_DIR/gstreamer/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
-export PKG_CONFIG_PATH="$SUBPROJECT_DIR/gstreamer/build/dist/lib/gstreamer-1.0/pkgconfig":$PKG_CONFIG_PATH
 
 gst_ret=0
-GSTREAMER_LATEST=1.26.1
+GSTREAMER_LATEST=1.27.1
 if [ $ENABLE_LATEST == 0 ]; then
   GSTREAMER_VERSION=1.14.4
 else
@@ -1181,7 +1178,7 @@ fi
 gst_core=(
   "gstreamer-1.0;gstreamer-1.0"
   "gstreamer-plugins-base-1.0;gstreamer-plugins-base-1.0"
-  "gstreamer-plugins-good-1.0;gstreamer-plugins-good-1.0" #For some reason this doesn't come out? Relying on plugins
+  "gstreamer-plugins-good-1.0;" #Dont check for this package since it doesnt exists in arch
   "gstreamer-plugins-bad-1.0;gstreamer-plugins-bad-1.0"
 )
 
@@ -1227,13 +1224,13 @@ gst_bad_plugins=(
     # "x11;gstx11"
     # "gl;gstgl"
     "interlace;gstinterlace"
-    "openh264;gstopenh264"
+    "openh264;" #Openh264 is an optional package
     "fdkaac;gstfdkaac"
     "videoparsers;gstvideoparsersbad"
     "onvif;gstrtponvif"
     "jpegformat;gstjpegformat"
     "v4l2codecs;gstv4l2codecs"
-    "libde265;gstde265"
+    "libde265;" #libde265 is an optional package
 )
 if [ $ENABLE_NVCODEC != 0 ]; then gst_bad_plugins+=("nvcodec;gstnvcodec"); fi
 
@@ -1241,40 +1238,40 @@ checkGstreamerPkg () {
   local static version project # reset first
   local "${@}"
 
-  gstpkgret=0;
-  if [ -z "${static}" ]; then
-    for gst_p in ${gst_core[@]}; do
-      IFS=";" read -r -a arr <<< "${gst_p}"
-      if [ ! -z "$(pkgCheck project=${arr[0]} name=${arr[1]} minver=${version})" ]; then
-        printf "  missing core package ${arr[0]} >= ${version}\n";
-      fi
-    done
-  else
-    for gst_p in ${gst_base_plugins[@]}; do
-      IFS=";" read -r -a arr <<< "${gst_p}"
-      if [ ! -z "$(pkgCheck project=${project}-${arr[0]} name=${arr[1]} minver=${version})" ]; then
-        printf "  missing base plugin ${arr[0]} >= ${version}\n";
-      fi
-    done
-    for gst_p in ${gst_good_plugins[@]}; do
-      IFS=";" read -r -a arr <<< "${gst_p}"
-      if [ ! -z "$(pkgCheck project=${project}-${arr[0]} name=${arr[1]} minver=${version})" ]; then
-        printf "  missing good plugin ${arr[0]} >= ${version}\n";
-      fi
-    done
-    for gst_p in ${gst_bad_plugins[@]}; do
-      IFS=";" read -r -a arr <<< "${gst_p}"
-      if [ ! -z "$(pkgCheck project=${project}-${arr[0]} name=${arr[1]} minver=${version})" ]; then
-        printf "  missing bad plugin ${arr[0]} >= ${version}\n";
-      fi
-    done
-  fi
+  for gst_p in ${gst_core[@]}; do
+    IFS=";" read -r -a arr <<< "${gst_p}"
+    if [ ! -z "${arr[1]}" ] && [ ! -z "$(pkgCheck project=${arr[0]} name=${arr[1]} minver=${version})" ]; then
+      printf "  missing core package ${arr[0]} >= ${version}\n";
+    fi
+  done
+
+  for gst_p in ${gst_base_plugins[@]}; do
+    IFS=";" read -r -a arr <<< "${gst_p}"
+    if [ ! -z "${arr[1]}" ] && [ ! -z "$(checkLibrary project=${project}-${arr[0]} name=${arr[1]} static=${static})" ]; then
+      printf "  missing base plugin ${arr[0]} >= ${version}\n";
+    fi
+  done
+  for gst_p in ${gst_good_plugins[@]}; do
+    IFS=";" read -r -a arr <<< "${gst_p}"
+    if [ ! -z "${arr[1]}" ] && [ ! -z "$(checkLibrary project=${project}-${arr[0]} name=${arr[1]} static=${static})" ]; then
+      printf "  missing good plugin ${arr[0]} >= ${version}\n";
+    fi
+  done
+  for gst_p in ${gst_bad_plugins[@]}; do
+    IFS=";" read -r -a arr <<< "${gst_p}"
+    if [ ! -z "${arr[1]}" ] && [ ! -z "$(checkLibrary project=${project}-${arr[0]} name=${arr[1]} static=${static})" ]; then
+      printf "  missing bad plugin ${arr[0]} >= ${version}\n";
+    fi
+  done
 }
 
+og_lib_path=$LIBRARY_PATH
+export LIBRARY_PATH=/usr/lib/gstreamer-1.0:/usr/local/lib/gstreamer-1.0:$LIBRARY_PATH
 #Gstreamer install on system doesn't break down by plugin, but groups them under base,good,bad,ugly
 if [ ! -z "$(checkGstreamerPkg project="gstreamer" version=$GSTREAMER_VERSION)" ]; then
   gst_ret=1;
 fi
+export LIBRARY_PATH=$og_lib_path
 
 export PKG_CONFIG_PATH="$SUBPROJECT_DIR/pulseaudio/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
 export PKG_CONFIG_PATH="$SUBPROJECT_DIR/libde265/dist/lib/pkgconfig":$PKG_CONFIG_PATH
@@ -1295,15 +1292,22 @@ export PKG_CONFIG_PATH="$SUBPROJECT_DIR/libxtrans/dist/share/pkgconfig":$PKG_CON
 
 #Check to see if gstreamer exist on the system
 if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
+  export PKG_CONFIG_PATH="$SUBPROJECT_DIR/gstreamer/build_omx/dist/lib/gstreamer-1.0/pkgconfig":$PKG_CONFIG_PATH
+  export PKG_CONFIG_PATH="$SUBPROJECT_DIR/gstreamer/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
+  export PKG_CONFIG_PATH="$SUBPROJECT_DIR/gstreamer/build/dist/lib/gstreamer-1.0/pkgconfig":$PKG_CONFIG_PATH
+
   gst_ret=0;
   GSTREAMER_VERSION=$GSTREAMER_LATEST; #If we are to build something, build latest
   #Gstreamer static plugins needs to be checked individually
-  if [ ! -z "$(checkGstreamerPkg project="gstreamer" version=$GSTREAMER_VERSION static=true)" ]; then
+  og_lib_path=$LIBRARY_PATH
+  export LIBRARY_PATH=$SUBPROJECT_DIR/gstreamer/build/dist/lib/gstreamer-1.0:$SUBPROJECT_DIR/gstreamer/build/dist/lib:$LIBRARY_PATH
+  if [ ! -z "$(checkGstreamerPkg project="gstreamer-src" version=$GSTREAMER_VERSION static=true)" ]; then
     gst_ret=1;
   fi
   if [ $ENABLE_LIBAV -eq 1 ] && [ ! -z "$(pkgCheck project="gstreamer-libav" name=gstlibav minver=$GSTREAMER_VERSION)" ]; then
     gst_ret=1;
   fi
+  export LIBRARY_PATH=$og_lib_path
 
   #Global check if gstreamer is already built
   if [ $gst_ret != 0 ]; then
