@@ -304,7 +304,7 @@ OnvifMgrEncryptedStore__capture_passphrase(OnvifMgrEncryptedStore * self){
     g_return_if_fail (priv->queue != NULL);
     g_return_if_fail (QUEUE_IS_EVENTQUEUE(priv->queue));
 
-    priv->dialog = OnvifMgrTrustStoreDialog__new(priv->queue);
+    priv->dialog = OnvifMgrTrustStoreDialog__new();
     g_signal_connect (G_OBJECT (priv->dialog), "showing", G_CALLBACK (OnvifMgrEncryptedStore__showing), self);
     g_signal_connect (G_OBJECT (priv->dialog), "submit", G_CALLBACK (OnvifMgrEncryptedStore__login), self);
     g_signal_connect (G_OBJECT (priv->dialog), "reset", G_CALLBACK (OnvifMgrEncryptedStore__reset), self);

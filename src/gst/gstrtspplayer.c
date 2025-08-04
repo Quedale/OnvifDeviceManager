@@ -311,6 +311,11 @@ GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
     } else {
         C_WARN ("Could not create gtkglsink, falling back to gtksink.\n");
         priv->sink = gst_element_factory_make ("gtksink", "gtksink");
+        if(!priv->sink){
+            C_FATAL("Failed to create GTK Sink");
+            //TODO Display fatal error on GUI
+            exit(1);
+        }
         priv->snapsink = priv->sink;
         g_object_get (priv->sink, "widget", &priv->canvas, NULL);
         //Temporarely disabled for performance
