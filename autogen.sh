@@ -1628,17 +1628,19 @@ fi
 printlines project="onvifmgr" task="build" msg="bootstrap"
 #Change to the project folder to run autoconf and automake
 cd "$SCRT_DIR"
-#Initialize project
-aclocal 2>&1 | printlines project="onvifmgr" task="aclocal"
+
+# Clean up any previous autotools cache to ensure a clean bootstrap
+rm -rf autom4te.cache aclocal.m4 configure
+
+#Initialize project with correct autotools sequence
+aclocal -I m4 2>&1 | printlines project="onvifmgr" task="aclocal"
 [ "${PIPESTATUS[0]}" -ne 0 ] && printError project="onvifmgr" task="aclocal" msg="Failed to bootstrap OnvifDeviceManager" && exit 1
+libtoolize --force --copy 2>&1 | printlines project="onvifmgr" task="libtoolize"
+[ "${PIPESTATUS[0]}" -ne 0 ] && printError project="onvifmgr" task="libtoolize" msg="Failed to bootstrap OnvifDeviceManager" && exit 1
 autoconf 2>&1 | printlines project="onvifmgr" task="autoconf"
 [ "${PIPESTATUS[0]}" -ne 0 ] && printError project="onvifmgr" task="autoconf" msg="Failed to bootstrap OnvifDeviceManager" && exit 1
-libtoolize 2>&1 | printlines project="onvifmgr" task="libtoolize"
-[ "${PIPESTATUS[0]}" -ne 0 ] && printError project="onvifmgr" task="libtoolize" msg="Failed to bootstrap OnvifDeviceManager" && exit 1
-automake --add-missing 2>&1 | printlines project="onvifmgr" task="automake"
+automake --add-missing --copy 2>&1 | printlines project="onvifmgr" task="automake"
 [ "${PIPESTATUS[0]}" -ne 0 ] && printError project="onvifmgr" task="automake" msg="Failed to bootstrap OnvifDeviceManager" && exit 1
-autoreconf 2>&1 | printlines project="onvifmgr" task="autoreconf"
-[ "${PIPESTATUS[0]}" -ne 0 ] && printError project="onvifmgr" task="autoreconf" msg="Failed to bootstrap OnvifDeviceManager" && exit 1
 
 configArgs=$@
 printlines project="onvifmgr" task="build" msg="configure $configArgs"
