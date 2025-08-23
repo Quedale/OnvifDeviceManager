@@ -1200,6 +1200,7 @@ gst_base_plugins=(
     "volume;gstvolume"
     "tcp;gsttcp"
     "overlaycomposition;gstoverlaycomposition"
+    "opus;gstopus"
   )
 gst_good_plugins=(
     "gtk3;gstgtk"
