@@ -230,11 +230,21 @@ GstRtspPlayer__get_session (GstRtspPlayer * self)
 }
 
 /* Dynamically link */
-static void 
+static void
 on_decoder_pad_added (GstElement *element, GstPad *new_pad, gpointer data){
     GstPad *sinkpad;
     GstPadLinkReturn ret;
     GstElement *decoder = (GstElement *) data;
+    GstCaps *caps;
+
+    /* Debug: Print the caps of the new pad */
+    caps = gst_pad_get_current_caps(new_pad);
+    if (caps) {
+        gchar *caps_str = gst_caps_to_string(caps);
+        C_DEBUG("Decoder pad added with caps: %s", caps_str);
+        g_free(caps_str);
+        gst_caps_unref(caps);
+    }
 
     /* We can now link this pad with the rtsp-decoder sink pad */
     sinkpad = gst_element_get_static_pad (decoder, "sink");
@@ -294,7 +304,15 @@ GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
     GstPad *pad, *ghostpad;
 
     video_bin = gst_bin_new("video_bin");
-    vdecoder = gst_element_factory_make ("decodebin3", "video_decodebin");
+    vdecoder = gst_element_factory_make ("decodebin", "video_decodebin");
+    if (!vdecoder) {
+        C_WARN("decodebin not available, trying decodebin3");
+        vdecoder = gst_element_factory_make ("decodebin3", "video_decodebin");
+    }
+    if (!vdecoder) {
+        C_WARN("Neither decodebin nor decodebin3 available, trying uridecodebin");
+        vdecoder = gst_element_factory_make ("uridecodebin", "video_decodebin");
+    }
     videoconvert = gst_element_factory_make ("videoconvert", "videoconverter");
     overlay_comp = gst_element_factory_make ("overlaycomposition", NULL);
     priv->sink = gst_element_factory_make ("glsinkbin", "glsinkbin");
@@ -358,7 +376,7 @@ GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
 
     pad = gst_element_get_static_pad (vdecoder, "sink");
     if (!pad) {
-        // TODO gst_object_unref 
+        // TODO gst_object_unref
         C_ERROR("unable to get decoder static sink pad");
         return NULL;
     }
@@ -384,13 +402,21 @@ GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
     return video_bin;
 }
 
-static GstElement* 
+static GstElement*
 GstRtspPlayerPrivate__create_audio_pad(){
     GstPad *pad, *ghostpad;
     GstElement *decoder, *convert, *level, *sink, *audio_bin;
 
     audio_bin = gst_bin_new("audiobin");
-    decoder = gst_element_factory_make ("decodebin3", "audio_decodebin");
+    decoder = gst_element_factory_make ("decodebin", "audio_decodebin");
+    if (!decoder) {
+        C_WARN("decodebin not available, trying decodebin3");
+        decoder = gst_element_factory_make ("decodebin3", "audio_decodebin");
+    }
+    if (!decoder) {
+        C_WARN("Neither decodebin nor decodebin3 available, trying uridecodebin");
+        decoder = gst_element_factory_make ("uridecodebin", "audio_decodebin");
+    }
     convert = gst_element_factory_make ("audioconvert", "audioconverter");
     level = gst_element_factory_make("level",NULL);
     sink = gst_element_factory_make ("autoaudiosink", NULL);
@@ -427,7 +453,7 @@ GstRtspPlayerPrivate__create_audio_pad(){
 
     pad = gst_element_get_static_pad (decoder, "sink");
     if (!pad) {
-        // TODO gst_object_unref 
+        // TODO gst_object_unref
         C_ERROR("unable to get decoder static sink pad");
         return NULL;
     }
