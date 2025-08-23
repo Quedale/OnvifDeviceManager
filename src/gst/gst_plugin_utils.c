@@ -38,7 +38,7 @@ GST_PLUGIN_STATIC_DECLARE(volume); // gstvolume
 GST_PLUGIN_STATIC_DECLARE(alsa);
 GST_PLUGIN_STATIC_DECLARE(opengl); // gstopengl
 // GST_PLUGIN_STATIC_DECLARE(ogg); gstogg
-// GST_PLUGIN_STATIC_DECLARE(opus); gstopus
+GST_PLUGIN_STATIC_DECLARE(opus); // gstopus
 // GST_PLUGIN_STATIC_DECLARE(vorbis); gstvorbis
 GST_PLUGIN_STATIC_DECLARE(ximagesink);
 // GST_PLUGIN_STATIC_DECLARE(xvimagesink);
@@ -255,7 +255,7 @@ gst_plugin_init_static (void)
     GST_PLUGIN_STATIC_REGISTER(alsa);
     GST_PLUGIN_STATIC_REGISTER(opengl); // gstopengl
     // GST_PLUGIN_STATIC_REGISTER(ogg); gstogg
-    // GST_PLUGIN_STATIC_REGISTER(opus); gstopus
+    GST_PLUGIN_STATIC_REGISTER(opus); // gstopus
     // GST_PLUGIN_STATIC_REGISTER(vorbis); gstvorbis
     GST_PLUGIN_STATIC_REGISTER(ximagesink);
     // GST_PLUGIN_STATIC_REGISTER(xvimagesink);
