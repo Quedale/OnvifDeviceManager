@@ -145,6 +145,7 @@ AC_DEFUN([CHECK_GSTREAMER_LIBS],[
     AC_SEARCH_LIBS([gst_plugin_videorate_register], [gstvideorate],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}videorate "])
     AC_SEARCH_LIBS([gst_plugin_volume_register], [gstvolume],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}volume "])
     AC_SEARCH_LIBS([gst_plugin_ximagesink_register], [gstximagesink],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}ximagesink "])
+    AC_SEARCH_LIBS([gst_plugin_opus_register], [gstopus],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}opus "])
 
     AS_IF([test -z "$GST_PLUGIN_MISSING"],[],[AC_MSG_RESULT([WARNING: Gstreamer system library missing : $GST_PLUGIN_MISSING])])
     AC_SUBST([LDFLAGS], [$og_ldflags]) #Restore ldflags
