@@ -1311,8 +1311,21 @@ GstRtspPlayer__dispose (GObject *gobject)
     P_MUTEX_CLEANUP(priv->player_lock);
     //A bug seems to have been introduced where the widget is destroyed while cleaning up gtkglsink and not removed from gtk hierarchy.
     //Removing the widget before destroying gtkglsink seems to be a viable retrocompatible solution without causing leaks in other version
-    gtk_container_remove (GTK_CONTAINER (priv->canvas_handle), GTK_WIDGET(priv->canvas));
-    g_object_unref(priv->canvas);
+
+    if (priv->canvas) {
+        if (priv->canvas_handle && GTK_IS_CONTAINER(priv->canvas_handle) && GTK_IS_WIDGET(priv->canvas)) {
+            // Additional safety: check parent relationship safely
+            GtkWidget *parent = gtk_widget_get_parent(GTK_WIDGET(priv->canvas));
+            if (parent && GTK_IS_WIDGET(parent) && parent == GTK_WIDGET(priv->canvas_handle)) {
+                gtk_container_remove (GTK_CONTAINER (priv->canvas_handle), GTK_WIDGET(priv->canvas));
+            }
+        }
+        // Only unref if canvas is still a valid GObject
+        if (G_IS_OBJECT(priv->canvas)) {
+            g_object_unref(priv->canvas);
+        }
+        priv->canvas = NULL;
+    }
     
     if(priv->video_bin){
         g_object_unref(priv->video_bin);

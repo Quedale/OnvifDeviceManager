@@ -131,12 +131,12 @@ static gboolean gtk_dotted_slider_refresh_items_gui(void * user_data){
 
 void gtk_dotted_slider_refresh_items(GtkDottedSlider *slider){
   C_TRAIL("gtk_dotted_slider_refresh_items");
-  g_idle_add(gtk_dotted_slider_refresh_items_gui,slider);
+  //g_idle_add(gtk_dotted_slider_refresh_items_gui,slider);
 }
 
 void
 gtk_dotted_slider_set_item_count (GtkDottedSlider *revealer,
-                                      gint        value)
+                                      gint value)
 {
   C_TRAIL("gtk_dotted_slider_set_item_count");
   GtkDottedSliderPrivate *priv = gtk_dotted_slider_get_instance_private (revealer);
