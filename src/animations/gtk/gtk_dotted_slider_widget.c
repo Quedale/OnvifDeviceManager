@@ -63,9 +63,10 @@ void gtk_dotted_slider_map_event (GtkWidget* self, gpointer user_data){
     custom_gtk_revealer_set_reveal_child(CUSTOM_GTK_REVEALER(self),TRUE);
 }
 
-static gboolean gtk_dotted_slider_refresh_items_gui(void * user_data){
-  GtkDottedSlider *slider = GTK_DOTTED_SLIDER(user_data);
-  C_TRAIL("gtk_dotted_slider_refresh_items_gui");
+
+
+void gtk_dotted_slider_refresh_items(GtkDottedSlider *slider){
+  C_TRAIL("gtk_dotted_slider_refresh_items");
   GtkCssProvider * cssProvider;
   GtkStyleContext * context;
   double delay;
@@ -125,13 +126,6 @@ static gboolean gtk_dotted_slider_refresh_items_gui(void * user_data){
 
   g_object_unref (cssProvider); 
   C_TRAIL("gtk_dotted_slider_refresh_items - done");
-
-  return FALSE;
-}
-
-void gtk_dotted_slider_refresh_items(GtkDottedSlider *slider){
-  C_TRAIL("gtk_dotted_slider_refresh_items");
-  g_idle_add(gtk_dotted_slider_refresh_items_gui,slider);
 }
 
 void

@@ -948,6 +948,13 @@ void OnvifApp__dispose(GObject * obj){
         priv->queue = NULL;
     }
 
+    //Destroying the player will cause it to hang until its state changed to NULL
+    //Destroying the player after the queue because the queue could dispatch retry call
+    if(priv->player){
+        g_object_unref(priv->player);
+        priv->player = NULL;
+    }
+
     if(priv->details){
         OnvifDetails__destroy(priv->details);
         priv->details = NULL;
@@ -956,13 +963,6 @@ void OnvifApp__dispose(GObject * obj){
     if(priv->settings){
         AppSettings__destroy(priv->settings);
         priv->settings = NULL;
-    }
-
-    //Destroying the player will cause it to hang until its state changed to NULL
-    //Destroying the player after the queue because the queue could dispatch retry call
-    if(priv->player){
-        g_object_unref(priv->player);
-        priv->player = NULL;
     }
     
     //Using idle destruction to allow pending idles to execute

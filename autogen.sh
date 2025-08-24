@@ -229,7 +229,8 @@ downloadAndExtract (){
   fi
 
   [ ! -z "$SRC_CACHE_DIR" ] && pathprefix="$SRC_CACHE_DIR/" || pathprefix=""
-
+  
+  dest_val=$pathprefix$file
   if [ ! -f "$dest_val" ]; then
     printlines project="${project}" task="wget" msg="downloading: ${path}"
     cd "$pathprefix" #Changing directory so that wget logs only the filename
