@@ -90,7 +90,8 @@ AC_SUBST(GST_PLUGIN_PACKAGES,m4_normalize('
     gstaudioresample
     gstaudioconvert
     gstapp
-')) 
+    gstopus
+'))
 
 #Function to check gstreamer built under subproject. (.pc file exists for each plugins)
 AC_DEFUN([CHECK_GSTREAMER_PACKAGES],[
