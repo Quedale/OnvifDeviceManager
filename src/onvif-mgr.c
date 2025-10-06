@@ -72,6 +72,9 @@ int main(int argc, char *argv[]) {
    */
   struct sigaction sa;
 
+  /* Work around until wayland is properly supported. GTK GL Sink fails to render otherwise*/
+  putenv("GDK_BACKEND=x11");
+
   memset(&sa, 0, sizeof(struct sigaction));
   sigemptyset(&sa.sa_mask);
 
