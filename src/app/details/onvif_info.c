@@ -9,22 +9,7 @@
 #define ONVIF_GET_NETWORK_ERROR "Error retreiving network details."
 #define ONVIF_GET_DEVICE_CAPS_ERROR "Error retreiving device capabilities."
 
-enum {
-    STARTED,
-    FINISHED,
-    LAST_SIGNAL
-};
-
-enum
-{
-  PROP_APP = 1,
-  N_PROPERTIES
-};
-
-
 typedef struct {
-    OnvifApp * app;
-    OnvifMgrDeviceRow * device;
     GtkWidget * info_page;
     GtkWidget * name_lbl;
     GtkWidget * hostname_lbl;
@@ -38,17 +23,10 @@ typedef struct {
     GtkWidget * mac_lbl;
     GtkWidget * version_lbl;
     GtkWidget * uri_lbl;
-
-    QueueEvent * previous_event;
-    gulong event_signal;
 } OnvifInfoPanelPrivate;
 
-static GParamSpec *obj_properties[N_PROPERTIES] = { NULL, };
-static guint signals[LAST_SIGNAL] = { 0 };
 
 typedef struct {
-    OnvifMgrDeviceRow * device;
-    OnvifInfoPanel * info;
     char * name;
     char * hostname;
     char * location;
@@ -62,22 +40,13 @@ typedef struct {
     char ** macs;
     char * version;
     char * uri;
-    QueueEvent * qevt; //Keep reference to check iscancelled before rendering result
-
 } InfoGUIUpdate;
 
-typedef struct {
-    OnvifInfoPanel * info;
-    OnvifMgrDeviceRow * device;
-} InfoDataUpdate;
+G_DEFINE_TYPE_WITH_PRIVATE(OnvifInfoPanel, OnvifInfoPanel_, ONVIFMGR_TYPE_DETAILSPANEL)
 
-G_DEFINE_TYPE_WITH_PRIVATE(OnvifInfoPanel, OnvifInfoPanel_, GTK_TYPE_SCROLLED_WINDOW)
-
-void OnvifInfoPanel_update_details(OnvifInfoPanel * self);
-void OnvifInfoPanel_clear_details(OnvifInfoPanel * self);
-
-void OnvifInfoPanel__create_ui(OnvifInfoPanel * self){
-
+static void 
+OnvifInfoPanel__createui(OnvifDetailsPanel * panel){
+    OnvifInfoPanel * self = ONVIFMGR_INFOPANEL(panel);
     OnvifInfoPanelPrivate *priv = OnvifInfoPanel__get_instance_private (self);
 
     GtkWidget * grid = gtk_grid_new();
@@ -111,31 +80,11 @@ void OnvifInfoPanel__create_ui(OnvifInfoPanel * self){
     gtk_container_add(GTK_CONTAINER(self),grid);
 }
 
-void OnvifInfoPanel__device_changed_cb(OnvifApp * app, OnvifMgrDeviceRow * device, OnvifInfoPanel * info){
-    OnvifInfoPanelPrivate *priv = OnvifInfoPanel__get_instance_private (info);
-    priv->device = device;
-    OnvifInfoPanel_clear_details(info);
-    if(gtk_widget_get_mapped(GTK_WIDGET(info)) && ONVIFMGR_IS_DEVICEROW(device) && OnvifMgrDeviceRow__is_initialized(device)){
-        OnvifInfoPanel_update_details(info);
-    }
-}
-
-void OnvifInfoPanel__map_event_cb (GtkWidget* self, OnvifInfoPanel * info){
-    OnvifInfoPanelPrivate *priv = OnvifInfoPanel__get_instance_private (info);
-    if(gtk_widget_get_mapped(GTK_WIDGET(info)) && ONVIFMGR_IS_DEVICEROW(priv->device) && OnvifMgrDeviceRow__is_initialized(priv->device)){
-        OnvifInfoPanel_clear_details(info);
-        OnvifInfoPanel_update_details(info);
-    }
-}
-
-gboolean onvif_info_gui_update (void * user_data){
+static void 
+OnvifInfoPanel__updateui (OnvifDetailsPanel * self, OnvifApp * app, OnvifMgrDeviceRow * device, void * user_data){
     InfoGUIUpdate * update = (InfoGUIUpdate *) user_data;
 
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(update->device) || !OnvifMgrDeviceRow__is_selected(update->device) || QueueEvent__is_cancelled(update->qevt)){
-        goto exit;
-    }
-
-    OnvifInfoPanelPrivate *priv = OnvifInfoPanel__get_instance_private (update->info);
+    OnvifInfoPanelPrivate *priv = OnvifInfoPanel__get_instance_private (ONVIFMGR_INFOPANEL(self));
 
     if(update->name) gtk_entry_set_text(GTK_ENTRY(priv->name_lbl),update->name);
     gtk_editable_set_editable  ((GtkEditable*)priv->name_lbl, FALSE);
@@ -188,8 +137,6 @@ gboolean onvif_info_gui_update (void * user_data){
     if(update->uri) gtk_entry_set_text(GTK_ENTRY(priv->uri_lbl),update->uri);
     gtk_editable_set_editable  ((GtkEditable*)priv->uri_lbl, FALSE);
 
-    g_signal_emit (update->info, signals[FINISHED], 0, update->device);
-exit:
     free(update->name);
     free(update->hostname);
     free(update->location);
@@ -205,74 +152,51 @@ exit:
     free(update->macs);
     free(update->version);
     free(update->uri);
-    g_object_unref(update->device);
-    g_object_unref(update->qevt);
     free(update);
-    return FALSE;
 }
 
-void update_details_event_cancelled_cb(QueueEvent * qevt, QueueEventState state, void * user_data){
-    InfoDataUpdate * input = (InfoDataUpdate *) user_data;
-    //Do not dispatch on QUEUEEVENT_DISPATCHED.
-    //FINISHED will be invoked at the end of the GUI update
-    if(state == QUEUEEVENT_CANCELLED)
-        gui_signal_emit(input->info, signals[FINISHED], input->device);
-}
 
-void _update_details_page_cleanup(QueueEvent * qevt, int cancelled, void * user_data){
-    InfoDataUpdate * input = (InfoDataUpdate *) user_data;
-    g_object_unref(input->device);
-    free(input);
-}
-
-void _update_details_page(QueueEvent * qevt, void * user_data){
+static void * 
+OnvifInfoPanel__getdata(OnvifDetailsPanel * self, OnvifApp * app, OnvifMgrDeviceRow * device, QueueEvent * qevt){
     OnvifDeviceHostnameInfo * hostname = NULL;
     OnvifDeviceInformation * dev_info = NULL;
     OnvifDeviceInterfaces * interfaces = NULL;
     OnvifScopes * scopes = NULL;
     OnvifCapabilities* caps = NULL;
 
-    InfoDataUpdate * input = (InfoDataUpdate *) user_data;
-
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device)){
-        C_TRAIL("_update_details_page - invalid device.");
-        return;
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) || !OnvifMgrDeviceRow__is_selected(device)){
+        C_TRAIL("OnvifInfoPanel__getdata - invalid device or no longer selected.");
+        return NULL;
     }
 
-    if(!OnvifMgrDeviceRow__is_selected(input->device)){
-        goto exit;
-    }
-
-    OnvifDevice * onvif_device = OnvifMgrDeviceRow__get_device(input->device);
+    InfoGUIUpdate * gui_update = NULL;
+    OnvifDevice * onvif_device = OnvifMgrDeviceRow__get_device(device);
     OnvifDeviceService * devserv = OnvifDevice__get_device_service(onvif_device);
 
     hostname = OnvifDeviceService__getHostname(devserv);
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device) || QueueEvent__is_cancelled(qevt))
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) || !OnvifMgrDeviceRow__is_selected(device) || QueueEvent__is_cancelled(qevt))
         goto exit;
 
     dev_info = OnvifDeviceService__getDeviceInformation(devserv);
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device) || QueueEvent__is_cancelled(qevt))
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) || !OnvifMgrDeviceRow__is_selected(device) || QueueEvent__is_cancelled(qevt))
         goto exit;
 
     interfaces = OnvifDeviceService__getNetworkInterfaces(devserv);
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device) || QueueEvent__is_cancelled(qevt))
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) || !OnvifMgrDeviceRow__is_selected(device) || QueueEvent__is_cancelled(qevt))
         goto exit;
 
     scopes = OnvifDeviceService__getScopes(devserv);
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device) || QueueEvent__is_cancelled(qevt))
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) || !OnvifMgrDeviceRow__is_selected(device) || QueueEvent__is_cancelled(qevt))
         goto exit;
 
     caps = OnvifDeviceService__getCapabilities(devserv);
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device) || QueueEvent__is_cancelled(qevt))
+    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(device) || !OnvifMgrDeviceRow__is_selected(device) || QueueEvent__is_cancelled(qevt))
         goto exit;
 
     //Initialize idle update data struct
-    InfoGUIUpdate * gui_update = malloc(sizeof(InfoGUIUpdate));
-    gui_update->info = input->info;
-    gui_update->device = input->device;
+    gui_update = malloc(sizeof(InfoGUIUpdate));
     gui_update->mac_count = 0;
     gui_update->macs= NULL;
-    gui_update->qevt = qevt;
 
     //GetHostname fault handling
     SoapFault * fault = SoapObject__get_fault(SOAP_OBJECT(hostname));
@@ -390,9 +314,6 @@ void _update_details_page(QueueEvent * qevt, void * user_data){
     }
 
     gui_update->uri = OnvifBaseService__get_endpoint(ONVIF_BASE_SERVICE(devserv));
-    g_object_ref(gui_update->device);
-    g_object_ref(gui_update->qevt);
-    gdk_threads_add_idle(G_SOURCE_FUNC(onvif_info_gui_update),gui_update);
 exit:
     if(hostname)
         g_object_unref(hostname);
@@ -404,41 +325,13 @@ exit:
         g_object_unref(scopes);
     if(caps)
         g_object_unref(caps);
+
+    return gui_update;
 }
 
-void OnvifInfoPanel_update_details(OnvifInfoPanel * self){
-    OnvifInfoPanelPrivate *priv = OnvifInfoPanel__get_instance_private (self);
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(priv->device)){
-        C_TRAIL("update_details_priv - invalid device.");
-        return;
-    }
-    
-    OnvifDevice * odev = OnvifMgrDeviceRow__get_device(priv->device);
-    if(!OnvifDevice__is_authenticated(odev)){
-        return;
-    }
-
-    InfoDataUpdate * input = malloc(sizeof(InfoDataUpdate));
-    input->device = priv->device;
-    input->info = self;
-    g_object_ref(input->device);
-    if(priv->previous_event && !QueueEvent__is_finished(priv->previous_event)) {
-        g_signal_handler_disconnect(priv->previous_event,priv->event_signal); //Removing signal to prevent loading from hiding
-        QueueEvent__cancel(priv->previous_event);
-        g_object_unref(priv->previous_event);
-        priv->previous_event = NULL;
-        priv->event_signal = 0;
-    } else if(priv->previous_event){
-        g_object_unref(priv->previous_event);
-    }
-
-    g_signal_emit (self, signals[STARTED], 0, input->device);
-    priv->previous_event = EventQueue__insert_plain(OnvifApp__get_EventQueue(priv->app), input->device, _update_details_page,input, _update_details_page_cleanup);
-    priv->event_signal = g_signal_connect (priv->previous_event, "state-changed", G_CALLBACK (update_details_event_cancelled_cb), input);
-    g_object_ref(priv->previous_event);
-}
-
-void OnvifInfoPanel_clear_details(OnvifInfoPanel * self){
+static void 
+OnvifInfoPanel_clearui(OnvifDetailsPanel * panel){
+    OnvifInfoPanel * self = ONVIFMGR_INFOPANEL(panel);
     OnvifInfoPanelPrivate *priv = OnvifInfoPanel__get_instance_private (self);
 
     gtk_entry_set_text(GTK_ENTRY(priv->name_lbl),"");
@@ -478,97 +371,17 @@ void OnvifInfoPanel_clear_details(OnvifInfoPanel * self){
 }
 
 static void
-OnvifInfoPanel__set_property (GObject      *object,
-                          guint         prop_id,
-                          const GValue *value,
-                          GParamSpec   *pspec)
-{
-    OnvifInfoPanel * info = ONVIFMGR_INFOPANEL (object);
-    OnvifInfoPanelPrivate *priv = OnvifInfoPanel__get_instance_private (info);
-    switch (prop_id){
-        case PROP_APP:
-            priv->app = ONVIFMGR_APP(g_value_get_object (value));
-            g_signal_connect (priv->app, "device-changed", G_CALLBACK (OnvifInfoPanel__device_changed_cb), info);
-            break;
-        default:
-            G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-            break;
-    }
+OnvifInfoPanel__class_init (OnvifInfoPanelClass * klass){
+    OnvifDetailsPanelClass * detailsp_klass = ONVIFMGR_DETAILSPANEL_CLASS(klass);
+    detailsp_klass->getdata = OnvifInfoPanel__getdata;
+    detailsp_klass->updateui = OnvifInfoPanel__updateui;
+    detailsp_klass->clearui = OnvifInfoPanel_clearui;
+    detailsp_klass->createui = OnvifInfoPanel__createui;
 }
 
 static void
-OnvifInfoPanel__get_property (GObject    *object,
-                          guint       prop_id,
-                          GValue     *value,
-                          GParamSpec *pspec)
-{
-    OnvifInfoPanel *info = ONVIFMGR_INFOPANEL (object);
-    OnvifInfoPanelPrivate *priv = OnvifInfoPanel__get_instance_private (info);
-    switch (prop_id){
-        case PROP_APP:
-            g_value_set_object (value, priv->app);
-            break;
-        default:
-            G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-            break;
-    }
-}
+OnvifInfoPanel__init (OnvifInfoPanel * self){
 
-static void
-OnvifInfoPanel__class_init (OnvifInfoPanelClass * klass)
-{
-    GObjectClass *object_class = G_OBJECT_CLASS (klass);
-
-    object_class->set_property = OnvifInfoPanel__set_property;
-    object_class->get_property = OnvifInfoPanel__get_property;
-
-    obj_properties[PROP_APP] =
-        g_param_spec_object ("app",
-                            "OnvifApp",
-                            "Pointer to OnvifApp parent.",
-                            ONVIFMGR_TYPE_APP  /* default value */,
-                            G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE);
-
-    GType params[1];
-    params[0] = ONVIFMGR_TYPE_DEVICEROW | G_SIGNAL_TYPE_STATIC_SCOPE;
-    signals[STARTED] =
-        g_signal_newv ("started",
-                        G_TYPE_FROM_CLASS (klass),
-                        G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
-                        NULL /* closure */,
-                        NULL /* accumulator */,
-                        NULL /* accumulator data */,
-                        NULL /* C marshaller */,
-                        G_TYPE_NONE /* return_type */,
-                        1     /* n_params */,
-                        params  /* param_types */);
-
-    signals[FINISHED] =
-        g_signal_newv ("finished",
-                        G_TYPE_FROM_CLASS (klass),
-                        G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
-                        NULL /* closure */,
-                        NULL /* accumulator */,
-                        NULL /* accumulator data */,
-                        NULL /* C marshaller */,
-                        G_TYPE_NONE /* return_type */,
-                        1     /* n_params */,
-                        params  /* param_types */);
-                        
-    g_object_class_install_properties (object_class,
-                                        N_PROPERTIES,
-                                        obj_properties);
-}
-
-static void
-OnvifInfoPanel__init (OnvifInfoPanel * self)
-{
-    OnvifInfoPanelPrivate *priv = OnvifInfoPanel__get_instance_private (self);
-    priv->app = NULL;
-    priv->device = NULL;
-    OnvifInfoPanel__create_ui(self);
-
-    g_signal_connect (self, "map", G_CALLBACK (OnvifInfoPanel__map_event_cb), self);
 }
 
 OnvifInfoPanel * OnvifInfoPanel__new(OnvifApp * app){

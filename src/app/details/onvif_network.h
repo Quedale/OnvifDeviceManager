@@ -2,23 +2,19 @@
 #define ONVIF_NETWORK_H_
 
 #include <gtk/gtk.h>
-#include "../onvif_app.h"
-#include "../omgr_device_row.h"
-
+#include "onvif_details_panel.h"
 
 G_BEGIN_DECLS
 
 #define ONVIFMGR_TYPE_NETWORKPANEL OnvifNetworkPanel__get_type()
-G_DECLARE_FINAL_TYPE (OnvifNetworkPanel, OnvifNetworkPanel_, ONVIFMGR, NETWORKPANEL, GtkScrolledWindow)
+G_DECLARE_FINAL_TYPE (OnvifNetworkPanel, OnvifNetworkPanel_, ONVIFMGR, NETWORKPANEL, OnvifDetailsPanel)
 
-struct _OnvifNetworkPanel
-{
+struct _OnvifNetworkPanel {
   GtkScrolledWindow parent_instance;
 };
 
 
-struct _OnvifNetworkPanelClass
-{
+struct _OnvifNetworkPanelClass {
   GtkScrolledWindowClass parent_class;
 };
 

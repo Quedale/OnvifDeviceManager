@@ -6,59 +6,8 @@
 #define DHCP_LABEL "DHCP : "
 #define LOCAL_LABEL "Local : "
 
-enum {
-    STARTED,
-    FINISHED,
-    LAST_SIGNAL
-};
 
-enum {
-  PROP_APP = 1,
-  N_PROPERTIES
-};
-
-typedef struct {
-    OnvifApp * app;
-    OnvifMgrDeviceRow * device;
-
-    QueueEvent * previous_event;
-    gulong event_signal;
-} OnvifNetworkPanelPrivate;
-
-static GParamSpec *obj_properties[N_PROPERTIES] = { NULL, };
-static guint signals[LAST_SIGNAL] = { 0 };
-
-G_DEFINE_TYPE_WITH_PRIVATE(OnvifNetworkPanel, OnvifNetworkPanel_, GTK_TYPE_SCROLLED_WINDOW)
-
-typedef struct {
-    OnvifNetworkPanel * network;
-    OnvifDeviceInterfaces * inet;
-
-    OnvifMgrDeviceRow * device;
-    QueueEvent * qevt; //Keep reference to check iscancelled before rendering result
-} NetworkGUIUpdate;
-
-void OnvifNetworkPanel_update_details(OnvifNetworkPanel * self);
-void OnvifNetworkPanel_clear_details(OnvifNetworkPanel * self);
-
-static void 
-OnvifNetworkPanel__device_changed_cb(OnvifApp * app, OnvifMgrDeviceRow * device, OnvifNetworkPanel * network){
-    OnvifNetworkPanelPrivate *priv = OnvifNetworkPanel__get_instance_private (network);
-    priv->device = device;
-    OnvifNetworkPanel_clear_details(network);
-    if(gtk_widget_get_mapped(GTK_WIDGET(network)) && ONVIFMGR_IS_DEVICEROW(device) && OnvifMgrDeviceRow__is_initialized(device)){
-        OnvifNetworkPanel_update_details(network);
-    }
-}
-
-static void 
-OnvifNetworkPanel__map_event_cb (GtkWidget* self, OnvifNetworkPanel * info){
-    OnvifNetworkPanelPrivate *priv = OnvifNetworkPanel__get_instance_private (info);
-    if(gtk_widget_get_mapped(GTK_WIDGET(info)) && ONVIFMGR_IS_DEVICEROW(priv->device) && OnvifMgrDeviceRow__is_initialized(priv->device)){
-        OnvifNetworkPanel_clear_details(info);
-        OnvifNetworkPanel_update_details(info);
-    }
-}
+G_DEFINE_TYPE(OnvifNetworkPanel, OnvifNetworkPanel_, ONVIFMGR_TYPE_DETAILSPANEL)
 
 static void
 OnvifNetworkPanelPrivate__add_ipaddr(OnvifPrefixedIPAddress ** addrs, int count, char * label, GtkWidget * grid, int * row_index){
@@ -206,203 +155,58 @@ OnvifNetworkPanelPrivate__create_interface_panel(OnvifDeviceInterface * inet){
     return frame;
 }
 
-static gboolean 
-onvif_network_gui_update (void * user_data){
-    NetworkGUIUpdate * update = (NetworkGUIUpdate *) user_data;
+static void 
+OnvifNetworkPanel__updateui (OnvifDetailsPanel * self, OnvifApp * app, OnvifMgrDeviceRow * device, void * user_data){
 
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(update->device) || !OnvifMgrDeviceRow__is_selected(update->device) || QueueEvent__is_cancelled(update->qevt)){
-        goto exit;
-    }
-    
+    OnvifDeviceInterfaces * inets = (OnvifDeviceInterfaces *) user_data;
+
     GtkWidget* vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     gtk_widget_set_hexpand(vbox,FALSE);
 
     GtkWidget* hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_box_pack_start(GTK_BOX(hbox), vbox, FALSE, FALSE, 0);
 
-    gtk_container_add(GTK_CONTAINER(update->network),hbox);
+    gtk_container_add(GTK_CONTAINER(self),hbox);
 
-    for(int a=0;a<OnvifDeviceInterfaces__get_count(update->inet);a++){
-        OnvifDeviceInterface * inet = OnvifDeviceInterfaces__get_interface(update->inet,a);
+    for(int a=0;a<OnvifDeviceInterfaces__get_count(inets);a++){
+        OnvifDeviceInterface * inet = OnvifDeviceInterfaces__get_interface(inets,a);
         gtk_box_pack_start(GTK_BOX(vbox), OnvifNetworkPanelPrivate__create_interface_panel(inet), FALSE, FALSE, 0);
     }
 
-    gtk_widget_show_all(GTK_WIDGET(update->network));
+    gtk_widget_show_all(GTK_WIDGET(self));
 
-    g_signal_emit (update->network, signals[FINISHED], 0, update->device);
-exit:
-    g_object_unref(update->inet);
-    g_object_unref(update->qevt);
-    g_object_unref(update->device);
-    free(update);
-
-    return FALSE;
+    g_object_unref(inets);
 }
 
-static void 
-update_network_event_cancelled_cb(QueueEvent * qevt, QueueEventState state, void * user_data){
-    NetworkGUIUpdate * input = (NetworkGUIUpdate *) user_data;
-    //Do not dispatch on QUEUEEVENT_DISPATCHED.
-    //FINISHED will be invoked at the end of the GUI update
-    if(state == QUEUEEVENT_CANCELLED)
-        gui_signal_emit(input->network, signals[FINISHED], input->device);
-}
-
-static void 
-_update_network_page_cleanup(QueueEvent * qevt, int cancelled, void * user_data){
-    NetworkGUIUpdate * input = (NetworkGUIUpdate *) user_data;
-    g_object_unref(input->device);
-    free(input);
-}
-
-static void 
-_update_network_page(QueueEvent * qevt, void * user_data){
-    NetworkGUIUpdate * input = (NetworkGUIUpdate *) user_data;
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(input->device) || !OnvifMgrDeviceRow__is_selected(input->device) || QueueEvent__is_cancelled(qevt)){
-        return;
-    }
-
-    OnvifDevice * onvif_device = OnvifMgrDeviceRow__get_device(input->device);
+static void * 
+OnvifNetworkPanel__getdata(OnvifDetailsPanel * self, OnvifApp * app, OnvifMgrDeviceRow * device, QueueEvent * qevt){
+    OnvifDevice * onvif_device = OnvifMgrDeviceRow__get_device(device);
     OnvifDeviceService * devserv = OnvifDevice__get_device_service(onvif_device);
+    if(!OnvifMgrDeviceRow__is_selected(device) || QueueEvent__is_cancelled(qevt)){
+        return NULL;
+    }
     OnvifDeviceInterfaces * inet = OnvifDeviceService__getNetworkInterfaces(devserv);
-    if(!OnvifMgrDeviceRow__is_selected(input->device) || QueueEvent__is_cancelled(qevt)){
-        return;
-    }
-
-    NetworkGUIUpdate * gui_update = malloc(sizeof(NetworkGUIUpdate));
-    gui_update->network = input->network;
-    gui_update->qevt = qevt;
-    gui_update->device = input->device;
-    gui_update->inet = inet;
-    g_object_ref(input->device); //Adding reference for gui thread
-    g_object_ref(gui_update->qevt);
-    gdk_threads_add_idle(G_SOURCE_FUNC(onvif_network_gui_update),gui_update);
+    return inet;
 }
 
-void 
-OnvifNetworkPanel_update_details(OnvifNetworkPanel * self){
-    OnvifNetworkPanelPrivate *priv = OnvifNetworkPanel__get_instance_private (self);
-    if(!ONVIFMGR_DEVICEROWROW_HAS_OWNER(priv->device)){
-        return;
-    }
-
-    OnvifDevice * odev = OnvifMgrDeviceRow__get_device(priv->device);
-    if(!OnvifDevice__is_authenticated(odev)){
-        return;
-    }
-
-    NetworkGUIUpdate * input = malloc(sizeof(NetworkGUIUpdate));
-    input->network = self;
-    input->inet = NULL;
-    input->device = priv->device;
-    g_object_ref(input->device); //Referenced cleaned up in _update_network_page_cleanup
-
-    if(priv->previous_event && !QueueEvent__is_finished(priv->previous_event)) {
-        g_signal_handler_disconnect(priv->previous_event,priv->event_signal); //Removing signal to prevent loading from hiding
-        QueueEvent__cancel(priv->previous_event);
-        g_object_unref(priv->previous_event);
-        priv->previous_event = NULL;
-        priv->event_signal = 0;
-    } else if(priv->previous_event){
-        g_object_unref(priv->previous_event);
-    }
-
-    g_signal_emit (self, signals[STARTED], 0, input->device);
-    priv->previous_event = EventQueue__insert_plain(OnvifApp__get_EventQueue(priv->app), input->device, _update_network_page,input, _update_network_page_cleanup);
-    priv->event_signal = g_signal_connect (priv->previous_event, "state-changed", G_CALLBACK (update_network_event_cancelled_cb), input);
-    g_object_ref(priv->previous_event);
-}
-
-void OnvifNetworkPanel_clear_details(OnvifNetworkPanel * self){
+static void 
+OnvifNetworkPanel_clearui(OnvifDetailsPanel * self){
     gtk_container_foreach(GTK_CONTAINER(self),(GtkCallback)gui_widget_destroy, NULL);
 }
 
 static void
-OnvifNetworkPanel__set_property (GObject      *object,
-                          guint         prop_id,
-                          const GValue *value,
-                          GParamSpec   *pspec){
-    OnvifNetworkPanel * info = ONVIFMGR_NETWORKPANEL (object);
-    OnvifNetworkPanelPrivate *priv = OnvifNetworkPanel__get_instance_private (info);
-    switch (prop_id){
-        case PROP_APP:
-            priv->app = ONVIFMGR_APP(g_value_get_object (value));
-            g_signal_connect (priv->app, "device-changed", G_CALLBACK (OnvifNetworkPanel__device_changed_cb), info);
-            break;
-        default:
-            G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-            break;
-    }
-}
-
-static void
-OnvifNetworkPanel__get_property (GObject    *object,
-                          guint       prop_id,
-                          GValue     *value,
-                          GParamSpec *pspec){
-    OnvifNetworkPanel *info = ONVIFMGR_NETWORKPANEL (object);
-    OnvifNetworkPanelPrivate *priv = OnvifNetworkPanel__get_instance_private (info);
-    switch (prop_id){
-        case PROP_APP:
-            g_value_set_object (value, priv->app);
-            break;
-        default:
-            G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-            break;
-    }
-}
-
-static void
 OnvifNetworkPanel__class_init (OnvifNetworkPanelClass * klass){
-    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    OnvifDetailsPanelClass * detailsp_klass = ONVIFMGR_DETAILSPANEL_CLASS(klass);
+    detailsp_klass->getdata = OnvifNetworkPanel__getdata;
+    detailsp_klass->clearui = OnvifNetworkPanel_clearui;
+    detailsp_klass->createui = NULL; //Dynamic UI
+    detailsp_klass->updateui = OnvifNetworkPanel__updateui; 
 
-    object_class->set_property = OnvifNetworkPanel__set_property;
-    object_class->get_property = OnvifNetworkPanel__get_property;
-
-    obj_properties[PROP_APP] =
-        g_param_spec_object ("app",
-                            "OnvifApp",
-                            "Pointer to OnvifApp parent.",
-                            ONVIFMGR_TYPE_APP  /* default value */,
-                            G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE);
-    GType params[1];
-    params[0] = ONVIFMGR_TYPE_DEVICEROW | G_SIGNAL_TYPE_STATIC_SCOPE;
-    signals[STARTED] =
-        g_signal_newv ("started",
-                        G_TYPE_FROM_CLASS (klass),
-                        G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
-                        NULL /* closure */,
-                        NULL /* accumulator */,
-                        NULL /* accumulator data */,
-                        NULL /* C marshaller */,
-                        G_TYPE_NONE /* return_type */,
-                        1     /* n_params */,
-                        params  /* param_types */);
-
-    signals[FINISHED] =
-        g_signal_newv ("finished",
-                        G_TYPE_FROM_CLASS (klass),
-                        G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
-                        NULL /* closure */,
-                        NULL /* accumulator */,
-                        NULL /* accumulator data */,
-                        NULL /* C marshaller */,
-                        G_TYPE_NONE /* return_type */,
-                        1     /* n_params */,
-                        params  /* param_types */);
-                        
-    g_object_class_install_properties (object_class,
-                                        N_PROPERTIES,
-                                        obj_properties);
 }
 
 static void
 OnvifNetworkPanel__init (OnvifNetworkPanel * self){
-    OnvifNetworkPanelPrivate *priv = OnvifNetworkPanel__get_instance_private (self);
-    priv->app = NULL;
-    priv->device = NULL;
 
-    g_signal_connect (self, "map", G_CALLBACK (OnvifNetworkPanel__map_event_cb), self);
 }
 
 OnvifNetworkPanel * 

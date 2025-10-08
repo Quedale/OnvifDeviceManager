@@ -1,6 +1,7 @@
 #include "onvif_details.h"
 #include "onvif_info.h"
 #include "onvif_network.h"
+#include "onvif_timedate.h"
 #include "clogger.h"
 
 typedef struct _OnvifDetails {
@@ -29,7 +30,7 @@ void OnvifDetails__show_loading_cb(GtkWidget * widget, OnvifMgrDeviceRow * devic
     details->selected_device = device;
 }
 
-void OnvifDetails__create_ui(OnvifDetails *self, OnvifInfoPanel * info, OnvifNetworkPanel * network){
+void OnvifDetails__create_ui(OnvifDetails *self, OnvifInfoPanel * info, OnvifNetworkPanel * network, OnvifTimeDatePanel * timedate){
     GtkWidget *label;
 
     self->details_notebook = gtk_notebook_new ();
@@ -42,13 +43,18 @@ void OnvifDetails__create_ui(OnvifDetails *self, OnvifInfoPanel * info, OnvifNet
     label = gtk_label_new ("Networking");
     gtk_notebook_append_page (GTK_NOTEBOOK (self->details_notebook), GTK_WIDGET(network), label);
 
+    label = gtk_label_new ("Time/Date");
+    gtk_notebook_append_page (GTK_NOTEBOOK (self->details_notebook), GTK_WIDGET(timedate), label);
+
 }
 
 OnvifDetails * OnvifDetails__create(OnvifApp * app){
     OnvifDetails *details  =  malloc(sizeof(OnvifDetails));
     OnvifInfoPanel * info = OnvifInfoPanel__new(app);
     OnvifNetworkPanel * network = OnvifNetworkPanel__new(app);
-    OnvifDetails__create_ui(details,info,network);
+    OnvifTimeDatePanel * timedate = OnvifTimeDatePanel__new(app);
+
+    OnvifDetails__create_ui(details,info,network,timedate);
 
     g_signal_connect (info, "finished", G_CALLBACK (OnvifDetails__hide_loading_cb), details);
     g_signal_connect (info, "started", G_CALLBACK (OnvifDetails__show_loading_cb), details);
@@ -56,6 +62,8 @@ OnvifDetails * OnvifDetails__create(OnvifApp * app){
     g_signal_connect (network, "finished", G_CALLBACK (OnvifDetails__hide_loading_cb), details);
     g_signal_connect (network, "started", G_CALLBACK (OnvifDetails__show_loading_cb), details);
 
+    g_signal_connect (timedate, "finished", G_CALLBACK (OnvifDetails__hide_loading_cb), details);
+    g_signal_connect (timedate, "started", G_CALLBACK (OnvifDetails__show_loading_cb), details);
     return details;
 }
 
