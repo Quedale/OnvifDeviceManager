@@ -18,6 +18,11 @@ extern char _binary_tower_png_size[];
 extern char _binary_tower_png_start[];
 extern char _binary_tower_png_end[];
 
+extern char _binary_add_png_size[];
+extern char _binary_add_png_start[];
+extern char _binary_add_png_end[];
+
+
 enum {
     DEVICE_CHANGED,
     LAST_SIGNAL
@@ -784,14 +789,31 @@ GtkWidget * OnvifApp__create_browser_ui(OnvifApp * app){
     GtkWidget * add_btn = gtk_button_new ();
     gui_widget_make_square(add_btn);
     label = gtk_label_new("");
-    // gtk_label_set_markup (GTK_LABEL (label), "&#x2795;"); //Heavy
-    gtk_label_set_markup (GTK_LABEL (label), "&#xFF0B;"); //Full width
     gtk_container_add (GTK_CONTAINER (add_btn), label);
     gui_widget_set_css(add_btn, btn_css);
 
     gtk_box_pack_start (GTK_BOX(hbox),add_btn,FALSE,FALSE,0);
 
     g_signal_connect (add_btn, "clicked", G_CALLBACK (OnvifApp__add_btn_cb), app);
+
+    image = GtkStyledImage__new((unsigned char *)_binary_add_png_start, _binary_add_png_end - _binary_add_png_start, 15, 15, error);
+    if(image){
+        gtk_widget_set_margin_bottom(image,5);
+        gtk_widget_set_margin_top(image,5);
+        gtk_widget_set_margin_start(image,5);
+        gtk_widget_set_margin_end(image,5);
+        gtk_button_set_image(GTK_BUTTON(add_btn), image);
+    } else {
+        if(error && error->message){
+            C_ERROR("Error creating tower icon : %s",error->message);
+        } else {
+            C_ERROR("Error creating tower icon : [null]");
+        }
+        label = gtk_label_new("");
+        // gtk_label_set_markup (GTK_LABEL (label), "&#x2795;"); //Heavy
+        gtk_label_set_markup (GTK_LABEL (label), "&#xFF0B;"); //Full width safe icon
+        gtk_container_add (GTK_CONTAINER (add_btn), label);
+    }
 
     /* --- Create a list item from the data element --- */
     widget = gtk_scrolled_window_new (NULL, NULL);

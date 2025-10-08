@@ -71,7 +71,7 @@ onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c \
 					$(top_srcdir)/src/queue/queue_event.c \
 					$(top_srcdir)/src/queue/queue_thread.c
 onvifmgr_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0 libntlm cutils libssl libcrypto onvifsoap` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
-onvifmgr_LDADD = locked-icon.o microphone.o warning.o trash.o tower.o
+onvifmgr_LDADD = locked-icon.o microphone.o warning.o trash.o tower.o add.o
 
 queuedemo_SOURCES = $(top_srcdir)/src/demo/queue-demo.c $(top_srcdir)/src/queue/event_queue.c $(top_srcdir)/src/queue/queue_event.c $(top_srcdir)/src/queue/queue_thread.c
 queuedemo_LDFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs cutils glib-2.0 gobject-2.0`
@@ -217,3 +217,7 @@ trash.o$(EXEEXT):
 save.o$(EXEEXT):
 	@echo "  CCLD     images/save.o"
 	@cd $(top_srcdir)/images && ld -r -b binary -o $(abs_builddir)/save.o save.png && cd ..
+
+add.o$(EXEEXT):
+	@echo "  CCLD     images/add.o"
+	@cd $(top_srcdir)/images && ld -r -b binary -o $(abs_builddir)/add.o add.png && cd ..
