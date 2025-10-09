@@ -91,6 +91,7 @@ AC_SUBST(GST_PLUGIN_PACKAGES,m4_normalize('
     gstaudioconvert
     gstapp
     gstopus
+    gstgtkwayland
 '))
 
 #Function to check gstreamer built under subproject. (.pc file exists for each plugins)
@@ -146,6 +147,7 @@ AC_DEFUN([CHECK_GSTREAMER_LIBS],[
     AC_SEARCH_LIBS([gst_plugin_volume_register], [gstvolume],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}volume "])
     AC_SEARCH_LIBS([gst_plugin_ximagesink_register], [gstximagesink],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}ximagesink "])
     AC_SEARCH_LIBS([gst_plugin_opus_register], [gstopus],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}opus "])
+    AC_SEARCH_LIBS([gst_plugin_gtkwayland_register], [gstwaylandsink],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}wayland "])
 
     AS_IF([test -z "$GST_PLUGIN_MISSING"],[],[AC_MSG_RESULT([WARNING: Gstreamer system library missing : $GST_PLUGIN_MISSING])])
     AC_SUBST([LDFLAGS], [$og_ldflags]) #Restore ldflags

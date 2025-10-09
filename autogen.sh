@@ -1225,6 +1225,8 @@ gst_good_plugins=(
 gst_bad_plugins=(
     # "x11;gstx11"
     # "gl;gstgl"
+    "wayland;gstwaylandsink" #This is mandatory otherwise gstgtkwayland will be skipped
+    "gtk3;gstgtkwayland"
     "interlace;gstinterlace"
     "openh264;" #Openh264 is an optional package
     "fdkaac;gstfdkaac"

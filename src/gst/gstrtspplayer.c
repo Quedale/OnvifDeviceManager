@@ -298,6 +298,32 @@ void GstRtspPlayer__caps_changed_cb (GstElement * overlay, GstCaps * caps, gint 
     GstRtspPlayerPrivate__apply_view_mode(priv);
 }
 
+static void 
+GstRtspPlayerPrivate__create_drm_sink(GstRtspPlayerPrivate * priv, char * backend){
+    if(!strcmp(backend,"wayland")){
+        C_DEBUG("Using Wayland Backend");
+        priv->sink = gst_element_factory_make ("gtkwaylandsink", "gtkwaylandsink");
+        priv->snapsink = priv->sink;
+        if (priv->snapsink != NULL && priv->sink != NULL) {
+        
+        }
+    } else if(!strcmp(backend,"x11")){
+        C_DEBUG("Using X11 Backend");
+        priv->sink = gst_element_factory_make ("glsinkbin", "glsinkbin");
+        priv->snapsink = gst_element_factory_make ("gtkglsink", "gtkglsink");
+        if (priv->snapsink != NULL && priv->sink != NULL) {
+            g_object_set (priv->sink, "sink", priv->snapsink, NULL);
+            //Temporarely disabled for performance
+            g_object_set (G_OBJECT (priv->snapsink), "enable-last-sample", FALSE, NULL);
+
+            // gst_base_sink_set_sync(GST_BASE_SINK_CAST(priv->snapsink),FALSE);
+            gst_base_sink_set_qos_enabled(GST_BASE_SINK_CAST(priv->snapsink),FALSE);
+        }
+    } else {
+        C_WARN("Unknown Backend : %s",backend);
+    }
+}
+
 static GstElement*
 GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
     GstElement *vdecoder, *videoconvert, *overlay_comp, *video_bin;
@@ -315,34 +341,54 @@ GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
     }
     videoconvert = gst_element_factory_make ("videoconvert", "videoconverter");
     overlay_comp = gst_element_factory_make ("overlaycomposition", NULL);
-    priv->sink = gst_element_factory_make ("glsinkbin", "glsinkbin");
-    priv->snapsink = gst_element_factory_make ("gtkglsink", "gtkglsink");
-    if (priv->snapsink != NULL && priv->sink != NULL) {
-        C_INFO ("Successfully created GTK GL Sink\n");
-        g_object_set (priv->sink, "sink", priv->snapsink, NULL);
-        g_object_get (priv->snapsink, "widget", &priv->canvas, NULL);
-        //Temporarely disabled for performance
-        g_object_set (G_OBJECT (priv->snapsink), "enable-last-sample", FALSE, NULL);
 
-        // gst_base_sink_set_sync(GST_BASE_SINK_CAST(priv->snapsink),FALSE);
-        gst_base_sink_set_qos_enabled(GST_BASE_SINK_CAST(priv->snapsink),FALSE);
+    //Attempt to create DRM sink based on GDK_BACKEND
+    char *backend = NULL;
+    if (( backend =getenv( "GDK_BACKEND" )) != NULL){
+        GstRtspPlayerPrivate__create_drm_sink(priv, backend);
     } else {
+        C_DEBUG("GDK_BACKEND not set.");
+    }
+
+    //Fallback DRM sink on XDG_SESSION_TYPE
+    if (!priv->sink && ( backend =getenv( "XDG_SESSION_TYPE" )) != NULL) {
+        GstRtspPlayerPrivate__create_drm_sink(priv, backend);
+    } else if (!priv->sink && backend == NULL){
+        C_DEBUG("XDG_SESSION_TYPE not set.");
+    }
+
+    //Fallback sink on software renderer.
+    if (!priv->sink) {
         C_WARN ("Could not create gtkglsink, falling back to gtksink.\n");
         priv->sink = gst_element_factory_make ("gtksink", "gtksink");
         if(!priv->sink){
-            C_FATAL("Failed to create GTK Sink");
+            C_FATAL("Failed to create GtkSink");
             //TODO Display fatal error on GUI
             exit(1);
         }
         priv->snapsink = priv->sink;
-        g_object_get (priv->sink, "widget", &priv->canvas, NULL);
         //Temporarely disabled for performance
         g_object_set (G_OBJECT (priv->snapsink), "enable-last-sample", FALSE, NULL);
 
         gst_base_sink_set_sync(GST_BASE_SINK_CAST(priv->sink),FALSE);
         gst_base_sink_set_qos_enabled(GST_BASE_SINK_CAST(priv->sink),FALSE);
     }
-    gtk_widget_set_no_show_all(priv->canvas, TRUE);
+
+    if(!priv->snapsink){
+        C_FATAL("Failed to create video widget");
+        //TODO Display fatal error on GUI
+        exit(1);
+    }
+
+    //Extract canvas widget
+    g_object_get (priv->snapsink, "widget", &priv->canvas, NULL);
+
+    if(!GTK_IS_WIDGET(priv->canvas)){
+        C_FATAL("Failed to create waylandsink widget");
+        //TODO Display fatal error on GUI
+        exit(1);
+    }
+
     gtk_container_add (GTK_CONTAINER (priv->canvas_handle), GTK_WIDGET(priv->canvas));
 
     if (!video_bin ||
