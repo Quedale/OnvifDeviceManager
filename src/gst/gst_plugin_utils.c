@@ -215,7 +215,8 @@ GST_PLUGIN_STATIC_DECLARE(pulseaudio);
 GST_PLUGIN_STATIC_DECLARE(de265);
 // extern void g_io_environmentproxy_load (gpointer data);
 // extern void g_io_openssl_load (gpointer data);
-GST_PLUGIN_STATIC_DECLARE(gtkwayland);
+// GST_PLUGIN_STATIC_DECLARE(gtkwayland);
+// GST_PLUGIN_STATIC_DECLARE(waylandsink);
 
 #endif
 void
@@ -432,7 +433,8 @@ gst_plugin_init_static (void)
     // GST_PLUGIN_STATIC_REGISTER(rtspclientsink);
     // GST_PLUGIN_STATIC_REGISTER(nle); gstnle
     // GST_PLUGIN_STATIC_REGISTER(ges); gstges
-    GST_PLUGIN_STATIC_REGISTER(gtkwayland);
+    // GST_PLUGIN_STATIC_REGISTER(gtkwayland);
+    // GST_PLUGIN_STATIC_REGISTER(waylandsink);
     // g_io_environmentproxy_load (NULL);
     // g_io_openssl_load (NULL);
 #endif

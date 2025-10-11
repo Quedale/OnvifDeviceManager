@@ -1163,6 +1163,28 @@ fi
 
 ################################################################
 # 
+#    Build wayland dependencies
+#       This is a soft dependency to support GstGlDisplay under wayland
+#       
+################################################################
+export PATH="$SUBPROJECT_DIR/wayland/dist/bin":$PATH
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/wayland/dist/lib/pkgconfig":$PKG_CONFIG_PATH
+if [ ! -z "$(pkgCheck project="wayland-client" name=wayland-client minver=1.24.0)" ] ||
+    [ ! -z "$(pkgCheck project="wayland-cursor" name=wayland-cursor minver=1.24.0)" ] ||
+    [ ! -z "$(pkgCheck project="wayland-scanner" name=wayland-scanner minver=1.24.0)" ] ||
+    [ ! -z "$(pkgCheck project="wayland-egl" name=wayland-egl minver=1.24.0)" ]; then
+  pullOrClone project="wayland" path=https://gitlab.freedesktop.org/wayland/wayland.git tag=1.24.0
+  buildMesonProject project="wayland" srcdir="wayland" prefix="$SUBPROJECT_DIR/wayland/dist" mesonargs="-Dtests=false -Ddocumentation=false"
+fi
+
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/wayland-protocols/dist/share/pkgconfig":$PKG_CONFIG_PATH
+if [ ! -z "$(pkgCheck project="wayland-protocols" name=wayland-protocols minver=1.45)" ]; then
+  pullOrClone project="wayland-protocols" path=https://gitlab.freedesktop.org/wayland/wayland-protocols.git tag=1.45
+  buildMesonProject project="wayland-protocols" srcdir="wayland-protocols" prefix="$SUBPROJECT_DIR/wayland-protocols/dist" mesonargs=""
+fi
+
+################################################################
+# 
 #    Build Gstreamer dependency
 #       sudo apt install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 ################################################################
@@ -1225,8 +1247,9 @@ gst_good_plugins=(
 gst_bad_plugins=(
     # "x11;gstx11"
     # "gl;gstgl"
-    "wayland;gstwaylandsink" #This is mandatory otherwise gstgtkwayland will be skipped
-    "gtk3;gstgtkwayland"
+    # "kms;gstkms"
+    # "wayland;gstwaylandsink" #This is mandatory otherwise gstgtkwayland will be skipped
+    # "gtk3;gstgtkwayland"
     "interlace;gstinterlace"
     "openh264;" #Openh264 is an optional package
     "fdkaac;gstfdkaac"
@@ -1645,6 +1668,9 @@ autoconf 2>&1 | printlines project="onvifmgr" task="autoconf"
 [ "${PIPESTATUS[0]}" -ne 0 ] && printError project="onvifmgr" task="autoconf" msg="Failed to bootstrap OnvifDeviceManager" && exit 1
 automake --add-missing --copy 2>&1 | printlines project="onvifmgr" task="automake"
 [ "${PIPESTATUS[0]}" -ne 0 ] && printError project="onvifmgr" task="automake" msg="Failed to bootstrap OnvifDeviceManager" && exit 1
+#Running autoreconf otherwise calling make will reconfigure the project
+autoreconf 2>&1 | printlines project="onvifmgr" task="autoreconf"
+[ "${PIPESTATUS[0]}" -ne 0 ] && printError project="onvifmgr" task="autoreconf" msg="Failed to bootstrap OnvifDeviceManager" && exit 1
 
 configArgs=$@
 printlines project="onvifmgr" task="build" msg="configure $configArgs"

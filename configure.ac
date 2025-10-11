@@ -46,6 +46,7 @@ AC_SUBST(PKG_FULL_PATH, [$PKG_FFMPEG_PATH:$PKG_PULSE_PATH:$PKG_ALSA_PATH:$PKG_GU
 AC_SUBST(GST_LIBS,m4_normalize('
     gstreamer-1.0
     gstreamer-video-1.0
+    gstreamer-wayland-1.0
     alsa
 '))
 
@@ -91,7 +92,6 @@ AC_SUBST(GST_PLUGIN_PACKAGES,m4_normalize('
     gstaudioconvert
     gstapp
     gstopus
-    gstgtkwayland
 '))
 
 #Function to check gstreamer built under subproject. (.pc file exists for each plugins)
