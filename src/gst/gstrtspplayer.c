@@ -5,6 +5,7 @@
 #include "portable_thread.h"
 #include "gst/rtsp/gstrtsptransport.h"
 #include "url_parser.h"
+#include "../app/gui_utils.h"
 
 typedef enum {
     RTSP_FALLBACK_NONE,
@@ -1353,11 +1354,6 @@ GstRtspPlayer__dispose (GObject *gobject)
     RtspBackchannel__destroy(priv->backchannel);
     
     P_MUTEX_CLEANUP(priv->player_lock);
-    //A bug seems to have been introduced where the widget is destroyed while cleaning up gtkglsink and not removed from gtk hierarchy.
-    //Removing the widget before destroying gtkglsink seems to be a viable retrocompatible solution without causing leaks in other version
-    gtk_container_remove (GTK_CONTAINER (priv->canvas_handle), GTK_WIDGET(priv->canvas));
-    g_object_unref(priv->canvas);
-    
     if(priv->video_bin){
         g_object_unref(priv->video_bin);
         priv->video_bin = NULL;
@@ -1368,6 +1364,8 @@ GstRtspPlayer__dispose (GObject *gobject)
         priv->audio_bin = NULL;
     }
 
+    safely_destroy_widget(priv->canvas);
+    
     G_OBJECT_CLASS (GstRtspPlayer__parent_class)->dispose (gobject);
 }
 
