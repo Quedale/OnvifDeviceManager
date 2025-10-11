@@ -525,8 +525,9 @@ static void OnvifApp__quit_cb (GtkButton *button, OnvifApp *data) {
 }
 
 /* This function is called when the main window is closed */
-static void OnvifApp__window_delete_event_cb (GtkWidget *widget, GdkEvent *event, OnvifApp *data) {
+static gboolean OnvifApp__window_delete_event_cb (GtkWidget *widget, GdkEvent *event, OnvifApp *data) {
     onvif_app_shutdown(data);
+    return TRUE;
 }
 
 void OnvifApp__btn_scan_cb (GtkWidget *widget, OnvifApp * app) {
