@@ -890,7 +890,7 @@ void OnvifApp__create_ui (OnvifApp * app) {
     gtk_box_pack_start(GTK_BOX(hbox),priv->player_loading_handle,FALSE,FALSE,0);
     gtk_widget_show_all(hbox);
 
-    widget = OnvifNVT__create_ui(priv->player);
+    widget = OnvifNVT__new(priv->player);
     gtk_notebook_append_page (GTK_NOTEBOOK (main_notebook), widget, hbox);
 
     label = gtk_label_new ("Details");

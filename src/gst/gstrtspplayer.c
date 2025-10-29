@@ -6,6 +6,8 @@
 #include "gst/rtsp/gstrtsptransport.h"
 #include "url_parser.h"
 #include "../app/gui_utils.h"
+#include "gstrtspstream.h"
+#include <gst/rtp/gstrtpbasedepayload.h>
 
 typedef enum {
     RTSP_FALLBACK_NONE,
@@ -35,7 +37,16 @@ struct _GstRtspPlayerSession {
     char * host_fallback;
     int enable_backchannel;
     void * user_data;
+
+    GstTagList *global_tags;
+    GList *streams;
 };
+
+
+typedef struct {
+    GstRtspPlayer * player;
+    GstElement * decoder;
+} DecoderPadData;
 
 typedef struct {
     GstRtspPlayer * owner;
@@ -46,7 +57,9 @@ typedef struct {
 
     //Reusable bins containing encoder and sink
     GstElement * video_bin;
+    DecoderPadData * video_decoder_data;
     GstElement * audio_bin;
+    DecoderPadData * audio_decoder_data;
     GstElement *sink;  /* Video Sink */
     GstElement *snapsink;
     GstCaps * sinkcaps; /* reference to extract native stream dimension */
@@ -67,6 +80,12 @@ typedef struct {
 } GstRtspPlayerPrivate;
 
 typedef struct {
+    GObject * object;
+    guint signalid;
+    GstRtspStream * stream;
+} GstSignalData;
+
+typedef struct {
     GstRtspPlayer * player;
     guint signalid;
     va_list args;
@@ -76,7 +95,7 @@ typedef struct {
     P_MUTEX_TYPE lock;
 } GstSignalWaitData;
 
-struct GstInitData{
+struct GstInitData {
     GMainContext ** context;
     GMainLoop ** loop;
     int ready;
@@ -87,6 +106,7 @@ struct GstInitData{
 enum {
   STOPPED,
   STARTED,
+  NEW_STREAM,
   RETRY,
   ERROR,
   LAST_SIGNAL
@@ -99,14 +119,32 @@ G_DEFINE_TYPE_WITH_PRIVATE(GstRtspPlayer, GstRtspPlayer_, G_TYPE_OBJECT)
 static gboolean 
 GstRtspPlayerSession__message_handler (GstBus * bus, GstMessage * message, GstRtspPlayerSession * session);
 
-static gboolean _player_signal_and_wait(GstSignalWaitData * data){
+static gboolean 
+_GstRtspPlayer_signal_emit(GstSignalData * data){
+    g_signal_emit (data->object, data->signalid, 0, data->stream);
+    g_object_unref(data->object);
+    free(data);
+    return FALSE;
+}
+
+static void 
+GstRtspPlayer__idle_signal_emit(GstRtspPlayer * self, guint signalid, GstRtspStream * stream){
+    GstSignalData * data = malloc(sizeof(GstSignalData));
+    data->object = G_OBJECT(self);
+    data->signalid = signalid;
+    data->stream = stream;
+    g_object_ref(self);
+    g_main_context_invoke(g_main_context_default(),G_SOURCE_FUNC(_GstRtspPlayer_signal_emit),data);
+}
+
+static gboolean _GstRtspPlayer__signal_and_wait(GstSignalWaitData * data){
     g_signal_emit_valist (data->player, data->signalid, 0, data->args);
     data->done = 1;
     P_COND_BROADCAST(data->cond);
     return FALSE;
 }
 
-void player_signal_and_wait(GstRtspPlayer * self, guint signalid, ...){
+void GstRtspPlayer__idle_signal_and_wait(GstRtspPlayer * self, guint signalid, ...){
     GstSignalWaitData data;
     va_start(data.args, signalid);
     data.done = 0;
@@ -114,7 +152,7 @@ void player_signal_and_wait(GstRtspPlayer * self, guint signalid, ...){
     data.signalid = signalid;
     P_COND_SETUP(data.cond);
     P_MUTEX_SETUP(data.lock);
-    g_main_context_invoke(g_main_context_default(),G_SOURCE_FUNC(_player_signal_and_wait),&data);
+    g_main_context_invoke(g_main_context_default(),G_SOURCE_FUNC(_GstRtspPlayer__signal_and_wait),&data);
     if(!data.done) { P_COND_WAIT(data.cond, data.lock); }
     P_COND_CLEANUP(data.cond);
     P_MUTEX_CLEANUP(data.lock);
@@ -132,6 +170,9 @@ static GstRtspPlayerSession * GstRtspPlayerSession__create(GstRtspPlayer * playe
     session->location = malloc(strlen(url)+1);
     strcpy(session->location,url);
     session->valid_location = 0;
+
+    session->global_tags = NULL;
+    session->streams = NULL;
 
     //Update credentials
     if(!user){
@@ -210,6 +251,16 @@ static void GstRtspPlayerSession__destroy(GstRtspPlayerSession * session){
             free(session->location_set);
             session->location_set = NULL;
         }
+
+        if (session->global_tags) {
+            gst_tag_list_unref (session->global_tags);
+            session->global_tags = NULL;
+        }
+
+        if(session->streams){
+            g_list_free_full(session->streams,g_object_unref);
+            session->streams = NULL;
+        }
         free(session);
     }
 }
@@ -222,37 +273,102 @@ void * GstRtspPlayerSession__get_user_data(GstRtspPlayerSession * session){
 }
 
 GstRtspPlayerSession *
-GstRtspPlayer__get_session (GstRtspPlayer * self)
-{
+GstRtspPlayer__get_session (GstRtspPlayer * self){
     g_return_val_if_fail (self != NULL, NULL);
     g_return_val_if_fail (GST_IS_RTSPPLAYER (self), NULL);
     GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
     return priv->session;
 }
 
+/*
+    Clone of gst_bin_get_by_interface,
+*/
+static gint
+compare_type (const GValue * velement, GType * iface){
+    GstElement *element = g_value_get_object (velement);
+    GType interface_type = *iface;
+    gint ret;
+
+    if (G_TYPE_CHECK_INSTANCE_TYPE (element, interface_type)) {
+        ret = 0;
+    } else {
+        ret = 1;
+    }
+    return ret;
+}
+
+/*
+    Pretty much a clone of gst_bin_get_by_interface,
+    excpept it doesn't check for interface type
+*/
+static GstElement *
+gst_bin_get_by_type (GstBin * bin, GType iface){
+    GstIterator *children;
+    GValue result = { 0, };
+    GstElement *element;
+    gboolean found;
+
+    g_return_val_if_fail (GST_IS_BIN (bin), NULL);
+
+    children = gst_bin_iterate_recurse (bin);
+    found = gst_iterator_find_custom (children, (GCompareFunc) compare_type, &result, &iface);
+    gst_iterator_free (children);
+
+    if (found) {
+        element = g_value_dup_object (&result);
+        g_value_unset (&result);
+    } else {
+        element = NULL;
+    }
+
+    return element;
+}
+
+
 /* Dynamically link */
 static void
-on_decoder_pad_added (GstElement *element, GstPad *new_pad, gpointer data){
+on_decoder_pad_added (GstElement *element, GstPad *new_pad, DecoderPadData * data){
     GstPad *sinkpad;
     GstPadLinkReturn ret;
-    GstElement *decoder = (GstElement *) data;
     GstCaps *caps;
+
+    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (data->player);
 
     /* Debug: Print the caps of the new pad */
     caps = gst_pad_get_current_caps(new_pad);
-    if (caps) {
-        gchar *caps_str = gst_caps_to_string(caps);
-        C_DEBUG("Decoder pad added with caps: %s", caps_str);
-        g_free(caps_str);
-        gst_caps_unref(caps);
-    }
+    gchar *caps_str = gst_caps_to_string(caps);
+    C_DEBUG("Decoder pad added with caps: %s", caps_str);
+    g_free(caps_str);
 
     /* We can now link this pad with the rtsp-decoder sink pad */
-    sinkpad = gst_element_get_static_pad (decoder, "sink");
+    sinkpad = gst_element_get_static_pad (data->decoder, "sink");
     ret = gst_pad_link (new_pad, sinkpad);
 
-    if (GST_PAD_LINK_FAILED (ret)) {
-        C_ERROR("failed to link dynamically '%s' to '%s'",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(decoder));
+    if (GST_PAD_LINK_SUCCESSFUL (ret)) {
+        /* Adding Depayed and Decoded caps to Stream */
+        GstRtspStream * stream = GstRtspStreams__get_stream(priv->session->streams,GST_OBJECT_CAST(element));
+        if(stream){
+            GstRtspStream__set_decoder_caps(stream,caps);
+
+            GstElement * depayloader = gst_bin_get_by_type(GST_BIN(element),GST_TYPE_RTP_BASE_DEPAYLOAD);
+            if(depayloader){
+                GstPad *srcpad = gst_element_get_static_pad(depayloader, "src");
+                if (srcpad) {
+                    GstRtspStream__set_depayed_caps(stream,gst_pad_get_current_caps(srcpad));
+                    gst_object_unref(srcpad);
+                } else {
+                    C_ERROR("Depayloader source pad not found.");
+                }
+            } else {
+                C_ERROR("Depayloader not found.");
+            }
+
+            GstRtspPlayer__idle_signal_emit(priv->session->player, signals[NEW_STREAM], stream);
+        } else {
+            C_ERROR("Failed to retrieve RTP Stream");
+        }
+    } else {
+        C_ERROR("failed to link dynamically '%s' to '%s'",GST_ELEMENT_NAME(element),GST_ELEMENT_NAME(data->decoder));
     }
 
     gst_object_unref (sinkpad);
@@ -299,21 +415,19 @@ void GstRtspPlayer__caps_changed_cb (GstElement * overlay, GstCaps * caps, gint 
     GstRtspPlayerPrivate__apply_view_mode(priv);
 }
 
-static GstElement*
-GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
-    GstElement *vdecoder, *videoconvert, *overlay_comp, *video_bin;
+static void
+GstRtspPlayer__create_video_pad(GstRtspPlayer * self){
+    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
+    GstElement *vdecoder, *videoconvert, *overlay_comp;
     GstPad *pad, *ghostpad;
 
-    video_bin = gst_bin_new("video_bin");
+    priv->video_bin = gst_bin_new("video_bin");
     vdecoder = gst_element_factory_make ("decodebin", "video_decodebin");
     if (!vdecoder) {
         C_WARN("decodebin not available, trying decodebin3");
         vdecoder = gst_element_factory_make ("decodebin3", "video_decodebin");
     }
-    if (!vdecoder) {
-        C_WARN("Neither decodebin nor decodebin3 available, trying uridecodebin");
-        vdecoder = gst_element_factory_make ("uridecodebin", "video_decodebin");
-    }
+    //TODO Fallback into manual decoding bin if vdecoder failed
     videoconvert = gst_element_factory_make ("videoconvert", "videoconverter");
     overlay_comp = gst_element_factory_make ("overlaycomposition", NULL);
 
@@ -348,6 +462,13 @@ GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
 
     //Extract canvas widget
     g_object_get (priv->snapsink, "widget", &priv->canvas, NULL);
+
+    /*Disable motion since it's not needed and there's a bug in gtkgstbasewidget.c 
+     gtk_gst_base_widget_display_size_to_stream_size - where "result" is uninitialised */
+    GdkEventMask mask = gtk_widget_get_events(priv->canvas);
+    mask ^= GDK_POINTER_MOTION_MASK;
+    gtk_widget_set_events(priv->canvas, mask);
+
     // TODO Add Setting page allowing to configure Gstreamer
     // gst_base_sink_set_qos_enabled(GST_BASE_SINK_CAST(priv->snapsink),FALSE);
     // gst_base_sink_set_sync(GST_BASE_SINK_CAST(priv->snapsink),TRUE);
@@ -364,17 +485,17 @@ GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
 
     gtk_container_add (GTK_CONTAINER (priv->canvas_handle), GTK_WIDGET(priv->canvas));
 
-    if (!video_bin ||
+    if (!priv->video_bin ||
             !vdecoder ||
             !videoconvert ||
             !overlay_comp ||
             !priv->sink) {
         C_ERROR ("One of the video elements wasn't created... Exiting\n");
-        return NULL;
+        return;
     }
 
     // Add Elements to the Bin
-    gst_bin_add_many (GST_BIN (video_bin),
+    gst_bin_add_many (GST_BIN (priv->video_bin),
         vdecoder,
         videoconvert,
         overlay_comp,
@@ -385,19 +506,24 @@ GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
             overlay_comp,
             priv->sink, NULL)){
         C_WARN ("Linking video part (A)-2 Fail...");
-        return NULL;
+        return;
     }
 
+    DecoderPadData * data = malloc(sizeof(DecoderPadData));
+    data->player = self;
+    data->decoder = videoconvert;
+    priv->video_decoder_data = data;
     // Dynamic Pad Creation
-    if(! g_signal_connect (vdecoder, "pad-added", G_CALLBACK (on_decoder_pad_added),videoconvert)){
-        C_WARN ("Linking (A)-1 part with part (A)-2 Fail...");
+    if(! g_signal_connect (vdecoder, "pad-added", G_CALLBACK (on_decoder_pad_added),priv->video_decoder_data)){
+        C_ERROR ("Unabled to connect \"pad-added\" signal to video decoder.");
+        return;
     }
 
     pad = gst_element_get_static_pad (vdecoder, "sink");
     if (!pad) {
         // TODO gst_object_unref
         C_ERROR("unable to get decoder static sink pad");
-        return NULL;
+        return;
     }
 
     if(! g_signal_connect (overlay_comp, "draw", G_CALLBACK (OverlayState__draw_overlay), priv->overlay_state)){
@@ -406,27 +532,27 @@ GstRtspPlayerPrivate__create_video_pad(GstRtspPlayerPrivate * priv){
 
     if(! g_signal_connect (overlay_comp, "caps-changed",G_CALLBACK (OverlayState__prepare_overlay), priv->overlay_state)){
         C_ERROR ("overlay caps-changed callback Fail...");
-        return NULL;
+        return;
     }
 
     if(! g_signal_connect (overlay_comp, "caps-changed",G_CALLBACK (GstRtspPlayer__caps_changed_cb), priv)){
         C_ERROR ("sink caps-changed callback Fail...");
-        return NULL;
+        return;
     }
 
     ghostpad = gst_ghost_pad_new ("bin_sink", pad);
-    gst_element_add_pad (video_bin, ghostpad);
+    gst_element_add_pad (priv->video_bin, ghostpad);
     gst_object_unref (pad);
-
-    return video_bin;
+    g_object_ref(priv->video_bin); //Adding ref so that it persists after pipeline destruction
 }
 
-static GstElement*
-GstRtspPlayerPrivate__create_audio_pad(){
+static void
+GstRtspPlayer__create_audio_pad(GstRtspPlayer * self){
+    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (self);
     GstPad *pad, *ghostpad;
-    GstElement *decoder, *convert, *level, *sink, *audio_bin;
+    GstElement *decoder, *convert, *level, *sink;
 
-    audio_bin = gst_bin_new("audiobin");
+    priv->audio_bin = gst_bin_new("audiobin");
     decoder = gst_element_factory_make ("decodebin", "audio_decodebin");
     if (!decoder) {
         C_WARN("decodebin not available, trying decodebin3");
@@ -440,17 +566,17 @@ GstRtspPlayerPrivate__create_audio_pad(){
     level = gst_element_factory_make("level",NULL);
     sink = gst_element_factory_make ("autoaudiosink", NULL);
     g_object_set (G_OBJECT (sink), "sync", FALSE, NULL);
-    if (!audio_bin ||
+    if (!priv->audio_bin ||
             !decoder ||
             !convert ||
             !level ||
             !sink) {
-        C_ERROR ("One of the audio elements wasn't created... Exiting\n");
-        return NULL;
+        C_ERROR ("One of the audio elements wasn't created.");
+        return;
     }
 
     // Add Elements to the Bin
-    gst_bin_add_many (GST_BIN (audio_bin),
+    gst_bin_add_many (GST_BIN (priv->audio_bin),
         decoder,
         convert,
         level,
@@ -462,26 +588,31 @@ GstRtspPlayerPrivate__create_audio_pad(){
             level,
             sink, NULL)){
         C_WARN ("Linking audio part (A)-2 Fail...");
-        return NULL;
+        return;
     }
 
+    DecoderPadData * data = malloc(sizeof(DecoderPadData));
+    data->player = self;
+    data->decoder = convert;
+    priv->audio_decoder_data = data;
     // Dynamic Pad Creation
-    if(! g_signal_connect (decoder, "pad-added", G_CALLBACK (on_decoder_pad_added),convert)){
-        C_WARN ("Linking (A)-1 part (2) with part (A)-2 Fail...");
+    if(! g_signal_connect (decoder, "pad-added", G_CALLBACK (on_decoder_pad_added),priv->audio_decoder_data)){
+        C_ERROR ("Unabled to connect \"pad-added\" signal to audio decoder.");
+        return;
     }
 
     pad = gst_element_get_static_pad (decoder, "sink");
     if (!pad) {
         // TODO gst_object_unref
         C_ERROR("unable to get decoder static sink pad");
-        return NULL;
+        return;
     }
 
     ghostpad = gst_ghost_pad_new ("bin_sink", pad);
-    gst_element_add_pad (audio_bin, ghostpad);
+    gst_element_add_pad (priv->audio_bin, ghostpad);
     gst_object_unref (pad);
 
-    return audio_bin;
+    g_object_ref(priv->audio_bin); //Adding ref so that it persists after pipeline destruction
 }
 
 struct create_video_data{
@@ -521,23 +652,21 @@ exit:
 static void
 GstRtspPlayerSession__on_rtsp_pad_added (GstElement *element, GstPad *new_pad, GstRtspPlayerSession * session){
     C_DEBUG ("%s Received new pad '%s' from '%s'", session->location, GST_PAD_NAME (new_pad), GST_ELEMENT_NAME (element));
-    
+    GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (session->player);
     GstPadLinkReturn pad_ret;
     GstPad *sink_pad = NULL;
     GstCaps *new_pad_caps = NULL;
     GstStructure *new_pad_struct = NULL;
-    char *capsName;
-    
+    char *caps_str;
+    GstRtspStream * nstream = NULL;
+
     /* Check the new pad's type */
     new_pad_caps = gst_pad_get_current_caps (new_pad);
-    capsName = gst_caps_to_string(new_pad_caps);
-
-    // gchar * caps_str = gst_caps_serialize(new_pad_caps,0);
-    // gchar * new_pad_type = gst_structure_get_name (new_pad_struct);
-    // printf("caps_str : %s\n",caps_str);
+    caps_str = gst_caps_to_string(new_pad_caps);
+    C_DEBUG("RTSP pad added with caps: %s", caps_str);
 
     //TODO perform stream selection by stream codec not payload
-    if (g_strrstr(capsName, "video")){
+    if (g_strrstr(caps_str, "video")){
         /*
             gtkglsink requires to be attached on the main thread
             pad_added is called by the streaming thread, so we sync with the main thread to attach it
@@ -558,8 +687,9 @@ GstRtspPlayerSession__on_rtsp_pad_added (GstElement *element, GstPad *new_pad, G
         P_COND_CLEANUP(data.cond);
         P_MUTEX_CLEANUP(data.lock);
 
-    } else if (g_strrstr(capsName,"audio")){
-        GstRtspPlayerPrivate *priv = GstRtspPlayer__get_instance_private (session->player);
+        nstream = GstRtspStream__new(priv->video_bin,new_pad_caps);
+
+    } else if (g_strrstr(caps_str,"audio")){
         gst_bin_add_many (GST_BIN (session->pipeline), priv->audio_bin, NULL);
 
         sink_pad = gst_element_get_static_pad (priv->audio_bin, "bin_sink");
@@ -570,19 +700,32 @@ GstRtspPlayerSession__on_rtsp_pad_added (GstElement *element, GstPad *new_pad, G
         }
         session->dynamic_elements = g_list_append(session->dynamic_elements, priv->audio_bin);
         gst_element_sync_state_with_parent(priv->audio_bin);
+
+        nstream = GstRtspStream__new(priv->audio_bin, new_pad_caps);
     } else {
         new_pad_struct = gst_caps_get_structure (new_pad_caps, 0);
         gint payload_v;
         gst_structure_get_int(new_pad_struct,"payload", &payload_v);
         C_ERROR("%s Support other payload formats %d", session->location,payload_v);
+
+        /* Unreference the new pad's caps, since no stream was created with it */
+        if (new_pad_caps)
+            gst_caps_unref (new_pad_caps);
+        goto exit;
     }
 
+    //TODO Probe subtitle? Is that a thing for camera?
+    // Technically really plausible with AI enhanced cameras
+    /* Add an event probe */
+    // gst_pad_add_probe (new_pad, GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM,
+    //     (GstPadProbeCallback) GstRtspStream__event_probe, nstream, NULL);
+
+    if(nstream)
+        session->streams = g_list_append (session->streams, nstream);
+    //New stream signal will be emitted after the decoder has caps
 exit:
     C_DEBUG ("%s Received new pad attached", session->location);
-    free(capsName);
-    /* Unreference the new pad's caps, if we got them */
-    if (new_pad_caps)
-        gst_caps_unref (new_pad_caps);
+    free(caps_str);
     if (sink_pad)
         gst_object_unref (sink_pad);
 }
@@ -701,12 +844,12 @@ gboolean GstRtspPlayerPrivate__stop_unlocked(GstRtspPlayerPrivate * priv){
 }
 
 void GstRtspPlayerPrivate__stop(GstRtspPlayerPrivate * priv){
-    C_DEBUG("GstRtspPlayerPrivate__stop\n");
+    C_DEBUG("GstRtspPlayerPrivate__stop");
     P_MUTEX_LOCK(priv->player_lock);
     priv->playing = 0;
 
     if(GstRtspPlayerPrivate__stop_unlocked(priv))
-        player_signal_and_wait (priv->owner, signals[STOPPED]);
+        GstRtspPlayer__idle_signal_and_wait (priv->owner, signals[STOPPED]);
     
     P_MUTEX_UNLOCK(priv->player_lock);
 }
@@ -910,7 +1053,7 @@ GstRtspPlayerSession__error_msg (GstRtspPlayerSession * session, GstBus *bus, Gs
             C_ERROR ("%s Error received from element %s: %s",session->location, GST_OBJECT_NAME (msg->src), err->message);
             C_ERROR ("%s Debugging information: %s",session->location, debug_info ? debug_info : "none");
             C_ERROR ("%s Error code : %d", session->location,err->code);
-            player_signal_and_wait (priv->owner, signals[ERROR], session);
+            GstRtspPlayer__idle_signal_and_wait (priv->owner, signals[ERROR], session);
     }
 
     g_clear_error (&err);
@@ -934,7 +1077,7 @@ GstRtspPlayerSession__error_msg (GstRtspPlayerSession * session, GstBus *bus, Gs
         GstRtspPlayerPrivate__stop_unlocked(priv);
         P_MUTEX_UNLOCK(priv->player_lock);
         //Error signal
-        player_signal_and_wait (priv->owner, signals[ERROR], session);
+        GstRtspPlayer__idle_signal_and_wait (priv->owner, signals[ERROR], session);
         return;
     } else { //Ignoring error after the player requested to stop (gst_rtspsrc_try_send)
         C_TRACE("Player no longer playing...");
@@ -1011,10 +1154,32 @@ GstRtspPlayerSession__state_changed_msg (GstRtspPlayerSession * session, GstBus 
         session->valid_location = 1;
         session->fallback = RTSP_FALLBACK_NONE;
 
-        player_signal_and_wait (priv->owner, signals[STARTED],session);
+        GstRtspPlayer__idle_signal_and_wait (priv->owner, signals[STARTED],session);
     }
 }
 
+static void
+GstRtspPlayerSession__tag_cb(GstBus * bus, GstMessage * message, GstRtspPlayerSession * session){
+    GstTagList *tl, *tmp = NULL;
+    GstTagScope scope;
+
+    gst_message_parse_tag (message, &tl);
+    scope = gst_tag_list_get_scope (tl);
+
+    if (scope == GST_TAG_SCOPE_STREAM) {
+        GstRtspStream * stream = GstRtspStreams__get_stream(session->streams,GST_MESSAGE_SRC(message));
+        if(stream)
+            GstRtspStream__populate_tags(stream,tl);
+    } else {
+        tmp = gst_tag_list_merge (session->global_tags, tl, GST_TAG_MERGE_REPLACE);
+
+        if (session->global_tags)
+            gst_tag_list_unref (session->global_tags);
+        session->global_tags = tmp;
+        //TODO Signal new global tags
+    }
+    gst_tag_list_unref (tl);
+}
 
 static gboolean 
 GstRtspPlayerSession__message_handler (GstBus * bus, GstMessage * message, GstRtspPlayerSession * session)
@@ -1039,7 +1204,7 @@ GstRtspPlayerSession__message_handler (GstBus * bus, GstMessage * message, GstRt
             C_TRACE("%s msg : GST_MESSAGE_INFO", session->location);
             break;
         case GST_MESSAGE_TAG:
-            // tag_cb(bus,message,player);
+            GstRtspPlayerSession__tag_cb(bus,message,session);
             break;
         case GST_MESSAGE_BUFFERING:
             C_TRACE("%s msg : GST_MESSAGE_BUFFERING", session->location);
@@ -1081,7 +1246,7 @@ GstRtspPlayerSession__message_handler (GstBus * bus, GstMessage * message, GstRt
                 C_WARN("RtspServer rtp stream timedout [GstRTSPSrcTimeout]");
                 GstRtspPlayerPrivate__stop(priv);
                 session->retry=0;
-                player_signal_and_wait (priv->owner, signals[RETRY], session);
+                GstRtspPlayer__idle_signal_and_wait (priv->owner, signals[RETRY], session);
             } else {
                 C_ERROR("%s Unhandled element msg name : %s//%d", session->location,name,message->type);
             }
@@ -1207,10 +1372,10 @@ GstRtspPlayer__init (GstRtspPlayer * self)
     priv->snapsink = NULL;
     priv->playing = 0;
     priv->sinkcaps = NULL;
-    priv->video_bin = GstRtspPlayerPrivate__create_video_pad(priv);
-    g_object_ref(priv->video_bin);
-    priv->audio_bin = GstRtspPlayerPrivate__create_audio_pad();
-    g_object_ref(priv->audio_bin);
+    priv->video_decoder_data = NULL;
+    priv->audio_decoder_data = NULL;
+    GstRtspPlayer__create_video_pad(self);
+    GstRtspPlayer__create_audio_pad(self);
 
     priv->backchannel = RtspBackchannel__create(priv->player_context);
 }
@@ -1366,6 +1531,15 @@ GstRtspPlayer__dispose (GObject *gobject)
 
     safely_destroy_widget(priv->canvas);
     
+    if(priv->video_decoder_data){
+        free(priv->video_decoder_data);
+        priv->video_decoder_data = NULL;
+    }
+
+    if(priv->audio_decoder_data){
+        free(priv->audio_decoder_data);
+        priv->audio_decoder_data = NULL;
+    }
     G_OBJECT_CLASS (GstRtspPlayer__parent_class)->dispose (gobject);
 }
 
@@ -1426,5 +1600,18 @@ GstRtspPlayer__class_init (GstRtspPlayerClass * klass)
                 G_TYPE_NONE /* return_type */,
                 1     /* n_params */,
                 params  /* param_types */);
+
+    params[0] = GST_TYPE_RTSPSTREAM | G_SIGNAL_TYPE_STATIC_SCOPE;
+    signals[NEW_STREAM] =
+        g_signal_newv ("new-stream",
+                        G_TYPE_FROM_CLASS (klass),
+                        G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
+                        NULL /* closure */,
+                        NULL /* accumulator */,
+                        NULL /* accumulator data */,
+                        NULL /* C marshaller */,
+                        G_TYPE_NONE /* return_type */,
+                        1     /* n_params */,
+                        params  /* param_types */);
 
 }

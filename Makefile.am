@@ -45,6 +45,7 @@ onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c \
 					$(top_srcdir)/src/app/details/onvif_network.c \
 					$(top_srcdir)/src/app/details/onvif_timedate.c \
 					$(top_srcdir)/src/app/onvif_nvt.c \
+					$(top_srcdir)/src/app/onvif_nvt_stream_details.c \
 					$(top_srcdir)/src/app/task_manager.c \
 					$(top_srcdir)/src/app/dialog/gtkprofilepanel.c \
 					$(top_srcdir)/src/app/dialog/omgr_add_dialog.c \
@@ -67,11 +68,12 @@ onvifmgr_SOURCES = $(top_srcdir)/src/onvif-mgr.c \
 					$(top_srcdir)/src/gst/src_retriever.c \
 					$(top_srcdir)/src/gst/backchannel.c \
 					$(top_srcdir)/src/gst/gstrtspplayer.c \
+					$(top_srcdir)/src/gst/gstrtspstream.c \
 					$(top_srcdir)/src/queue/event_queue.c \
 					$(top_srcdir)/src/queue/queue_event.c \
 					$(top_srcdir)/src/queue/queue_thread.c
 onvifmgr_LDFLAGS = $(GST_LINK_TYPE) $(LIB_UDEV_PATH) `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs $(GST_LIBS) $(EXT_PLGS) $(GST_PLGS) gtk+-3.0 libntlm cutils libssl libcrypto onvifsoap` -Wl,-Bdynamic -lm -lstdc++ -z noexecstack
-onvifmgr_LDADD = locked-icon.o microphone.o warning.o trash.o tower.o add.o
+onvifmgr_LDADD = locked-icon.o microphone.o warning.o trash.o tower.o add.o info.o
 
 queuedemo_SOURCES = $(top_srcdir)/src/demo/queue-demo.c $(top_srcdir)/src/queue/event_queue.c $(top_srcdir)/src/queue/queue_event.c $(top_srcdir)/src/queue/queue_thread.c
 queuedemo_LDFLAGS = `PKG_CONFIG_PATH=$(PKG_FULL_PATH) pkg-config --libs cutils glib-2.0 gobject-2.0`
@@ -221,3 +223,7 @@ save.o$(EXEEXT):
 add.o$(EXEEXT):
 	@echo "  CCLD     images/add.o"
 	@cd $(top_srcdir)/images && ld -r -b binary -o $(abs_builddir)/add.o add.png && cd ..
+
+info.o$(EXEEXT):
+	@echo "  CCLD     images/info.o"
+	@cd $(top_srcdir)/images && ld -r -b binary -o $(abs_builddir)/info.o info.png && cd ..
