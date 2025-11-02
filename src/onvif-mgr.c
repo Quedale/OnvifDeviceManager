@@ -66,6 +66,29 @@ void handler_signal(int sig) {
   exit(1);
 }
 
+
+static void 
+set_element_priority(char * element_name, int priority){
+  GstRegistry* plugins_register = gst_registry_get();
+  GstPluginFeature* plugfeat = gst_registry_lookup_feature(plugins_register, element_name);
+
+  if(plugfeat == NULL) {
+      C_WARN("Element '%s' not found.",element_name);
+      return;
+  }
+
+  int rank = gst_plugin_feature_get_rank(plugfeat);
+  if(rank > priority){
+    C_WARN("Found element '%s'. Lowering priority from %d to %d...",element_name,rank,priority);
+    gst_plugin_feature_set_rank(plugfeat, priority);
+  } else if(rank < priority){
+    C_WARN("Found element '%s'. Increasing priority from %d to %d...",element_name,rank,priority);
+    gst_plugin_feature_set_rank(plugfeat, priority);
+  }
+
+  gst_object_unref(plugfeat);
+}
+
 int main(int argc, char *argv[]) {
   /*
     Debugging handlers
@@ -102,6 +125,11 @@ int main(int argc, char *argv[]) {
   /* Initialize GStreamer */
   gst_init (&argc, &argv);
   
+  //Dropping vaapi plugin priority under libav since I can't get it to work properly under flatpak. TODO: Fix this?
+  set_element_priority("vah264dec",GST_RANK_PRIMARY-1);
+  set_element_priority("vah265dec",GST_RANK_PRIMARY-1);
+  set_element_priority("vaav1dec",GST_RANK_PRIMARY-1);
+
   C_INFO("Onvif Manager Version : %d.%d", ONVIFMGR_VERSION_MAJ, ONVIFMGR_VERSION_MIN);
   C_INFO("Gstreamer Version : %i.%i.%i.%i",GST_PLUGINS_BASE_VERSION_MAJOR,GST_PLUGINS_BASE_VERSION_MINOR,GST_PLUGINS_BASE_VERSION_MICRO,GST_PLUGINS_BASE_VERSION_NANO);
   C_INFO("GTK Version : %d.%d.%d", gtk_get_major_version(), gtk_get_minor_version(), gtk_get_micro_version());
