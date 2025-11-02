@@ -47,6 +47,8 @@ AC_SUBST(GST_LIBS,m4_normalize('
     gstreamer-1.0
     gstreamer-video-1.0
     gstreamer-wayland-1.0
+    gstreamer-pbutils-1.0
+    gstreamer-rtp-1.0
     alsa
 '))
 
