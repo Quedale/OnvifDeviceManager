@@ -115,7 +115,7 @@ OnvifNVT__create_controls_overlay(OnvifNVT * self){
     priv->info_panel = gtk_frame_new(NULL);
     gtk_widget_set_margin_start(priv->info_panel,10);
     //Slight transparence for the detail panel so that it's readable, while still allowing to view the stream
-    gui_widget_set_css(priv->info_panel,"* { border-color:grey; border-radius: 10px; background-color: rgba(0, 0, 0, 0.25); }");
+    gui_widget_set_css(priv->info_panel,"* { border-color:grey; border-radius: 10px; color: white; background-color: rgba(0, 0, 0, 0.25); }");
     gtk_grid_attach (GTK_GRID (priv->overlay_grid), priv->info_panel, 0, 2, 1, 1);
 
     GtkWidget * frame_panel = gtk_box_new(GTK_ORIENTATION_VERTICAL,0);

@@ -45,9 +45,12 @@ AC_SUBST(PKG_FULL_PATH, [$PKG_FFMPEG_PATH:$PKG_PULSE_PATH:$PKG_ALSA_PATH:$PKG_GU
 #Gstreamer core packages normalized
 AC_SUBST(GST_LIBS,m4_normalize('
     gstreamer-1.0
+    gstreamer-base-1.0
     gstreamer-video-1.0
-    gstreamer-wayland-1.0
+    gstreamer-audio-1.0
+    gstreamer-tag-1.0
     gstreamer-pbutils-1.0
+    gstreamer-wayland-1.0
     gstreamer-rtp-1.0
     alsa
 '))
@@ -201,7 +204,6 @@ AC_ARG_ENABLE(libav,
 AM_CONDITIONAL([LIBAVCOND], [test x$targetlibav = xyes])
 AM_COND_IF([LIBAVCOND],[
     AC_SUBST(EXT_PLGS_LIBAV, gstlibav)
-    AC_SUBST(EXT_PKG_LIBAV, "gstlibav >= 1.14.4")
     AC_SUBST(EXT_CFLAGS_LIBAV, -DENABLELIBAV)
     AC_MSG_RESULT([configure: checking libav enabled... yes]) 
 ],[
