@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
   c_log_set_level(arguments.log_level);
   /* Initialize GTK */
   gtk_init (&argc, &argv);
-  gtk_window_set_default_icon_name("onvifmgr");
+  gtk_window_set_default_icon_name("io.github.quedale.onvifmgr");
   
   /* Initialize GStreamer */
   gst_init (&argc, &argv);

@@ -236,17 +236,17 @@ install-data-local:
 	@mkdir -p $(top_srcdir)/images/generated_icons/64x64
 	@mkdir -p $(top_srcdir)/images/generated_icons/32x32
 	@mkdir -p $(top_srcdir)/images/generated_icons/16x16
-	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png -resize 128x128 $(top_srcdir)/images/generated_icons/128x128/onvifmgr.png
-	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png -resize 64x64 $(top_srcdir)/images/generated_icons/64x64/onvifmgr.png
-	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png -resize 32x32 $(top_srcdir)/images/generated_icons/32x32/onvifmgr.png
-	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png -resize 16x16 $(top_srcdir)/images/generated_icons/16x16/onvifmgr.png
+	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png -resize 128x128 $(top_srcdir)/images/generated_icons/128x128/io.github.quedale.onvifmgr.png
+	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png -resize 64x64 $(top_srcdir)/images/generated_icons/64x64/io.github.quedale.onvifmgr.png
+	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png -resize 32x32 $(top_srcdir)/images/generated_icons/32x32/io.github.quedale.onvifmgr.png
+	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png -resize 16x16 $(top_srcdir)/images/generated_icons/16x16/io.github.quedale.onvifmgr.png
 	@echo "Copying app icons to $(icondir)"
 	@mkdir -p $(icondir)/128x128/apps
 	@mkdir -p $(icondir)/64x64/apps
 	@mkdir -p $(icondir)/32x32/apps
 	@mkdir -p $(icondir)/16x16/apps
-	@$(INSTALL) -C $(top_srcdir)/images/generated_icons/128x128/onvifmgr.png $(icondir)/128x128/apps
-	@$(INSTALL) -C $(top_srcdir)/images/generated_icons/64x64/onvifmgr.png $(icondir)/64x64/apps
-	@$(INSTALL) -C $(top_srcdir)/images/generated_icons/32x32/onvifmgr.png $(icondir)/32x32/apps
-	@$(INSTALL) -C $(top_srcdir)/images/generated_icons/16x16/onvifmgr.png $(icondir)/16x16/apps
+	@$(INSTALL) -C $(top_srcdir)/images/generated_icons/128x128/io.github.quedale.onvifmgr.png $(icondir)/128x128/apps
+	@$(INSTALL) -C $(top_srcdir)/images/generated_icons/64x64/io.github.quedale.onvifmgr.png $(icondir)/64x64/apps
+	@$(INSTALL) -C $(top_srcdir)/images/generated_icons/32x32/io.github.quedale.onvifmgr.png $(icondir)/32x32/apps
+	@$(INSTALL) -C $(top_srcdir)/images/generated_icons/16x16/io.github.quedale.onvifmgr.png $(icondir)/16x16/apps
 	@rm -rf $(top_srcdir)/images/generated_icons
