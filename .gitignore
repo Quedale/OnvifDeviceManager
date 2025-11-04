@@ -29,3 +29,4 @@ onvifmgr_settings.ini
 .vscode
 *.deb
 onvifmgr_*/*
+repo

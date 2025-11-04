@@ -4,6 +4,9 @@ JOB_FLAG := $(filter -j%, $(subst -j ,-j,$(shell ps T | grep "^\s*$(MAKE_PID).*$
 JOBS     := $(subst -j,,$(JOB_FLAG))
 TAB  := $(NULL)<tab>$(NULL)
 
+icondir = $(datadir)/icons/hicolor/scalable/apps
+icon_DATA = images/onvifmgr.png
+
 # Extract list of compiled package
 # GST_PLGS = $(shell ls $(PKG_GST_PATH) | sed -z 's/\.pc\n/ /g;s/,$$/\n/')
 # GST_LIBS = $(shell ls $(PKG_PATH) | sed -z 's/\.pc\n/ /g;s/,$$/\n/')
