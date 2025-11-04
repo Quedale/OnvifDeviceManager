@@ -245,8 +245,9 @@ install-data-local:
 	@mkdir -p $(icondir)/64x64/apps
 	@mkdir -p $(icondir)/32x32/apps
 	@mkdir -p $(icondir)/16x16/apps
-	@$(INSTALL) -C $(top_srcdir)/images/generated_icons/128x128/io.github.quedale.onvifmgr.png $(icondir)/128x128/apps
-	@$(INSTALL) -C $(top_srcdir)/images/generated_icons/64x64/io.github.quedale.onvifmgr.png $(icondir)/64x64/apps
-	@$(INSTALL) -C $(top_srcdir)/images/generated_icons/32x32/io.github.quedale.onvifmgr.png $(icondir)/32x32/apps
-	@$(INSTALL) -C $(top_srcdir)/images/generated_icons/16x16/io.github.quedale.onvifmgr.png $(icondir)/16x16/apps
+	@$(INSTALL) -C -Dm644 $(top_srcdir)/images/generated_icons/128x128/io.github.quedale.onvifmgr.png $(icondir)/128x128/apps
+	@$(INSTALL) -C -Dm644 $(top_srcdir)/images/generated_icons/64x64/io.github.quedale.onvifmgr.png $(icondir)/64x64/apps
+	@$(INSTALL) -C -Dm644 $(top_srcdir)/images/generated_icons/32x32/io.github.quedale.onvifmgr.png $(icondir)/32x32/apps
+	@$(INSTALL) -C -Dm644 $(top_srcdir)/images/generated_icons/16x16/io.github.quedale.onvifmgr.png $(icondir)/16x16/apps
 	@rm -rf $(top_srcdir)/images/generated_icons
+	@gtk-update-icon-cache $(icondir)
