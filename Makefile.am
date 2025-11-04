@@ -5,15 +5,6 @@ JOBS     := $(subst -j,,$(JOB_FLAG))
 TAB  := $(NULL)<tab>$(NULL)
 
 icondir = $(datadir)/icons/hicolor
-icon16dir = $(icondir)/16x16/apps
-icon16_DATA = images/generated_icons/16x16/onvifmgr.png
-icon32dir = $(icondir)/32x32/apps
-icon32_DATA = images/generated_icons/32x32/onvifmgr.png
-icon64dir = $(icondir)/64x64/apps
-icon64_DATA = images/generated_icons/64x64/onvifmgr.png
-icon128dir = $(icondir)/128x128/apps
-icon128_DATA = images/generated_icons/128x128/onvifmgr.png
-EXTRA_DIST = $(icon16_DATA) $(icon32_DATA) $(icon64_DATA) $(icon128_DATA)
 
 # Extract list of compiled package
 # GST_PLGS = $(shell ls $(PKG_GST_PATH) | sed -z 's/\.pc\n/ /g;s/,$$/\n/')
@@ -245,7 +236,13 @@ install-data-local:
 	@mkdir -p $(top_srcdir)/images/generated_icons/64x64
 	@mkdir -p $(top_srcdir)/images/generated_icons/32x32
 	@mkdir -p $(top_srcdir)/images/generated_icons/16x16
-	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png  -resize 128x128 $(top_srcdir)/images/generated_icons/128x128/onvifmgr.png;
-	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png  -resize 64x64 $(top_srcdir)/images/generated_icons/64x64/onvifmgr.png;
-	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png  -resize 32x32 $(top_srcdir)/images/generated_icons/32x32/onvifmgr.png;
-	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png  -resize 16x16 $(top_srcdir)/images/generated_icons/16x16/onvifmgr.png;
+	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png -resize 128x128 $(top_srcdir)/images/generated_icons/128x128/onvifmgr.png
+	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png -resize 64x64 $(top_srcdir)/images/generated_icons/64x64/onvifmgr.png
+	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png -resize 32x32 $(top_srcdir)/images/generated_icons/32x32/onvifmgr.png
+	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png -resize 16x16 $(top_srcdir)/images/generated_icons/16x16/onvifmgr.png
+	@echo "Copying app icons to $(icondir)"
+	@$(INSTALL) $(top_srcdir)/images/generated_icons/128x128/onvifmgr.png $(icondir)/128x128/apps
+	@$(INSTALL) $(top_srcdir)/images/generated_icons/64x64/onvifmgr.png $(icondir)/64x64/apps
+	@$(INSTALL) $(top_srcdir)/images/generated_icons/32x32/onvifmgr.png $(icondir)/32x32/apps
+	@$(INSTALL) $(top_srcdir)/images/generated_icons/16x16/onvifmgr.png $(icondir)/16x16/apps
+	@rm -rf $(top_srcdir)/images/generated_icons
