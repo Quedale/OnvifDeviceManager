@@ -1047,6 +1047,12 @@ if [ ! -z "$(pkgCheck project="glib" name=glib-2.0 minver=2.64.0)" ] || [ ! -z "
   buildMesonProject project="glib" srcdir="glib-2.85.2" prefix="$SUBPROJECT_DIR/glib-2.85.2/dist" mesonargs="-Dsysprof=disabled -Dpcre2:test=false -Dpcre2:grep=false -Dxattr=false -Db_lundef=false -Dtests=false -Dglib_debug=disabled -Dglib_assert=false -Dglib_checks=false"
 fi
 
+export PATH="$SUBPROJECT_DIR/ImageMagick/build/dist/bin":$PATH
+if [ ! -z "$(progVersionCheck project="ImageMagick" program='magick')" ]; then
+  pullOrClone project="ImageMagick" path=https://github.com/ImageMagick/ImageMagick.git
+  buildMakeProject project="ImageMagick" srcdir="ImageMagick" prefix="$SUBPROJECT_DIR/ImageMagick/build/dist" configure="--without-webp --without-tiff --without-raw --without-pango --without-openexr --without-lzma --without-lqr --without-openjp2 --without-lcms --without-jxl --without-jpeg --without-jbig --without-heic --without-dmr --without-gdi32 --without-raqm --without-freetype --without-fontconfig --without-djvu --without-zstd --without-zlib --without-zip --without-bzlib --without-magick-plus-plus --disable-cipher --disable-docs --disable-assert --disable-dpc --disable-openmp"
+fi
+
 ################################################################
 # 
 #    Build cutils
