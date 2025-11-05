@@ -192,8 +192,11 @@ distclean-local:
 	find $(top_srcdir)/src -name "*.Po" -type f -delete
 	find $(top_srcdir)/src -name ".dirstamp" -type f -delete
 	find $(top_srcdir)/src -name ".deps" -type d -delete
-	find $(top_srcdir)/src -name "*.desktop" -type f -delete
+	find $(abs_builddir) -name "*.desktop" -type f -delete
 	rm -rf $(top_srcdir)/images/generated_icons
+
+uninstall-hook:
+	rm $(desktopdir)/$(APP_ID).desktop
 
 install-data-hook:
 	@echo "Rename .desktop file to match AppID : $(APP_ID)"
