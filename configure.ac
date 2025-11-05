@@ -108,6 +108,10 @@ AC_ARG_WITH([no-gst-plugin-check],
    esac],
   [NOCHECK_ENABLED="no"])
 
+AC_ARG_WITH([appid],
+  [AS_HELP_STRING([--with-appid], [Override default AppID 'onvifmgr'])],
+  [AC_SUBST([APP_ID], [$with_appid])],
+  [AC_SUBST([APP_ID], [onvifmgr])])
 
 #Function to check gstreamer built under subproject. (.pc file exists for each plugins)
 AC_DEFUN([CHECK_GSTREAMER_PACKAGES],[
@@ -294,8 +298,10 @@ AC_SUBST(EXT_CFLAGS, '$(EXT_CFLAGS_LIBAV) $(EXT_CFLAGS_NV)')
 AC_SUBST(PKG_FULL_PATH, [$PKG_PATH:$PKG_GST_PATH:$PKG_FFMPEG_PATH:$PKG_PULSE_PATH:$PKG_ALSA_PATH:$PKG_GUDEV_PATH:$PKG_UDEV_PATH:$PKG_GLIB_PATH:$PKG_V4L2_PATH:$PKG_ONVIF_DISCO_PATH:$PKG_ONVIF_SOAP_PATH:$PKG_CUTILS_PATH:$PKG_OPENSSL_PATH:$PKG_DE265_PATH:$PKG_NTLM_PATH:$PKG_LIBX11_PATH:$PKG_GTK_PATH:$PKG_CONFIG_PATH])
 
 
+AC_SUBST(ONVIF_APP_ID, [io.github.quedale.onvifmgr])
 AC_CONFIG_FILES([
     Makefile
+    deployment/io.github.quedale.onvifmgr.desktop
 ])
 
 LT_INIT([shared])

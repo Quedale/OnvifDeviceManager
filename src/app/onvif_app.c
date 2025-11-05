@@ -58,7 +58,7 @@ static guint signals[LAST_SIGNAL] = { 0 };
 
 static void OnvifApp__ownable_interface_init (COwnableObjectInterface *iface);
 
-G_DEFINE_TYPE_WITH_CODE(OnvifApp, OnvifApp_, G_TYPE_OBJECT, G_ADD_PRIVATE (OnvifApp)
+G_DEFINE_TYPE_WITH_CODE(OnvifApp, OnvifApp_, GTK_TYPE_APPLICATION, G_ADD_PRIVATE (OnvifApp)
                                     G_IMPLEMENT_INTERFACE (COWNABLE_TYPE_OBJECT,OnvifApp__ownable_interface_init))
 
 static void OnvifApp__profile_changed_cb (OnvifMgrDeviceRow *device);
@@ -851,7 +851,7 @@ void OnvifApp__create_ui (OnvifApp * app) {
 
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (app);
 
-    main_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+    main_window = gtk_application_window_new (GTK_APPLICATION(app));
     g_signal_connect (G_OBJECT (main_window), "delete-event", G_CALLBACK (OnvifApp__window_delete_event_cb), app);
 
     gtk_window_set_title (GTK_WINDOW (main_window), "Onvif Device Manager");
@@ -993,28 +993,8 @@ void OnvifApp__dispose(GObject * obj){
         safely_destroy_widget(priv->window);
         priv->window = NULL;
     }
-}
 
-static void
-OnvifApp__class_init (OnvifAppClass *klass)
-{
-    GObjectClass *object_class = G_OBJECT_CLASS (klass);
-    object_class->dispose = OnvifApp__dispose;
-
-    // GType type = ONVIFMGR_TYPE_DEVICEROW;
-    GType params[1];
-    params[0] = ONVIFMGR_TYPE_DEVICEROW | G_SIGNAL_TYPE_STATIC_SCOPE;
-    signals[DEVICE_CHANGED] =
-        g_signal_newv ("device-changed",
-                        G_TYPE_FROM_CLASS (klass),
-                        G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
-                        NULL /* closure */,
-                        NULL /* accumulator */,
-                        NULL /* accumulator data */,
-                        NULL /* C marshaller */,
-                        G_TYPE_NONE /* return_type */,
-                        1     /* n_params */,
-                        params  /* param_types */);
+    G_OBJECT_CLASS (OnvifApp__parent_class)->dispose (obj);
 }
 
 static gboolean
@@ -1059,14 +1039,10 @@ OnvifApp__new_object_store(OnvifMgrEncryptedStore * store, OnvifMgrSerializable 
 }
 
 static void
-OnvifApp__init (OnvifApp *self)
-{
+OnvifApp__activate (GApplication* application){
+    OnvifApp * self = ONVIFMGR_APP(application);
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (self);
 
-    priv->device = NULL;
-    priv->owned = 1;
-    priv->task_label = NULL;
-    priv->queue = EventQueue__new();
     g_signal_connect (G_OBJECT(priv->queue), "pool-changed", G_CALLBACK (OnvifApp__eq_dispatch_cb), self);
 
     //TODO register listener
@@ -1104,11 +1080,48 @@ OnvifApp__init (OnvifApp *self)
     EventQueue__start(priv->queue);
 
     OnvifMgrEncryptedStore__capture_passphrase(priv->store);
+
+    G_APPLICATION_CLASS (OnvifApp__parent_class)->activate (application);
+}
+
+static void
+OnvifApp__class_init (OnvifAppClass *klass)
+{   
+    GApplicationClass *gapp_class = G_APPLICATION_CLASS(klass);
+    gapp_class->activate = OnvifApp__activate;
+    GObjectClass *object_class = G_OBJECT_CLASS (klass);
+    object_class->dispose = OnvifApp__dispose;
+
+    // GType type = ONVIFMGR_TYPE_DEVICEROW;
+    GType params[1];
+    params[0] = ONVIFMGR_TYPE_DEVICEROW | G_SIGNAL_TYPE_STATIC_SCOPE;
+    signals[DEVICE_CHANGED] =
+        g_signal_newv ("device-changed",
+                        G_TYPE_FROM_CLASS (klass),
+                        G_SIGNAL_RUN_LAST | G_SIGNAL_NO_RECURSE | G_SIGNAL_NO_HOOKS,
+                        NULL /* closure */,
+                        NULL /* accumulator */,
+                        NULL /* accumulator data */,
+                        NULL /* C marshaller */,
+                        G_TYPE_NONE /* return_type */,
+                        1     /* n_params */,
+                        params  /* param_types */);
+}
+
+static void
+OnvifApp__init (OnvifApp *self)
+{
+    OnvifAppPrivate *priv = OnvifApp__get_instance_private (self);
+
+    priv->device = NULL;
+    priv->owned = 1;
+    priv->task_label = NULL;
+    priv->queue = EventQueue__new();
 }
 
 
 OnvifApp * OnvifApp__new(void){
-    return g_object_new (ONVIFMGR_TYPE_APP, NULL);
+    return g_object_new (ONVIFMGR_TYPE_APP, "application-id", "io.github.quedale.onvifmgr", "flags",G_APPLICATION_DEFAULT_FLAGS, NULL);
 }
 
 void OnvifApp__destroy(OnvifApp* self){

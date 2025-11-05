@@ -30,3 +30,4 @@ onvifmgr_settings.ini
 *.deb
 onvifmgr_*/*
 repo
+images/generated_icons

@@ -5,6 +5,18 @@ JOBS     := $(subst -j,,$(JOB_FLAG))
 TAB  := $(NULL)<tab>$(NULL)
 
 icondir = $(datadir)/icons/hicolor
+desktopdir = $(datadir)/applications
+desktop_DATA = deployment/io.github.quedale.onvifmgr.desktop
+EXTRA_DIST = deployment/io.github.quedale.onvifmgr.desktop.in
+
+icon16dir =  $(datadir)/icons/hicolor/16x16
+icon16_DATA = $(top_srcdir)/images/generated_icons/16x16/onvifmgr.png
+icon32dir =  $(datadir)/icons/hicolor/32x32
+icon32_DATA = $(top_srcdir)/images/generated_icons/32x32/onvifmgr.png
+icon64dir =  $(datadir)/icons/hicolor/64x64
+icon64_DATA = $(top_srcdir)/images/generated_icons/64x64/onvifmgr.png
+icon128dir =  $(datadir)/icons/hicolor/128x128
+icon128_DATA = $(top_srcdir)/images/generated_icons/128x128/onvifmgr.png
 
 # Extract list of compiled package
 # GST_PLGS = $(shell ls $(PKG_GST_PATH) | sed -z 's/\.pc\n/ /g;s/,$$/\n/')
@@ -173,13 +185,20 @@ deb$(EXEEXT): onvifmgr
 clean-local:
 	@echo "Force clean up actual src directory."
 	find $(top_srcdir)/src -name "*.o" -type f -delete
-
+	find $(top_srcdir)/src -name "*.desktop" -type f -delete
+	
 distclean-local:
 	@echo "Force clean up actual src directory."
 	find $(top_srcdir)/src -name "*.Po" -type f -delete
 	find $(top_srcdir)/src -name ".dirstamp" -type f -delete
 	find $(top_srcdir)/src -name ".deps" -type d -delete
+	find $(top_srcdir)/src -name "*.desktop" -type f -delete
+	rm -rf $(top_srcdir)/images/generated_icons
 
+install-data-hook:
+	@echo "Rename .desktop file to match AppID : $(APP_ID)"
+	cd $(desktopdir); mv io.github.quedale.onvifmgr.desktop $(APP_ID).desktop
+	
 paths$(EXEEXT):
 	@echo "PKG_FULL_PATH : $(PKG_FULL_PATH)"
 	@echo ""
@@ -229,25 +248,3 @@ add.o$(EXEEXT):
 info.o$(EXEEXT):
 	@echo "  CCLD     images/info.o"
 	@cd $(top_srcdir)/images && ld -r -b binary -o $(abs_builddir)/info.o info.png && cd ..
-
-install-data-local:
-	@echo "Generating app icons..."
-	@mkdir -p $(top_srcdir)/images/generated_icons/128x128
-	@mkdir -p $(top_srcdir)/images/generated_icons/64x64
-	@mkdir -p $(top_srcdir)/images/generated_icons/32x32
-	@mkdir -p $(top_srcdir)/images/generated_icons/16x16
-	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png -resize 128x128 $(top_srcdir)/images/generated_icons/128x128/io.github.quedale.onvifmgr.png
-	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png -resize 64x64 $(top_srcdir)/images/generated_icons/64x64/io.github.quedale.onvifmgr.png
-	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png -resize 32x32 $(top_srcdir)/images/generated_icons/32x32/io.github.quedale.onvifmgr.png
-	@PATH=$(top_srcdir)/subprojects/ImageMagick/build/dist/bin:$(PATH) magick $(top_srcdir)/images/onvifmgr.png -resize 16x16 $(top_srcdir)/images/generated_icons/16x16/io.github.quedale.onvifmgr.png
-	@echo "Copying app icons to $(icondir)"
-	@mkdir -p $(icondir)/128x128/apps
-	@mkdir -p $(icondir)/64x64/apps
-	@mkdir -p $(icondir)/32x32/apps
-	@mkdir -p $(icondir)/16x16/apps
-	@$(INSTALL) -C -Dm644 $(top_srcdir)/images/generated_icons/128x128/io.github.quedale.onvifmgr.png $(icondir)/128x128/apps
-	@$(INSTALL) -C -Dm644 $(top_srcdir)/images/generated_icons/64x64/io.github.quedale.onvifmgr.png $(icondir)/64x64/apps
-	@$(INSTALL) -C -Dm644 $(top_srcdir)/images/generated_icons/32x32/io.github.quedale.onvifmgr.png $(icondir)/32x32/apps
-	@$(INSTALL) -C -Dm644 $(top_srcdir)/images/generated_icons/16x16/io.github.quedale.onvifmgr.png $(icondir)/16x16/apps
-	@rm -rf $(top_srcdir)/images/generated_icons
-	@gtk-update-icon-cache $(icondir)

@@ -1,8 +1,8 @@
 #include "onvif_app_shutdown.h"
 #include "clogger.h"
 
-gboolean safely_quit_gtk_main(void * user_data){
-    gtk_main_quit();
+gboolean safely_quit_gtk_main(GApplication * application){
+    g_application_quit(application);
     return FALSE;
 }
 void * _thread_destruction(void * event){
@@ -16,7 +16,7 @@ void * _thread_destruction(void * event){
     
     //Quitting from idle thread allows the windows and OnvifMgrDeviceRow (and nested OnvifDevice) to destroy properly
     //Using LOW priority to allow other event to run first.
-    g_idle_add_full (G_PRIORITY_LOW, G_SOURCE_FUNC(safely_quit_gtk_main), NULL, NULL);
+    g_idle_add_full (G_PRIORITY_LOW, G_SOURCE_FUNC(safely_quit_gtk_main), app, NULL);
 
     pthread_exit(0);
 }
