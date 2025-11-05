@@ -46,7 +46,38 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - D-Link (Tapo C200)
 - [Yi-Hack Allwinner V2](https://github.com/roleoroleo/yi-hack-Allwinner-v2) (Pro 2K Home)
 
-# How to build
+# How to build - Option 1 : Flatpak
+### Install flatpak-builder
+```
+# For Debian/Ubuntu
+sudo apt install flatpak-builder
+
+# For Fedora
+sudo dnf install flatpak-builder
+
+# For Arch Linux
+sudo pacman -S flatpak-builder
+```
+
+### Add flathub repository
+```
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+```
+
+### Build container
+```
+cd deployment
+flatpak-builder --force-clean --user --install-deps-from=flathub --repo=repo --install builddir io.github.quedale.onvifmgr.yml
+```
+
+### Run container
+At this point you should have appropriate Desktop menu available, but you can use the following command line:
+```
+flatpak run io.github.quedale.onvifmgr
+```
+
+
+# How to build - Option 2 : Native
 ### Clone repository
 ```
 git clone https://github.com/Quedale/OnvifDeviceManager.git
