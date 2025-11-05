@@ -163,14 +163,11 @@ int main(int argc, char *argv[]) {
   C_INFO("****************************");
 
   /* Initialize Application */
-  OnvifApp * app = OnvifApp__new();
-
-  C_TRAIL("Starting GTK MainLoop");
-  int status = g_application_run (G_APPLICATION (app), argc, argv);
+  OnvifApp__new();
 
   /* Start the GTK main loop. We will not regain control until gtk_main_quit is called. */
-  g_object_unref (app);
+  gtk_main ();
 
   gst_deinit ();
-  return status;
+  return 0;
 }

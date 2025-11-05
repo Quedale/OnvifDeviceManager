@@ -13,15 +13,15 @@ G_BEGIN_DECLS
 
 
 #define ONVIFMGR_TYPE_APP OnvifApp__get_type()
-G_DECLARE_FINAL_TYPE (OnvifApp, OnvifApp_, ONVIFMGR, APP, GtkApplication)
+G_DECLARE_FINAL_TYPE (OnvifApp, OnvifApp_, ONVIFMGR, APP, GObject)
 
 struct _OnvifApp {
-  GtkApplication parent_instance;
+  GObject parent_instance;
 };
 
 
 struct _OnvifAppClass {
-  GtkApplicationClass parent_class;
+  GObjectClass parent_class;
 };
 
 OnvifApp * OnvifApp__new (void);
