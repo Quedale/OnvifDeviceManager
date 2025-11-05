@@ -122,7 +122,9 @@ int main(int argc, char *argv[]) {
   /* Initialize GTK */
   gtk_init (&argc, &argv);
   gtk_window_set_default_icon_name("io.github.quedale.onvifmgr");
-  
+  gdk_set_program_class("io.github.quedale.onvifmgr");
+  g_set_prgname("io.github.quedale.onvifmgr");
+
   /* Initialize GStreamer */
   gst_init (&argc, &argv);
   

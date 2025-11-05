@@ -9,13 +9,13 @@ desktopdir = $(datadir)/applications
 desktop_DATA = deployment/io.github.quedale.onvifmgr.desktop
 EXTRA_DIST = deployment/io.github.quedale.onvifmgr.desktop.in
 
-icon16dir =  $(datadir)/icons/hicolor/16x16
+icon16dir =  $(datadir)/icons/hicolor/16x16/apps
 icon16_DATA = $(top_srcdir)/images/generated_icons/16x16/onvifmgr.png
-icon32dir =  $(datadir)/icons/hicolor/32x32
+icon32dir =  $(datadir)/icons/hicolor/32x32/apps
 icon32_DATA = $(top_srcdir)/images/generated_icons/32x32/onvifmgr.png
-icon64dir =  $(datadir)/icons/hicolor/64x64
+icon64dir =  $(datadir)/icons/hicolor/64x64/apps
 icon64_DATA = $(top_srcdir)/images/generated_icons/64x64/onvifmgr.png
-icon128dir =  $(datadir)/icons/hicolor/128x128
+icon128dir =  $(datadir)/icons/hicolor/128x128/apps
 icon128_DATA = $(top_srcdir)/images/generated_icons/128x128/onvifmgr.png
 
 # Extract list of compiled package
@@ -200,7 +200,11 @@ uninstall-hook:
 
 install-data-hook:
 	@echo "Rename .desktop file to match AppID : $(APP_ID)"
-	cd $(desktopdir); mv io.github.quedale.onvifmgr.desktop $(APP_ID).desktop
+	@cd $(desktopdir); mv io.github.quedale.onvifmgr.desktop $(APP_ID).desktop || echo "Desktop files are identical"
+	@cd $(icon16dir); mv onvifmgr.png $(APP_ID).png || echo "Icon 16x16 files are identical"
+	@cd $(icon32dir); mv onvifmgr.png $(APP_ID).png || echo "Icon 32x32 files are identical"
+	@cd $(icon64dir); mv onvifmgr.png $(APP_ID).png || echo "Icon 64x64 files are identical"
+	@cd $(icon128dir); mv onvifmgr.png $(APP_ID).png || echo "Icon 128x128 files are identical"
 	
 paths$(EXEEXT):
 	@echo "PKG_FULL_PATH : $(PKG_FULL_PATH)"
