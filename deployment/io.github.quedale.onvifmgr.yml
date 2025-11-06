@@ -35,6 +35,7 @@ modules:
         buildsystem: cmake
         config-opts:
           - -DCMAKE_BUILD_TYPE=Release
+          - -DENABLE_SHARED=on
         sources:
           - type: git
             url: https://github.com/Quedale/CUtils.git
@@ -45,6 +46,8 @@ modules:
           - --with-openssl=/usr/lib/ssl
           - --prefix=${FLATPAK_DEST}
           - --disable-debug
+          - --enable-shared
+          - --disable-static
         sources:
           - type: archive
             url: https://download-mirror.savannah.gnu.org/releases/libntlm/libntlm-1.8.tar.gz
@@ -57,7 +60,7 @@ modules:
           - make -j$(nproc) install
           - make distclean
           - GENERATED_SOURCE_PATH=$(pwd)/generated-src GSOAP_SRC_DIR=$(pwd)/gsoap-src PATH=$(pwd)/dist/bin:$PATH ./bootstrap.sh --skip-dependencies
-          - cmake -DCMAKE_INSTALL_PREFIX=${FLATPAK_DEST} -DGENERATED_SOURCE_PATH=$(pwd)/generated-src -DCMAKE_BUILD_TYPE=Release -DGSOAP_SRC_DIR=$(pwd)/gsoap-src .
+          - cmake -DCMAKE_INSTALL_PREFIX=${FLATPAK_DEST} -DONVIFSOAP_STATIC=off -DGENERATED_SOURCE_PATH=$(pwd)/generated-src -DCMAKE_BUILD_TYPE=Release -DGSOAP_SRC_DIR=$(pwd)/gsoap-src .
           - make -j$(nproc) install
         sources:
           - type: git
