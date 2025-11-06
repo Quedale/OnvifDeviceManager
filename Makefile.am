@@ -17,6 +17,8 @@ icon64dir =  $(datadir)/icons/hicolor/64x64/apps
 icon64_DATA = $(top_srcdir)/images/generated_icons/64x64/onvifmgr.png
 icon128dir =  $(datadir)/icons/hicolor/128x128/apps
 icon128_DATA = $(top_srcdir)/images/generated_icons/128x128/onvifmgr.png
+icon256dir =  $(datadir)/icons/hicolor/256x256/apps
+icon256_DATA = $(top_srcdir)/images/generated_icons/256x256/onvifmgr.png
 
 # Extract list of compiled package
 # GST_PLGS = $(shell ls $(PKG_GST_PATH) | sed -z 's/\.pc\n/ /g;s/,$$/\n/')
@@ -201,6 +203,7 @@ uninstall-hook:
 	rm -f $(icon32dir)/$(ONVIF_APP_ID).png
 	rm -f $(icon64dir)/$(ONVIF_APP_ID).png
 	rm -f $(icon128dir)/$(ONVIF_APP_ID).png
+	rm -f $(icon256dir)/$(ONVIF_APP_ID).png
 
 install-data-hook:
 	@echo "Rename .desktop file to match AppID : $(ONVIF_APP_ID)"
@@ -209,6 +212,7 @@ install-data-hook:
 	@cd $(icon32dir); mv onvifmgr.png $(ONVIF_APP_ID).png || echo "Icon 32x32 files are identical"
 	@cd $(icon64dir); mv onvifmgr.png $(ONVIF_APP_ID).png || echo "Icon 64x64 files are identical"
 	@cd $(icon128dir); mv onvifmgr.png $(ONVIF_APP_ID).png || echo "Icon 128x128 files are identical"
+	@cd $(icon256dir); mv onvifmgr.png $(ONVIF_APP_ID).png || echo "Icon 256x256 files are identical"
 
 paths$(EXEEXT):
 	@echo "PKG_FULL_PATH : $(PKG_FULL_PATH)"

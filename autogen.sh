@@ -73,6 +73,8 @@ generateIcons(){
   [ $? -ne 0 ] && printError project="imgresizer" task="resize" msg="Failed to create 64x64 icon" && exit 1
   mkdir -p $SCRT_DIR/images/generated_icons/128x128 && ./image-resizer $SCRT_DIR/images/onvifmgr.png $SCRT_DIR/images/generated_icons/128x128/onvifmgr.png 128 128 | printlines project="imgresizer" task="resize"
   [ $? -ne 0 ] && printError project="imgresizer" task="resize" msg="Failed to create 128x128 icon" && exit 1
+  mkdir -p $SCRT_DIR/images/generated_icons/256x256 && ./image-resizer $SCRT_DIR/images/onvifmgr.png $SCRT_DIR/images/generated_icons/256x256/onvifmgr.png 256 256 | printlines project="imgresizer" task="resize"
+  [ $? -ne 0 ] && printError project="imgresizer" task="resize" msg="Failed to create 256x256 icon" && exit 1
 }
 
 #Set debug flag on current project

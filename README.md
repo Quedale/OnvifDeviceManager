@@ -20,6 +20,7 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Encrypted Credential Storage 
 
 # TODO
+- GUI Invalid certificate warning
 - EventQueue GUI (TaskManager)
 - GObject rollout
 - Edit Onvif device identification

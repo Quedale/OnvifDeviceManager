@@ -8,11 +8,12 @@ build-options:
   # Similarly, using 'Release' build type instead of 'Debug' also increased the size
   no-debuginfo: true
 finish-args:
-  - --share=network     # ONVIF has network in the name, duh!
-  - --socket=pulseaudio # Support camera bidirectional audio
-  - --socket=wayland    # Support for wayland GUI
-  - --socket=x11        # Support for x11 GUI
-  - --device=dri        # Support for hardware acceleration. (Necessary for 4K cameras)
+  - --share=network       # ONVIF has network in the name, duh!
+  - --socket=pulseaudio   # Support camera bidirectional audio
+  - --socket=wayland      # Support for wayland GUI
+  - --socket=fallback-x11 # Support for x11 fallback (Required by Wayland)
+  - --share=ipc           # Required by x11 (according to flatpak builder)
+  - --device=dri          # Support for hardware acceleration. (Necessary for 4K cameras)
 modules:
   - name: onvifmgr
     buildsystem: simple
@@ -25,9 +26,12 @@ modules:
       - ./configure --enable-libav=yes --with-no-gst-plugin-check --with-appid=io.github.quedale.onvifmgr --prefix=/app --disable-debug
       - make -j$(nproc)
       - make install
+    post-install:
+      # - install -Dm644 deployment/io.github.quedale.onvifmgr.metainfo.xml /app/share/metainfo/io.github.quedale.onvifmgr.metainfo.xml
+      - install -Dm0644 LICENSE -t ${FLATPAK_DEST}/share/licenses/$FLATPAK_ID/my-module                                 # https://docs.flathub.org/docs/for-app-authors/requirements#installing-license-files
+      - install -Dm644 deployment/io.github.quedale.onvifmgr.yml /app/io.github.quedale.onvifmgr.metainfo.yml  # https://docs.flathub.org/docs/for-app-authors/requirements#required-files
       - rm -rf /app/lib/pkgconfig #Cleaning up files not needed at runtime
       - rm -rf /app/include       #Cleaning up files not needed at runtime
-      # - install -Dm644 deployment/io.github.quedale.onvifmgr.metainfo.xml /app/share/metainfo/io.github.quedale.onvifmgr.metainfo.xml
     sources:
       - type: git
         url: https://github.com/Quedale/OnvifDeviceManager.git
