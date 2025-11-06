@@ -45,8 +45,12 @@ AC_SUBST(PKG_FULL_PATH, [$PKG_FFMPEG_PATH:$PKG_PULSE_PATH:$PKG_ALSA_PATH:$PKG_GU
 #Gstreamer core packages normalized
 AC_SUBST(GST_LIBS,m4_normalize('
     gstreamer-1.0
+    gstreamer-base-1.0
     gstreamer-video-1.0
-    gstreamer-wayland-1.0
+    gstreamer-audio-1.0
+    gstreamer-tag-1.0
+    gstreamer-pbutils-1.0
+    gstreamer-rtp-1.0
     alsa
 '))
 
@@ -94,6 +98,21 @@ AC_SUBST(GST_PLUGIN_PACKAGES,m4_normalize('
     gstopus
 '))
 
+AC_ARG_WITH([no-gst-plugin-check],
+  [AS_HELP_STRING([--with-no-plugin-check], [Disable system gstreamer plugin check])],
+  [case "$with_noplgchk" in
+     yes) NOCHECK_ENABLED="yes" ;;
+     no)  NOCHECK_ENABLED="no" ;;
+     *)   NOCHECK_ENABLED="yes"
+          NOCHECK_PREFIX="$with_noplgchk" ;;
+   esac],
+  [NOCHECK_ENABLED="no"])
+
+AC_ARG_WITH([appid],
+  [AS_HELP_STRING([--with-appid], [Override default AppID 'onvifmgr'])],
+  [AC_SUBST([ONVIF_APP_ID], [$with_appid])],
+  [AC_SUBST([ONVIF_APP_ID], [onvifmgr])])
+
 #Function to check gstreamer built under subproject. (.pc file exists for each plugins)
 AC_DEFUN([CHECK_GSTREAMER_PACKAGES],[
     og_pkg_path=$PKG_CONFIG_PATH
@@ -104,54 +123,60 @@ AC_DEFUN([CHECK_GSTREAMER_PACKAGES],[
 
 #Function to search gstreamer system libraries (plugins don't have a .pc file on archlinux)
 AC_DEFUN([CHECK_GSTREAMER_LIBS],[
-    og_libs=$LIBS
-    og_ldflags=$LDFLAGS
-    AC_SUBST([LDFLAGS], ['-L/usr/lib/gstreamer-1.0 -L/usr/local/lib/gstreamer-1.0']) #plugin subfolder isn't actually part of system path
-    AC_SEARCH_LIBS([gst_plugin_alaw_register], [gstalaw],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}alaw "])
-    AC_SEARCH_LIBS([gst_plugin_alsa_register], [gstalsa],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}alsa "])
-    AC_SEARCH_LIBS([gst_plugin_app_register], [gstapp],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}app "])
-    AC_SEARCH_LIBS([gst_plugin_audioconvert_register], [gstaudioconvert],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}audioconvert "])
-    AC_SEARCH_LIBS([gst_plugin_audioparsers_register], [gstaudioparsers],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}audioparsers "])
-    AC_SEARCH_LIBS([gst_plugin_audioresample_register], [gstaudioresample],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}audioresample "])
-    AC_SEARCH_LIBS([gst_plugin_audiotestsrc_register], [gstaudiotestsrc],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}audiotestsrc "])
-    AC_SEARCH_LIBS([gst_plugin_autodetect_register], [gstautodetect],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}autodetect "])
-    AC_SEARCH_LIBS([gst_plugin_coreelements_register], [gstcoreelements],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}coreelements "])
-    #AC_SEARCH_LIBS([gst_plugin_de265_register], [gstde265],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}de265 "])
-    AC_SEARCH_LIBS([gst_plugin_fdkaac_register], [gstfdkaac],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}fdkaac "])
-    AC_SEARCH_LIBS([gst_plugin_gtk_register], [gstgtk],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}gtk "])
-    AC_SEARCH_LIBS([gst_plugin_interlace_register], [gstinterlace],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}interlace "])
-    AC_SEARCH_LIBS([gst_plugin_interleave_register], [gstinterleave],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}interleave "])
-    AC_SEARCH_LIBS([gst_plugin_jpeg_register], [gstjpeg],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}jpeg "])
-    AC_SEARCH_LIBS([gst_plugin_jpegformat_register], [gstjpegformat],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}jpegformat "])
-    AC_SEARCH_LIBS([gst_plugin_level_register], [gstlevel],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}level "])
-    AC_SEARCH_LIBS([gst_plugin_mulaw_register], [gstmulaw],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}mulaw "])
-    AC_SEARCH_LIBS([gst_plugin_opengl_register], [gstopengl],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}opengl "])
-    #AC_SEARCH_LIBS([gst_plugin_openh264_register], [gstopenh264],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}openh264 "])
-    AC_SEARCH_LIBS([gst_plugin_overlaycomposition_register], [gstoverlaycomposition],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}overlaycomposition "])
-    AC_SEARCH_LIBS([gst_plugin_pbtypes_register], [gstpbtypes],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}pbtypes "])
-    AC_SEARCH_LIBS([gst_plugin_playback_register], [gstplayback],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}playback "])
-    AC_SEARCH_LIBS([gst_plugin_pulseaudio_register], [gstpulseaudio],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}pulseaudio "])
-    AC_SEARCH_LIBS([gst_plugin_rawparse_register], [gstrawparse],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}rawparse "])
-    AC_SEARCH_LIBS([gst_plugin_rtsp_register], [gstrtsp],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}rtsp "])
-    AC_SEARCH_LIBS([gst_plugin_rtp_register], [gstrtp],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}rtp "])
-    AC_SEARCH_LIBS([gst_plugin_rtpmanager_register], [gstrtpmanager],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}rtpmanager "])
-    AC_SEARCH_LIBS([gst_plugin_rtponvif_register], [gstrtponvif],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}rtponvif "])
-    AC_SEARCH_LIBS([gst_plugin_tcp_register], [gsttcp],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}tcp "])
-    AC_SEARCH_LIBS([gst_plugin_typefindfunctions_register], [gsttypefindfunctions],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}typefindfunctions "])
-    AC_SEARCH_LIBS([gst_plugin_udp_register], [gstudp],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}udp "])
-    AC_SEARCH_LIBS([gst_plugin_v4l2codecs_register], [gstv4l2codecs],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}v4l2codecs "])
-    AC_SEARCH_LIBS([gst_plugin_video4linux2_register], [gstvideo4linux2],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}video4linux2 "])
-    AC_SEARCH_LIBS([gst_plugin_videoconvertscale_register], [gstvideoconvertscale],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}videoconvertscale "])
-    AC_SEARCH_LIBS([gst_plugin_videoparsersbad_register], [gstvideoparsersbad],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}videoparsersbad "])
-    AC_SEARCH_LIBS([gst_plugin_videorate_register], [gstvideorate],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}videorate "])
-    AC_SEARCH_LIBS([gst_plugin_volume_register], [gstvolume],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}volume "])
-    AC_SEARCH_LIBS([gst_plugin_ximagesink_register], [gstximagesink],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}ximagesink "])
-    AC_SEARCH_LIBS([gst_plugin_opus_register], [gstopus],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}opus "])
-    AC_SEARCH_LIBS([gst_plugin_gtkwayland_register], [gstwaylandsink],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}wayland "])
+    AS_IF([test "x$NOCHECK_ENABLED" = "xyes"],
+    [
+        AC_MSG_NOTICE([Disabled gstreamer plugin check. (Using this may lead to unexpected results.)])
+    ], 
+    [
+        og_libs=$LIBS
+        og_ldflags=$LDFLAGS
+        AC_SUBST([LDFLAGS], ['-L/usr/lib/gstreamer-1.0 -L/usr/local/lib/gstreamer-1.0']) #plugin subfolder isn't actually part of system path
+        AC_SEARCH_LIBS([gst_plugin_alaw_register], [gstalaw],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}alaw "])
+        AC_SEARCH_LIBS([gst_plugin_alsa_register], [gstalsa],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}alsa "])
+        AC_SEARCH_LIBS([gst_plugin_app_register], [gstapp],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}app "])
+        AC_SEARCH_LIBS([gst_plugin_audioconvert_register], [gstaudioconvert],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}audioconvert "])
+        AC_SEARCH_LIBS([gst_plugin_audioparsers_register], [gstaudioparsers],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}audioparsers "])
+        AC_SEARCH_LIBS([gst_plugin_audioresample_register], [gstaudioresample],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}audioresample "])
+        AC_SEARCH_LIBS([gst_plugin_audiotestsrc_register], [gstaudiotestsrc],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}audiotestsrc "])
+        AC_SEARCH_LIBS([gst_plugin_autodetect_register], [gstautodetect],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}autodetect "])
+        AC_SEARCH_LIBS([gst_plugin_coreelements_register], [gstcoreelements],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}coreelements "])
+        #AC_SEARCH_LIBS([gst_plugin_de265_register], [gstde265],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}de265 "])
+        AC_SEARCH_LIBS([gst_plugin_fdkaac_register], [gstfdkaac],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}fdkaac "])
+        AC_SEARCH_LIBS([gst_plugin_gtk_register], [gstgtk],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}gtk "])
+        AC_SEARCH_LIBS([gst_plugin_interlace_register], [gstinterlace],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}interlace "])
+        AC_SEARCH_LIBS([gst_plugin_interleave_register], [gstinterleave],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}interleave "])
+        AC_SEARCH_LIBS([gst_plugin_jpeg_register], [gstjpeg],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}jpeg "])
+        AC_SEARCH_LIBS([gst_plugin_jpegformat_register], [gstjpegformat],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}jpegformat "])
+        AC_SEARCH_LIBS([gst_plugin_level_register], [gstlevel],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}level "])
+        AC_SEARCH_LIBS([gst_plugin_mulaw_register], [gstmulaw],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}mulaw "])
+        AC_SEARCH_LIBS([gst_plugin_opengl_register], [gstopengl],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}opengl "])
+        #AC_SEARCH_LIBS([gst_plugin_openh264_register], [gstopenh264],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}openh264 "])
+        AC_SEARCH_LIBS([gst_plugin_overlaycomposition_register], [gstoverlaycomposition],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}overlaycomposition "])
+        AC_SEARCH_LIBS([gst_plugin_pbtypes_register], [gstpbtypes],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}pbtypes "])
+        AC_SEARCH_LIBS([gst_plugin_playback_register], [gstplayback],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}playback "])
+        AC_SEARCH_LIBS([gst_plugin_pulseaudio_register], [gstpulseaudio],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}pulseaudio "])
+        AC_SEARCH_LIBS([gst_plugin_rawparse_register], [gstrawparse],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}rawparse "])
+        AC_SEARCH_LIBS([gst_plugin_rtsp_register], [gstrtsp],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}rtsp "])
+        AC_SEARCH_LIBS([gst_plugin_rtp_register], [gstrtp],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}rtp "])
+        AC_SEARCH_LIBS([gst_plugin_rtpmanager_register], [gstrtpmanager],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}rtpmanager "])
+        AC_SEARCH_LIBS([gst_plugin_rtponvif_register], [gstrtponvif],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}rtponvif "])
+        AC_SEARCH_LIBS([gst_plugin_tcp_register], [gsttcp],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}tcp "])
+        AC_SEARCH_LIBS([gst_plugin_typefindfunctions_register], [gsttypefindfunctions],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}typefindfunctions "])
+        AC_SEARCH_LIBS([gst_plugin_udp_register], [gstudp],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}udp "])
+        AC_SEARCH_LIBS([gst_plugin_v4l2codecs_register], [gstv4l2codecs],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}v4l2codecs "])
+        AC_SEARCH_LIBS([gst_plugin_video4linux2_register], [gstvideo4linux2],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}video4linux2 "])
+        AC_SEARCH_LIBS([gst_plugin_videoconvertscale_register], [gstvideoconvertscale],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}videoconvertscale "])
+        AC_SEARCH_LIBS([gst_plugin_videoparsersbad_register], [gstvideoparsersbad],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}videoparsersbad "])
+        AC_SEARCH_LIBS([gst_plugin_videorate_register], [gstvideorate],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}videorate "])
+        AC_SEARCH_LIBS([gst_plugin_volume_register], [gstvolume],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}volume "])
+        AC_SEARCH_LIBS([gst_plugin_ximagesink_register], [gstximagesink],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}ximagesink "])
+        AC_SEARCH_LIBS([gst_plugin_opus_register], [gstopus],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}opus "])
+        AC_SEARCH_LIBS([gst_plugin_gtkwayland_register], [gstwaylandsink],[], [GST_PLUGIN_MISSING="${GST_PLUGIN_MISSING}wayland "])
 
-    AS_IF([test -z "$GST_PLUGIN_MISSING"],[],[AC_MSG_RESULT([WARNING: Gstreamer system library missing : $GST_PLUGIN_MISSING])])
-    AC_SUBST([LDFLAGS], [$og_ldflags]) #Restore ldflags
-    LIBS=$og_libs #We handle libs manually. Clear automatically populated libs
+        AS_IF([test -z "$GST_PLUGIN_MISSING"],[],[AC_MSG_RESULT([WARNING: Gstreamer system library missing : $GST_PLUGIN_MISSING])])
+        AC_SUBST([LDFLAGS], [$og_ldflags]) #Restore ldflags
+        LIBS=$og_libs #We handle libs manually. Clear automatically populated libs
+   ])
 ])
 
 AC_DEFUN([SET_GST_STATIC_VARS],[
@@ -182,7 +207,6 @@ AC_ARG_ENABLE(libav,
 AM_CONDITIONAL([LIBAVCOND], [test x$targetlibav = xyes])
 AM_COND_IF([LIBAVCOND],[
     AC_SUBST(EXT_PLGS_LIBAV, gstlibav)
-    AC_SUBST(EXT_PKG_LIBAV, "gstlibav >= 1.14.4")
     AC_SUBST(EXT_CFLAGS_LIBAV, -DENABLELIBAV)
     AC_MSG_RESULT([configure: checking libav enabled... yes]) 
 ],[
@@ -271,11 +295,11 @@ AM_COND_IF([GSTBUILDCOND],[
 AC_SUBST(EXT_CFLAGS, '$(EXT_CFLAGS_LIBAV) $(EXT_CFLAGS_NV)')
 
 #Declare all path for pkg-config to search
-AC_SUBST(PKG_FULL_PATH, [$PKG_PATH:$PKG_GST_PATH:$PKG_FFMPEG_PATH:$PKG_PULSE_PATH:$PKG_ALSA_PATH:$PKG_GUDEV_PATH:$PKG_UDEV_PATH:$PKG_GLIB_PATH:$PKG_V4L2_PATH:$PKG_ONVIF_DISCO_PATH:$PKG_ONVIF_SOAP_PATH:$PKG_CUTILS_PATH:$PKG_OPENSSL_PATH:$PKG_DE265_PATH:$PKG_NTLM_PATH:$PKG_LIBX11_PATH:$PKG_GTK_PATH])
-
+AC_SUBST(PKG_FULL_PATH, [$PKG_PATH:$PKG_GST_PATH:$PKG_FFMPEG_PATH:$PKG_PULSE_PATH:$PKG_ALSA_PATH:$PKG_GUDEV_PATH:$PKG_UDEV_PATH:$PKG_GLIB_PATH:$PKG_V4L2_PATH:$PKG_ONVIF_DISCO_PATH:$PKG_ONVIF_SOAP_PATH:$PKG_CUTILS_PATH:$PKG_OPENSSL_PATH:$PKG_DE265_PATH:$PKG_NTLM_PATH:$PKG_LIBX11_PATH:$PKG_GTK_PATH:$PKG_CONFIG_PATH])
 
 AC_CONFIG_FILES([
     Makefile
+    deployment/io.github.quedale.onvifmgr.desktop
 ])
 
 LT_INIT([shared])

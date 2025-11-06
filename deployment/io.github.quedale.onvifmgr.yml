@@ -1,0 +1,71 @@
+id: io.github.quedale.onvifmgr
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+command: onvifmgr
+build-options:
+  # For some reason, disabling debuginfo spikes the package size considerably
+  # Similarly, using 'Release' build type instead of 'Debug' also increased the size
+  no-debuginfo: true
+finish-args:
+  - --share=network     # ONVIF has network in the name, duh!
+  - --socket=pulseaudio # Support camera bidirectional audio
+  - --socket=wayland    # Support for wayland GUI
+  - --socket=x11        # Support for x11 GUI
+  - --device=dri        # Support for hardware acceleration. (Necessary for 4K cameras)
+modules:
+  - name: onvifmgr
+    buildsystem: simple
+    build-commands:
+      - ./autogen.sh --generate-icons-only
+      - aclocal
+      - libtoolize
+      - autoconf
+      - automake --add-missing
+      - ./configure --enable-libav=yes --with-no-gst-plugin-check --with-appid=io.github.quedale.onvifmgr --prefix=/app --disable-debug
+      - make -j$(nproc)
+      - make install
+      # - install -Dm644 deployment/io.github.quedale.onvifmgr.metainfo.xml /app/share/metainfo/io.github.quedale.onvifmgr.metainfo.xml
+    sources:
+      - type: git
+        url: https://github.com/Quedale/OnvifDeviceManager.git
+        branch: main
+    modules:
+      - name: cutils
+        buildsystem: cmake
+        config-opts:
+          - -DCMAKE_BUILD_TYPE=Release
+        sources:
+          - type: git
+            url: https://github.com/Quedale/CUtils.git
+            branch: main
+      - name: libntlm #Relatively excessive dependency since ONVIF doesn't formally support it. It's just technically possible.
+        buildsystem: autotools
+        config-opts:
+          - --with-openssl=/usr/lib/ssl
+          - --prefix=${FLATPAK_DEST}
+          - --disable-debug
+        sources:
+          - type: archive
+            url: https://download-mirror.savannah.gnu.org/releases/libntlm/libntlm-1.8.tar.gz
+            sha256: ce6569a47a21173ba69c990965f73eb82d9a093eb871f935ab64ee13df47fda1
+      - name: onvifsoap
+        buildsystem: simple
+        build-commands:
+          #gsoap has to be built so that wsdl2h and soapcpp2 are available for OnvifSoapLib/bootstrap.sh
+          - gsoap-src/configure --disable-debug --with-openssl=/usr/lib/ssl --prefix=$(pwd)/dist
+          - make -j$(nproc) install
+          - make distclean
+          - GENERATED_SOURCE_PATH=$(pwd)/generated-src GSOAP_SRC_DIR=$(pwd)/gsoap-src PATH=$(pwd)/dist/bin:$PATH ./bootstrap.sh --skip-dependencies
+          - cmake -DCMAKE_INSTALL_PREFIX=${FLATPAK_DEST} -DGENERATED_SOURCE_PATH=$(pwd)/generated-src -DCMAKE_BUILD_TYPE=Release -DGSOAP_SRC_DIR=$(pwd)/gsoap-src .
+          - make -j$(nproc) install
+        sources:
+          - type: git
+            url: https://github.com/Quedale/OnvifSoapLib.git
+            branch: main
+          - type: archive #Adding gsoap source under onvifsoap module because some source files and binaries are needed
+            url: https://sourceforge.net/projects/gsoap2/files/gsoap_2.8.134.zip/download
+            sha256: 63478e555c0ccde0164f055ff605b02805db0abc6712a04bcb14cb617b047218
+            dest-filename: gsoap_2.8.134.zip
+            archive-type: zip
+            dest: gsoap-src

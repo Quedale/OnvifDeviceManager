@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+
+Name=Onvif Manager
+Comment=Onvif Device Manager for Linux
+Categories=Network;GTK;
+
+Icon=@ONVIF_APP_ID@
+Exec=onvifmgr
+Terminal=false
+
+StartupWMClass=@ONVIF_APP_ID@

@@ -196,7 +196,7 @@ OnvifDetailsPanel__constructed(GObject* object){
     if(klass->createui != NULL)
         klass->createui (ONVIFMGR_DETAILSPANEL(object));
     else
-        C_INFO("No createui virtualmethod");
+        C_INFO("No createui virtualmethod %s",G_OBJECT_TYPE_NAME(object));
 
     G_OBJECT_CLASS (OnvifDetailsPanel__parent_class)->constructed (object);
 }

@@ -4,6 +4,7 @@ ENABLE_LIBAV=0    #Enables building and linking Gstreamer libav plugin.   enable
 ENABLE_NVCODEC=0  #Enables building and linking Gstreamer nvidia pluging. enabled using --enable-nvcodec
 ENABLE_DEBUG=1    #Disables debug build flag.                                   disabled using --no-debug
 NO_DOWNLOAD=0
+GEN_ICONS=0
 WGET_CMD="wget"   #Default wget command. Gets properly initialized later with parameters adequate for its version
 
 #Save current working directory to run configure in
@@ -50,11 +51,29 @@ do
         set -- "$@" "$arg"
     elif [ "$arg" == "--no-download" ]; then
         NO_DOWNLOAD=1
+    elif [ "$arg" == "--generate-icons-only" ]; then
+        GEN_ICONS=1
     else
         set -- "$@" "$arg"
     fi
     i=$((i + 1));
 done
+
+generateIcons(){
+  #Compile small resizer utility
+  gcc -o image-resizer $SCRT_DIR/src/image-resizer.c `pkg-config --cflags --libs gtk+-3.0` | printlines project="imgresizer" task="compile"
+  [ $? -ne 0 ] && printError project="onvifmgr" task="aclocal" msg="Failed to build image-resizer" && exit 1
+
+  #Generate application icons
+  mkdir -p $SCRT_DIR/images/generated_icons/16x16 && ./image-resizer $SCRT_DIR/images/onvifmgr.png $SCRT_DIR/images/generated_icons/16x16/onvifmgr.png 16 16 | printlines project="imgresizer" task="resize"
+  [ $? -ne 0 ] && printError project="imgresizer" task="resize" msg="Failed to create 16x16 icon" && exit 1
+  mkdir -p $SCRT_DIR/images/generated_icons/32x32 && ./image-resizer $SCRT_DIR/images/onvifmgr.png $SCRT_DIR/images/generated_icons/32x32/onvifmgr.png 32 32 | printlines project="imgresizer" task="resize"
+  [ $? -ne 0 ] && printError project="imgresizer" task="resize" msg="Failed to create 32x32 icon" && exit 1
+  mkdir -p $SCRT_DIR/images/generated_icons/64x64 && ./image-resizer $SCRT_DIR/images/onvifmgr.png $SCRT_DIR/images/generated_icons/64x64/onvifmgr.png 64 64 | printlines project="imgresizer" task="resize"
+  [ $? -ne 0 ] && printError project="imgresizer" task="resize" msg="Failed to create 64x64 icon" && exit 1
+  mkdir -p $SCRT_DIR/images/generated_icons/128x128 && ./image-resizer $SCRT_DIR/images/onvifmgr.png $SCRT_DIR/images/generated_icons/128x128/onvifmgr.png 128 128 | printlines project="imgresizer" task="resize"
+  [ $? -ne 0 ] && printError project="imgresizer" task="resize" msg="Failed to create 128x128 icon" && exit 1
+}
 
 #Set debug flag on current project
 [ $ENABLE_DEBUG -eq 1 ] && set -- "$@" "--enable-debug=yes"
@@ -888,6 +907,11 @@ setupPythonVirtualEnv(){
   VENV_SETUP=1
 }
 
+if [ $GEN_ICONS -eq 1 ]; then
+  generateIcons
+  exit 0
+fi
+
 # Hard dependency check
 MISSING_DEP=0
 if [ ! -z "$(progVersionCheck project="make" program='make')" ]; then
@@ -1651,6 +1675,8 @@ if [ $gst_ret != 0 ] || [ $ENABLE_LATEST != 0 ]; then
 else
     printlines project="gstreamer" task="check" msg="found"
 fi
+
+generateIcons
 
 printlines project="onvifmgr" task="build" msg="bootstrap"
 #Change to the project folder to run autoconf and automake
