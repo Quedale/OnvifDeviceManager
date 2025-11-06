@@ -25,6 +25,8 @@ modules:
       - ./configure --enable-libav=yes --with-no-gst-plugin-check --with-appid=io.github.quedale.onvifmgr --prefix=/app --disable-debug
       - make -j$(nproc)
       - make install
+      - rm -rf /app/lib/pkgconfig #Cleaning up files not needed at runtime
+      - rm -rf /app/include       #Cleaning up files not needed at runtime
       # - install -Dm644 deployment/io.github.quedale.onvifmgr.metainfo.xml /app/share/metainfo/io.github.quedale.onvifmgr.metainfo.xml
     sources:
       - type: git
