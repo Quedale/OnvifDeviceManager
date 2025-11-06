@@ -468,7 +468,6 @@ buildMakeProject(){
       "-DCMAKE_BUILD_TYPE=$btype " \
       "-DCMAKE_INSTALL_PREFIX='${prefix}' " \
       "-DENABLE_TESTS=OFF " \
-      "-DENABLE_SHARED=on " \
       "'${cmakedir}'" 2>&1 | printlines project="${project}" task="cmake"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="${project}" task="cmake" msg="failed ${srcdir}"
