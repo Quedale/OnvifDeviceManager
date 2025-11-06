@@ -196,11 +196,11 @@ distclean-local:
 	rm -rf $(top_srcdir)/images/generated_icons
 
 uninstall-hook:
-	rm $(desktopdir)/$(ONVIF_APP_ID).desktop
-	rm $(icon16dir)/$(ONVIF_APP_ID).png
-	rm $(icon32dir)/$(ONVIF_APP_ID).png
-	rm $(icon64dir)/$(ONVIF_APP_ID).png
-	rm $(icon128dir)/$(ONVIF_APP_ID).png
+	rm -f $(desktopdir)/$(ONVIF_APP_ID).desktop
+	rm -f $(icon16dir)/$(ONVIF_APP_ID).png
+	rm -f $(icon32dir)/$(ONVIF_APP_ID).png
+	rm -f $(icon64dir)/$(ONVIF_APP_ID).png
+	rm -f $(icon128dir)/$(ONVIF_APP_ID).png
 
 install-data-hook:
 	@echo "Rename .desktop file to match AppID : $(ONVIF_APP_ID)"
