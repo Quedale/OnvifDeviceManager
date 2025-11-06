@@ -993,6 +993,8 @@ void OnvifApp__dispose(GObject * obj){
         safely_destroy_widget(priv->window);
         priv->window = NULL;
     }
+
+    G_OBJECT_CLASS (OnvifApp__parent_class)->dispose (obj);
 }
 
 static void

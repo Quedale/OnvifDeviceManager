@@ -219,6 +219,29 @@ GST_PLUGIN_STATIC_DECLARE(de265);
 // GST_PLUGIN_STATIC_DECLARE(waylandsink);
 
 #endif
+
+static void 
+set_element_priority(char * element_name, int priority){
+  GstRegistry* plugins_register = gst_registry_get();
+  GstPluginFeature* plugfeat = gst_registry_lookup_feature(plugins_register, element_name);
+
+  if(plugfeat == NULL) {
+      C_WARN("Element '%s' not found.",element_name);
+      return;
+  }
+
+  int rank = gst_plugin_feature_get_rank(plugfeat);
+  if(rank > priority){
+    C_WARN("Found element '%s'. Lowering priority from %d to %d...",element_name,rank,priority);
+    gst_plugin_feature_set_rank(plugfeat, priority);
+  } else if(rank < priority){
+    C_WARN("Found element '%s'. Increasing priority from %d to %d...",element_name,rank,priority);
+    gst_plugin_feature_set_rank(plugfeat, priority);
+  }
+
+  gst_object_unref(plugfeat);
+}
+
 void
 gst_plugin_init_static (void)
 {
@@ -439,6 +462,12 @@ gst_plugin_init_static (void)
     // g_io_openssl_load (NULL);
 #endif
     g_once_init_leave (&initialization_value, 1);
+
+    //Dropping vaapi plugin priority under libav since I can't get it to work properly under flatpak. TODO: Fix this?
+    set_element_priority("vah264dec",GST_RANK_PRIMARY-1);
+    set_element_priority("vah265dec",GST_RANK_PRIMARY-1);
+    set_element_priority("vaav1dec",GST_RANK_PRIMARY-1);
+    
     C_DEBUG("Gstreamer plugins initialized...");
   }
 }

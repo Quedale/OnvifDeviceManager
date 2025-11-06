@@ -10,6 +10,10 @@
 #include <argp.h>
 #include <gdk/gdk.h>
 
+#ifndef ONVIF_APP_ID
+  #define ONVIF_APP_ID "onvifmgr"
+#endif
+
 static struct argp_option options[] = {
     { "loglevel",       'l',    "INT",     0,  "Set the application log level. (Default: 6)", 1},
     { 0 }
@@ -99,10 +103,13 @@ int main(int argc, char *argv[]) {
   /* Initialize GTK */
   gtk_init (&argc, &argv);
 
+  g_set_prgname(ONVIF_APP_ID);
+
   /* Initialize GStreamer */
   gst_init (&argc, &argv);
   
   C_INFO("Onvif Manager Version : %d.%d", ONVIFMGR_VERSION_MAJ, ONVIFMGR_VERSION_MIN);
+  C_INFO("Onvif App ID : "ONVIF_APP_ID);
   C_INFO("Gstreamer Version : %i.%i.%i.%i",GST_PLUGINS_BASE_VERSION_MAJOR,GST_PLUGINS_BASE_VERSION_MINOR,GST_PLUGINS_BASE_VERSION_MICRO,GST_PLUGINS_BASE_VERSION_NANO);
   C_INFO("GTK Version : %d.%d.%d", gtk_get_major_version(), gtk_get_minor_version(), gtk_get_micro_version());
   C_INFO("GLib Version %d.%d.%d", GLIB_MAJOR_VERSION, GLIB_MINOR_VERSION, GLIB_MICRO_VERSION);

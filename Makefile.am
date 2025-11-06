@@ -4,6 +4,20 @@ JOB_FLAG := $(filter -j%, $(subst -j ,-j,$(shell ps T | grep "^\s*$(MAKE_PID).*$
 JOBS     := $(subst -j,,$(JOB_FLAG))
 TAB  := $(NULL)<tab>$(NULL)
 
+icondir = $(datadir)/icons/hicolor
+desktopdir = $(datadir)/applications
+desktop_DATA = deployment/io.github.quedale.onvifmgr.desktop
+EXTRA_DIST = deployment/io.github.quedale.onvifmgr.desktop.in
+
+icon16dir =  $(datadir)/icons/hicolor/16x16/apps
+icon16_DATA = $(top_srcdir)/images/generated_icons/16x16/onvifmgr.png
+icon32dir =  $(datadir)/icons/hicolor/32x32/apps
+icon32_DATA = $(top_srcdir)/images/generated_icons/32x32/onvifmgr.png
+icon64dir =  $(datadir)/icons/hicolor/64x64/apps
+icon64_DATA = $(top_srcdir)/images/generated_icons/64x64/onvifmgr.png
+icon128dir =  $(datadir)/icons/hicolor/128x128/apps
+icon128_DATA = $(top_srcdir)/images/generated_icons/128x128/onvifmgr.png
+
 # Extract list of compiled package
 # GST_PLGS = $(shell ls $(PKG_GST_PATH) | sed -z 's/\.pc\n/ /g;s/,$$/\n/')
 # GST_LIBS = $(shell ls $(PKG_PATH) | sed -z 's/\.pc\n/ /g;s/,$$/\n/')
@@ -171,12 +185,30 @@ deb$(EXEEXT): onvifmgr
 clean-local:
 	@echo "Force clean up actual src directory."
 	find $(top_srcdir)/src -name "*.o" -type f -delete
+	find $(abs_builddir) -name "*.desktop" -type f -delete
 
 distclean-local:
 	@echo "Force clean up actual src directory."
 	find $(top_srcdir)/src -name "*.Po" -type f -delete
 	find $(top_srcdir)/src -name ".dirstamp" -type f -delete
 	find $(top_srcdir)/src -name ".deps" -type d -delete
+	find $(abs_builddir) -name "*.desktop" -type f -delete
+	rm -rf $(top_srcdir)/images/generated_icons
+
+uninstall-hook:
+	rm $(desktopdir)/$(ONVIF_APP_ID).desktop
+	rm $(icon16dir)/$(ONVIF_APP_ID).png
+	rm $(icon32dir)/$(ONVIF_APP_ID).png
+	rm $(icon64dir)/$(ONVIF_APP_ID).png
+	rm $(icon128dir)/$(ONVIF_APP_ID).png
+
+install-data-hook:
+	@echo "Rename .desktop file to match AppID : $(ONVIF_APP_ID)"
+	@cd $(desktopdir); mv io.github.quedale.onvifmgr.desktop $(ONVIF_APP_ID).desktop || echo "Desktop files are identical"
+	@cd $(icon16dir); mv onvifmgr.png $(ONVIF_APP_ID).png || echo "Icon 16x16 files are identical"
+	@cd $(icon32dir); mv onvifmgr.png $(ONVIF_APP_ID).png || echo "Icon 32x32 files are identical"
+	@cd $(icon64dir); mv onvifmgr.png $(ONVIF_APP_ID).png || echo "Icon 64x64 files are identical"
+	@cd $(icon128dir); mv onvifmgr.png $(ONVIF_APP_ID).png || echo "Icon 128x128 files are identical"
 
 paths$(EXEEXT):
 	@echo "PKG_FULL_PATH : $(PKG_FULL_PATH)"
