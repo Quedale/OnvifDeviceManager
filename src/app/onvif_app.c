@@ -11,7 +11,7 @@
 #include "clogger.h"
 #include "gui_utils.h"
 #include "gtkstyledimage.h"
-#include "discoverer.h"
+#include "onvif_discoverer.h"
 #include "onvif_app_shutdown.h"
 
 extern char _binary_tower_png_size[];
@@ -65,7 +65,7 @@ static void OnvifApp__profile_changed_cb (OnvifMgrDeviceRow *device);
 void OnvifApp__cred_dialog_login_cb(OnvifMgrAppDialog * app_dialog, OnvifMgrDeviceRow * device);
 void OnvifApp__cred_dialog_cancel_cb(OnvifMgrAppDialog * app_dialog, OnvifMgrDeviceRow * device);
 static gboolean OnvifApp__discovery_finished_cb (OnvifApp * self);
-static gboolean OnvifApp__disocvery_found_server_cb (DiscoveryEvent * event);
+static gboolean OnvifApp__disocvery_found_server_cb (void * user_data);
 static int OnvifApp__device_already_exist(OnvifApp * app, char * xaddr);
 static void OnvifApp__add_device(OnvifApp * app, OnvifMgrDeviceRow * omgr_device);
 static void OnvifApp__select_device(OnvifApp * app,  GtkListBoxRow * row);
@@ -131,14 +131,17 @@ void _wait_before_retry_stream(QueueEvent * qevt, void * user_data){
     free(user_data);
 }
 
-void _dicovery_found_server_cb (DiscoveryEvent * event) {
+void _dicovery_found_server_cb (OnvifDiscoverer * discoverer, OnvifProbeMatches * probematches, OnvifApp * app) {
     C_TRACE("_dicovery_found_server_cb");
-    OnvifApp * app = (OnvifApp *) event->data;
     if(!COwnableObject__has_owner(COWNABLE_OBJECT(app))){
         return;
     }
     
-    gdk_threads_add_idle(G_SOURCE_FUNC(OnvifApp__disocvery_found_server_cb),event);
+    void ** gui_data = malloc(sizeof(void*)*2);
+    gui_data[0] = app;
+    gui_data[1] = probematches;
+    g_object_ref(probematches);
+    gdk_threads_add_idle(G_SOURCE_FUNC(OnvifApp__disocvery_found_server_cb),gui_data);
 }
 
 void _start_onvif_discovery(QueueEvent * qevt, void * user_data){
@@ -150,11 +153,13 @@ void _start_onvif_discovery(QueueEvent * qevt, void * user_data){
     
     OnvifAppPrivate *priv = OnvifApp__get_instance_private (self);
     //Start UDP Scan
-    struct UdpDiscoverer discoverer = UdpDiscoverer__create(_dicovery_found_server_cb);
-    UdpDiscoverer__start(&discoverer, self, AppSettingsDiscovery__get_repeat(priv->settings->discovery), AppSettingsDiscovery__get_timeout(priv->settings->discovery));
+    OnvifDiscoverer * discoverer = OnvifDiscoverer__new(AppSettingsDiscovery__get_repeat(priv->settings->discovery), AppSettingsDiscovery__get_timeout(priv->settings->discovery));
+    g_signal_connect(discoverer,"probe-match",G_CALLBACK(_dicovery_found_server_cb),self);
+    OnvifDiscoverer__start(discoverer);
     //TODO Support discovery cancel? (No way to cancel it as of right now)
     g_object_ref(self);
     gdk_threads_add_idle(G_SOURCE_FUNC(OnvifApp__discovery_finished_cb),self);
+    g_object_unref(discoverer);
 }
 
 void _display_onvif_device(QueueEvent * qevt, void * user_data){
@@ -397,28 +402,30 @@ exit:
 }
 
 
-static gboolean OnvifApp__disocvery_found_server_cb (DiscoveryEvent * event) {
+static gboolean OnvifApp__disocvery_found_server_cb (void * user_data) {
+    void ** gui_data = (void **) user_data;
+    OnvifApp * app = ONVIFMGR_APP(gui_data[0]);
+    OnvifProbeMatches * probematches = ONVIF_PROBEMATCHES(gui_data[1]);
+
     C_TRACE("OnvifApp__found_server_cb");
-    DiscoveredServer * server = event->server;
-    OnvifApp * app = (OnvifApp *) event->data;
     if(!COwnableObject__has_owner(COWNABLE_OBJECT(app))){
         goto exit;
     }
 
     ProbMatch * m;
     int i;
-  
-    C_INFO("Found server - Match count : %i\n",server->matches->match_count);
-    for (i = 0 ; i < server->matches->match_count ; ++i) {
-        m = server->matches->matches[i];
+    int match_count = OnvifProbeMatches__get_count(probematches);
+    C_INFO("Found server - Match count : %i\n",match_count);
+    for (i = 0 ; i < match_count ; ++i) {
+        m = OnvifProbeMatches__get_matches(probematches)[i];
         if(!OnvifApp__device_already_exist(app,m->addrs[0])){
             gchar * addr_dup = g_strdup(m->addrs[0]);
             OnvifDevice * onvif_dev = OnvifDevice__new(addr_dup);
             free(addr_dup);
             
-            char * name = onvif_extract_scope("name",m);
-            char * hardware = onvif_extract_scope("hardware",m);
-            char * location = onvif_extract_scope("location",m);
+            char * name = ProbMatch__extract_scope("name",m);
+            char * hardware = ProbMatch__extract_scope("hardware",m);
+            char * location = ProbMatch__extract_scope("location",m);
             
             GtkWidget * omgr_device = OnvifMgrDeviceRow__new(app,onvif_dev,name,hardware,location);
             OnvifApp__add_device(app,ONVIFMGR_DEVICEROW(omgr_device));
@@ -429,7 +436,8 @@ static gboolean OnvifApp__disocvery_found_server_cb (DiscoveryEvent * event) {
     }
 
 exit:
-    CObject__destroy((CObject*)event);
+    g_object_unref(probematches);
+    free(gui_data);
     return FALSE;
 }
 
