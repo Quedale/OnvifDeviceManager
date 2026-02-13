@@ -865,8 +865,8 @@ setupPythonVirtualEnv(){
     VENV_EXEC="virtualenv"
   fi
 
-  #Setting up Virtual Python environment
-  if [ ! -f "./venvfolder/bin/activate" ]; then
+  # Setting up Virtual Python environment
+  if [ ! -f "./venvfolder/bin/activate" ] && [ ! -f "./venvfolder/local/bin/activate" ]; then
     $VENV_EXEC ./venvfolder 2>&1 | printlines project="virtualenv" task="setup"
     if [ "${PIPESTATUS[0]}" -ne 0 ]; then
       printError project="virtualenv" task="setup" msg="failed to run python3 virtualenv.pyz"
@@ -876,12 +876,20 @@ setupPythonVirtualEnv(){
     printlines project="virtualenv" task="check" msg="found"
   fi
 
-  #Activate virtual environment
-  if [[ ! -f "venvfolder/bin/activate" ]]; then
+  # Activate virtual environment
+  ACTIVATE=""
+
+  if [ -f "./venvfolder/bin/activate" ]; then
+    ACTIVATE="./venvfolder/bin/activate"
+  elif [ -f "./venvfolder/local/bin/activate" ]; then
+    ACTIVATE="./venvfolder/local/bin/activate"
+  fi
+
+  if [ -z "$ACTIVATE" ]; then
     printError project="virtualenv" task="activate" msg="failed to activate python virtual environment."
     exit 1;
   else
-    source venvfolder/bin/activate 
+    source "$ACTIVATE"
     printlines project="virtualenv" task="activate" msg="activated python virtual environment."
   fi
 
