@@ -23,6 +23,7 @@ typedef struct {
     GtkWidget * mac_lbl;
     GtkWidget * version_lbl;
     GtkWidget * uri_lbl;
+    GtkWidget * feed_url_lbl;
 } OnvifInfoPanelPrivate;
 
 
@@ -40,6 +41,7 @@ typedef struct {
     char ** macs;
     char * version;
     char * uri;
+    char * feed_url;
 } InfoGUIUpdate;
 
 G_DEFINE_TYPE_WITH_PRIVATE(OnvifInfoPanel, OnvifInfoPanel_, ONVIFMGR_TYPE_DETAILSPANEL)
@@ -76,6 +78,8 @@ OnvifInfoPanel__createui(OnvifDetailsPanel * panel){
     priv->version_lbl = add_label_entry(grid,i++,"ONVIF Version : ");
 
     priv->uri_lbl = add_label_entry(grid,i++,"URI : ");
+
+    priv->feed_url_lbl = add_label_entry(grid,i++,"Feed URL : ");
 
     gtk_container_add(GTK_CONTAINER(self),grid);
 }
@@ -137,6 +141,9 @@ OnvifInfoPanel__updateui (OnvifDetailsPanel * self, OnvifApp * app, OnvifMgrDevi
     if(update->uri) gtk_entry_set_text(GTK_ENTRY(priv->uri_lbl),update->uri);
     gtk_editable_set_editable  ((GtkEditable*)priv->uri_lbl, FALSE);
 
+    if(update->feed_url) gtk_entry_set_text(GTK_ENTRY(priv->feed_url_lbl),update->feed_url);
+    gtk_editable_set_editable  ((GtkEditable*)priv->feed_url_lbl, FALSE);
+
     free(update->name);
     free(update->hostname);
     free(update->location);
@@ -152,6 +159,7 @@ OnvifInfoPanel__updateui (OnvifDetailsPanel * self, OnvifApp * app, OnvifMgrDevi
     free(update->macs);
     free(update->version);
     free(update->uri);
+    free(update->feed_url);
     free(update);
 }
 
@@ -197,6 +205,7 @@ OnvifInfoPanel__getdata(OnvifDetailsPanel * self, OnvifApp * app, OnvifMgrDevice
     gui_update = malloc(sizeof(InfoGUIUpdate));
     gui_update->mac_count = 0;
     gui_update->macs= NULL;
+    gui_update->feed_url = NULL;
 
     //GetHostname fault handling
     SoapFault * fault = SoapObject__get_fault(SOAP_OBJECT(hostname));
@@ -314,6 +323,21 @@ OnvifInfoPanel__getdata(OnvifDetailsPanel * self, OnvifApp * app, OnvifMgrDevice
     }
 
     gui_update->uri = OnvifBaseService__get_endpoint(ONVIF_BASE_SERVICE(devserv));
+
+    OnvifMediaProfile * profile = OnvifMgrDeviceRow__get_profile(device);
+    OnvifUri * media_uri = OnvifMediaService__getStreamUri(OnvifDevice__get_media_service(onvif_device),(profile) ? OnvifMediaProfile__get_index(profile) : 0);
+    if(media_uri){
+        SoapFault * media_fault = SoapObject__get_fault(SOAP_OBJECT(media_uri));
+        if(*media_fault == SOAP_FAULT_NONE) {
+            cstring_safe_copy(&gui_update->feed_url, OnvifUri__get_uri(media_uri), NULL);
+        } else {
+            cstring_safe_copy(&gui_update->feed_url, "Error retrieving feed URL", NULL);
+        }
+        g_object_unref(media_uri);
+    } else {
+        cstring_safe_copy(&gui_update->feed_url, "Error retrieving feed URL", NULL);
+    }
+
 exit:
     if(hostname)
         g_object_unref(hostname);
@@ -368,6 +392,9 @@ OnvifInfoPanel_clearui(OnvifDetailsPanel * panel){
 
     gtk_entry_set_text(GTK_ENTRY(priv->uri_lbl),"");
     gtk_editable_set_editable  ((GtkEditable*)priv->uri_lbl, FALSE);
+
+    gtk_entry_set_text(GTK_ENTRY(priv->feed_url_lbl),"");
+    gtk_editable_set_editable  ((GtkEditable*)priv->feed_url_lbl, FALSE);
 }
 
 static void
