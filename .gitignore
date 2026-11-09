@@ -31,3 +31,5 @@ onvifmgr_settings.ini
 onvifmgr_*/*
 repo
 images/generated_icons
+.flatpak-builder/
+builddir/
