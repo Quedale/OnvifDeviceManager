@@ -1049,6 +1049,12 @@ setupPythonVirtualEnv
 #   buildMesonProject project="gtk" srcdir="gtk" prefix="$SUBPROJECT_DIR/gtk/dist" mesonargs="-Dtests=false -Dintrospection=false -Ddemos=false -Dexamples=false -Dlibepoxy:tests=false"
 # fi
 
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/libxml2/dist/lib/pkgconfig":$PKG_CONFIG_PATH
+if [ ! -z "$(pkgCheck project="libxml2" name=libxml-2.0 minver=2.15.4)" ]; then
+  pullOrClone project="libxml2" path="https://github.com/GNOME/libxml2.git" tag="v2.15.4"
+  buildMesonProject project="libxml2" srcdir="libxml2" prefix="$SUBPROJECT_DIR/libxml2/dist" mesonargs=""
+fi
+
 ################################################################
 # 
 #    Build Openssl for gsoap and onvifsoap
@@ -1073,11 +1079,11 @@ fi
 #   sudo apt-get install libglib2.0-dev (gstreamer minimum 2.64.0)
 # 
 ################################################################
-export PATH="$SUBPROJECT_DIR/glib-2.85.2/dist/bin":$PATH
-export PKG_CONFIG_PATH="$SUBPROJECT_DIR/glib-2.85.2/dist/lib/pkgconfig":$PKG_CONFIG_PATH
+export PATH="$SUBPROJECT_DIR/glib-2.90.1/dist/bin":$PATH
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/glib-2.90.1/dist/lib/pkgconfig":$PKG_CONFIG_PATH
 if [ ! -z "$(pkgCheck project="glib" name=glib-2.0 minver=2.64.0)" ] || [ ! -z "$(progVersionCheck project="glib-mkenums" program=glib-mkenums)" ]; then
-  downloadAndExtract project="glib" file="glib-2.85.2.tar.xz" path="https://download.gnome.org/sources/glib/2.85/glib-2.85.2.tar.xz"
-  buildMesonProject project="glib" srcdir="glib-2.85.2" prefix="$SUBPROJECT_DIR/glib-2.85.2/dist" mesonargs="-Dsysprof=disabled -Dpcre2:test=false -Dpcre2:grep=false -Dxattr=false -Db_lundef=false -Dtests=false -Dglib_debug=disabled -Dglib_assert=false -Dglib_checks=false"
+  downloadAndExtract project="glib" file="glib-2.90.1.tar.xz" path="https://download.gnome.org/sources/glib/2.90/glib-2.90.1.tar.xz"
+  buildMesonProject project="glib" srcdir="glib-2.90.1" prefix="$SUBPROJECT_DIR/glib-2.90.1/dist" mesonargs="-Dsysprof=disabled -Dpcre2:test=false -Dpcre2:grep=false -Dxattr=false -Db_lundef=false -Dtests=false -Dglib_debug=disabled -Dglib_assert=false -Dglib_checks=false"
 fi
 
 ################################################################
@@ -1099,10 +1105,11 @@ if [ $rebuild != 0 ]; then
   buildMakeProject project="cutils" srcdir="CUtils" prefix="$SUBPROJECT_DIR/CUtils/build/dist" cmakedir=".." outoftree=true cmakeclean=true
 fi
 
-export PKG_CONFIG_PATH="$SUBPROJECT_DIR/libntlm-1.8/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/libntlm/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
 if [ ! -z "$(pkgCheck project="libntlm" name=libntlm minver=v1.5)" ]; then
-  downloadAndExtract project="libntlm" file="libntlm-1.8.tar.gz" path="https://download-mirror.savannah.gnu.org/releases/libntlm/libntlm-1.8.tar.gz"
-  buildMakeProject project="libntlm" srcdir="libntlm-1.8" skipbootstrap="true" prefix="$SUBPROJECT_DIR/libntlm-1.8/build/dist" configure="--enable-shared=no" #TODO support shared linking
+  #downloadAndExtract project="libntlm" file="libntlm-1.8.tar.gz" path="https://download-mirror.savannah.gnu.org/releases/libntlm/libntlm-1.8.tar.gz"
+  pullOrClone project="cutils" path="https://gitlab.com/gsasl/libntlm" ignorecache="true" tag=v1.8
+  buildMakeProject project="libntlm" srcdir="libntlm" prefix="$SUBPROJECT_DIR/libntlm/build/dist" configure="--enable-shared=no" #TODO support shared linking
 fi
 
 ################################################################
@@ -1125,7 +1132,7 @@ if [ $rebuild != 0 ]; then
     buildMakeProject project="zlib" srcdir="zlib-1.2.13" prefix="$SUBPROJECT_DIR/zlib-1.2.13/build/dist"
   fi
 
-  gsoap_version=2.8.134
+  gsoap_version=2.8.147
   if [ ! -z "$(pkgCheck project="gsoap" name=gsoap minver=$gsoap_version)" ]; then
     SSL_PREFIX=$(pkg-config --variable=prefix openssl)
     if [ "$SSL_PREFIX" != "/usr" ]; then
@@ -1224,7 +1231,7 @@ fi
 export PKG_CONFIG_PATH="$SUBPROJECT_DIR/FFmpeg/dist/lib/pkgconfig":$PKG_CONFIG_PATH
 
 gst_ret=0
-GSTREAMER_LATEST=1.27.2
+GSTREAMER_LATEST=1.28.9
 if [ $ENABLE_LATEST == 0 ]; then
   GSTREAMER_VERSION=1.14.4
 else
