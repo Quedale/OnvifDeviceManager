@@ -66,15 +66,15 @@ generateIcons(){
 
   #Generate application icons
   mkdir -p $SCRT_DIR/images/generated_icons/16x16 && ./image-resizer $SCRT_DIR/images/onvifmgr.png $SCRT_DIR/images/generated_icons/16x16/onvifmgr.png 16 16 | printlines project="imgresizer" task="resize"
-  [ $? -ne 0 ] && printError project="imgresizer" task="resize" msg="Failed to create 16x16 icon" && exit 1
+  [ "${PIPESTATUS[0]}" -ne 0 ] && printError project="imgresizer" task="resize" msg="Failed to create 16x16 icon" && exit 1
   mkdir -p $SCRT_DIR/images/generated_icons/32x32 && ./image-resizer $SCRT_DIR/images/onvifmgr.png $SCRT_DIR/images/generated_icons/32x32/onvifmgr.png 32 32 | printlines project="imgresizer" task="resize"
-  [ $? -ne 0 ] && printError project="imgresizer" task="resize" msg="Failed to create 32x32 icon" && exit 1
+  [ "${PIPESTATUS[0]}" -ne 0 ] && printError project="imgresizer" task="resize" msg="Failed to create 32x32 icon" && exit 1
   mkdir -p $SCRT_DIR/images/generated_icons/64x64 && ./image-resizer $SCRT_DIR/images/onvifmgr.png $SCRT_DIR/images/generated_icons/64x64/onvifmgr.png 64 64 | printlines project="imgresizer" task="resize"
-  [ $? -ne 0 ] && printError project="imgresizer" task="resize" msg="Failed to create 64x64 icon" && exit 1
+  [ "${PIPESTATUS[0]}" -ne 0 ] && printError project="imgresizer" task="resize" msg="Failed to create 64x64 icon" && exit 1
   mkdir -p $SCRT_DIR/images/generated_icons/128x128 && ./image-resizer $SCRT_DIR/images/onvifmgr.png $SCRT_DIR/images/generated_icons/128x128/onvifmgr.png 128 128 | printlines project="imgresizer" task="resize"
-  [ $? -ne 0 ] && printError project="imgresizer" task="resize" msg="Failed to create 128x128 icon" && exit 1
+  [ "${PIPESTATUS[0]}" -ne 0 ] && printError project="imgresizer" task="resize" msg="Failed to create 128x128 icon" && exit 1
   mkdir -p $SCRT_DIR/images/generated_icons/256x256 && ./image-resizer $SCRT_DIR/images/onvifmgr.png $SCRT_DIR/images/generated_icons/256x256/onvifmgr.png 256 256 | printlines project="imgresizer" task="resize"
-  [ $? -ne 0 ] && printError project="imgresizer" task="resize" msg="Failed to create 256x256 icon" && exit 1
+  [ "${PIPESTATUS[0]}" -ne 0 ] && printError project="imgresizer" task="resize" msg="Failed to create 256x256 icon" && exit 1
 }
 
 #Set debug flag on current project
