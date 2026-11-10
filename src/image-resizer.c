@@ -23,20 +23,26 @@ int main(int argc, char **argv) {
     g_print("Output size : %dx%d\n", out_width,out_height);
 
     if(out_width <= 0 || out_height <= 0){
-        g_printerr("Invalid side provided : %dx%d", out_width, out_height);
+        g_print("Invalid side provided : %dx%d", out_width, out_height);
         return 1;
     }
 
-    pixbuf = gdk_pixbuf_new_from_file(src_path, NULL);
+    pixbuf = gdk_pixbuf_new_from_file(src_path, &error);
     if (pixbuf == NULL) {
-        g_printerr("Failed to load image: %s\n", src_path);
+        if(error){
+            g_print("%s\n",error->message);
+            g_error_free(error);
+        } else {
+            g_print("Failed to load image: %s\n", src_path);
+        }
+ 
         return 1;
     }
 
     scaled_pixbuf = gdk_pixbuf_scale_simple(pixbuf, out_width, out_height, GDK_INTERP_BILINEAR);
     
     if (!gdk_pixbuf_save(scaled_pixbuf, out_path, "png", &error, NULL)) {
-        g_printerr("Error saving pixbuf: %s\n", error->message);
+        g_print("Error saving pixbuf: %s\n", error->message);
         g_error_free(error);
     }
 
