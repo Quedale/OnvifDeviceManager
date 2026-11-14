@@ -408,6 +408,7 @@ buildMakeProject(){
     cd "${srcdir}/build"
     rel_path=".."
   else
+    mkdir -p "${srcdir}"
     cd "${srcdir}"
     rel_path="."
   fi
@@ -1105,11 +1106,11 @@ if [ $rebuild != 0 ]; then
   buildMakeProject project="cutils" srcdir="CUtils" prefix="$SUBPROJECT_DIR/CUtils/build/dist" cmakedir=".." outoftree=true cmakeclean=true
 fi
 
-export PKG_CONFIG_PATH="$SUBPROJECT_DIR/libntlm/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
+export PKG_CONFIG_PATH="$SUBPROJECT_DIR/libntlm-1.8/build/dist/lib/pkgconfig":$PKG_CONFIG_PATH
 if [ ! -z "$(pkgCheck project="libntlm" name=libntlm minver=v1.5)" ]; then
-  #downloadAndExtract project="libntlm" file="libntlm-1.8.tar.gz" path="https://download-mirror.savannah.gnu.org/releases/libntlm/libntlm-1.8.tar.gz"
-  pullOrClone project="cutils" path="https://gitlab.com/gsasl/libntlm" ignorecache="true" tag=v1.8
-  buildMakeProject project="libntlm" srcdir="libntlm" prefix="$SUBPROJECT_DIR/libntlm/build/dist" configure="--enable-shared=no" #TODO support shared linking
+  downloadAndExtract project="libntlm" file="libntlm-1.8.tar.gz" path="https://download-mirror.savannah.gnu.org/releases/libntlm/libntlm-1.8.tar.gz"
+  # pullOrClone project="cutils" path="https://gitlab.com/gsasl/libntlm" ignorecache="true" tag=v1.8
+  buildMakeProject project="libntlm" srcdir="libntlm-1.8" prefix="$SUBPROJECT_DIR/libntlm-1.8/build/dist" configure="--enable-shared=no" skipbootstrap=true #TODO support shared linking
 fi
 
 ################################################################

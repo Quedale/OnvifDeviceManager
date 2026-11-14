@@ -12,7 +12,7 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Vew RTSP Stream with backchannel (Push-to-talk)
 - Prototype Soundlevel indicator
 - Support system and static libraries. (static recommended)
-- Support Multiple ONVIF Profiles
+- Support Multiple ONVIF Media Profiles
 - Tested H264, H265 and MJPEG stream up to 4K
 - Logging framework
 - HTTP authentication challenge (Basic, Digest and NTLM)
@@ -44,7 +44,7 @@ The goal of this project is to implement a Onvif Device Manager similar to the w
 - Merit LILIN (PSR5024EX30 & SR7424/8)
 - Reolink (RLC-820A)
 - Imou (Ranger 2C)
-- D-Link (Tapo C200)
+- TP-Link (Tapo C200)
 - [Yi-Hack Allwinner V2](https://github.com/roleoroleo/yi-hack-Allwinner-v2) (Pro 2K Home)
 
 # How to build - Option 1 : Flatpak
